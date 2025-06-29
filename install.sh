@@ -52,12 +52,6 @@ main() {
     # Check if commands directory already exists
     if [ -d "$INSTALL_DIR" ]; then
         print_warning "Commands directory already exists at $INSTALL_DIR"
-        read -p "Do you want to overwrite it? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_status "Installation cancelled."
-            exit 0
-        fi
         print_status "Backing up existing commands to ${INSTALL_DIR}.backup"
         mv "$INSTALL_DIR" "${INSTALL_DIR}.backup"
     fi
