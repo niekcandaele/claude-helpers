@@ -2,7 +2,7 @@
 
 ## Goal
 
-To guide you through implementing a feature by working through ALL tasks systematically, with continuous testing and proper error handling, until completion or encountering unresolvable blockers.
+To guide you through implementing a feature by working through tasks one at a time, with user approval between each task.
 
 ## Input
 
@@ -10,16 +10,11 @@ Task list file reference: $ARGUMENTS (e.g., `tasks/tasks-prd-user-profile-editin
 
 ## Task Implementation Rules
 
-- **Continuous execution:** Continue working through ALL tasks WITHOUT stopping for permission between tasks
-- **Stop only when:**
-  - All tasks are completed successfully
-  - Encountering the same error 3+ times despite different approaches
-  - A blocker prevents any forward progress
-  - Explicit user intervention is needed (e.g., API keys, credentials)
+- **One sub-task at a time:** Do **NOT** start the next sub‑task until you ask the user for permission and they say "yes" or "y"
 - **Completion protocol:**  
   1. When you finish a **sub‑task**, immediately mark it as completed by changing `[ ]` to `[x]`.  
-  2. If **all** subtasks underneath a parent task are now `[x]`, also mark the **parent task** as completed.
-- **Testing requirement:** After EVERY sub-task, run appropriate tests/builds to verify the implementation works correctly
+  2. If **all** subtasks underneath a parent task are now `[x]`, also mark the **parent task** as completed.  
+- Stop after each sub‑task and wait for the user's go‑ahead.
 
 ## Task List Maintenance
 
@@ -50,61 +45,34 @@ Before beginning task implementation, ask the user to choose their preferred exe
 
 ## Process
 
-1. **Initial Setup:**
-   - Read the task list file and any existing research documentation
-   - Detect project type (Node.js, Python, Docker, etc.) from files
-   - Check for existing CLAUDE.md for project-specific commands
-   - Ask execution mode preference (parallel vs sequential)
-
-2. **Research Phase (if not already done):**
-   - Check `tasks/research/[feature]/` for existing documentation
-   - If missing, perform thorough research using:
-     - Context7 for library documentation
-     - Web search for latest patterns and best practices
-     - MCP resources for additional information
-   - Save ALL findings to markdown files in research directory
-
-3. **Continuous Task Execution:**
-   - Identify next available task(s) with satisfied dependencies
-   - For each task:
-     a. Read relevant research documentation
-     b. Implement the functionality
-     c. Run immediate tests/verification
-     d. If tests fail, debug and fix (up to 3 attempts)
-     e. Update task list and relevant files
-     f. Continue to next task WITHOUT asking permission
-
-4. **Testing After Every Task:**
-   - Run project-specific build command
-   - Execute test suite
-   - For Docker projects: check container health
-   - For web apps: use Playwright to verify UI
-   - For APIs: test endpoints
-   - Document any new test commands in CLAUDE.md
-
-5. **Error Handling:**
-   - On test failure: Debug and retry (max 3 attempts)
-   - Document errors in `tasks/errors-log.md`
-   - If stuck after 3 attempts, move to next independent task
-   - Return to blocked tasks after completing others
-
-6. **Progress Reporting:**
-   - Provide concise updates after each task completion
-   - Show test results summary
-   - Continue immediately without waiting for approval
+1. **Read Task List:** Load and analyze the specified task list file
+2. **Ask Execution Mode:** Present the parallel vs sequential choice to the user
+3. **Identify Next Task(s):** 
+   - **Sequential Mode:** Find the first incomplete sub-task (marked with `[ ]`) that has all its dependencies satisfied
+   - **Parallel Mode:** Find ALL incomplete sub-tasks that have all their dependencies satisfied
+   - Check for `[depends on: X.Y]` notation
+   - Verify all referenced dependencies are marked `[x]`
+   - Skip tasks with incomplete dependencies
+4. **Implement Task(s):** 
+   - **Sequential Mode:** Work on the specific sub-task
+   - **Parallel Mode:** Launch sub-agents for each independent task
+   - Follow best practices:
+     - Understand existing codebase patterns before making changes
+     - Follow project conventions and coding standards
+     - Write tests when applicable
+     - Ensure code quality and security
+5. **Update Task List:** Mark completed sub-task(s) as `[x]` and update relevant files section
+6. **Request Permission:** Ask user for permission to continue to next sub-task(s)
+7. **Repeat:** Continue with next batch of tasks only after user approval
 
 ## Important Guidelines
 
-- **Research First:** Always check research docs before implementing
-- **Test Continuously:** Run tests after EVERY sub-task, not just at the end
-- **Don't Stop:** Keep working until all tasks are done or truly blocked
-- **Document Everything:** Save research findings, test commands, and errors
-- **Project Detection:** Identify and use project-specific commands:
-  - Node.js: `npm test`, `npm run build`, `npm run lint`
-  - Python: `pytest`, `python -m build`, `ruff`
-  - Docker: `docker compose build`, `docker compose up`, check logs
-  - Use Playwright for UI testing when applicable
-- **Update CLAUDE.md:** Add discovered test/build commands for future sessions
+- **Before starting work:** Check which sub‑task is next by examining the task list and verifying all dependencies are satisfied
+- **After implementing a sub‑task:** Update the task list file and pause for user approval
+- **When all sub-tasks under a parent are complete:** Mark the parent task as `[x]` as well
+- **If you discover new tasks:** Add them to the task list in the appropriate location
+- **For file modifications:** Always read existing files first to understand patterns and conventions
+- **For testing:** Run appropriate test commands (e.g., `npx jest`) to verify implementations
 
 ## Dependency Checking
 
@@ -122,17 +90,13 @@ Before starting any task:
 ## Task Completion Protocol
 
 1. Complete the implementation for one sub-task
-2. **Immediate Testing:**
-   - Run build/compilation
-   - Execute relevant tests
-   - Verify functionality works as expected
-3. Update the task list file:
+2. Update the task list file:
    - Change `[ ]` to `[x]` for the completed sub-task
    - Update "Relevant Files" section if new files were created/modified
    - Mark parent task `[x]` if all its sub-tasks are now complete
-4. Save the updated task list file
-5. **Report progress briefly:** "✓ Task [X.Y] completed and tested. Moving to next task..."
-6. **Continue immediately** to the next available task
+3. Save the updated task list file
+4. Ask user: "Sub-task [X.Y] completed. Ready for the next sub-task? (yes/y to continue)"
+5. Wait for user confirmation before proceeding
 
 ## Error Handling
 
@@ -146,36 +110,8 @@ Before starting any task:
 ## Instructions
 
 1. Read the task list file specified in $ARGUMENTS
-2. Check for existing research documentation in `tasks/research/[feature]/`
-3. Ask user for execution mode preference (parallel/sequential)
-4. Begin continuous execution:
-   - Work through ALL tasks without stopping
-   - Test after every implementation
-   - Handle errors gracefully
-   - Save important findings to documentation
-5. Only stop when:
-   - All tasks are complete
-   - Encountering unresolvable blockers
-   - User explicitly asks to stop
-
-## Resilience Protocol
-
-When encountering errors:
-1. First attempt: Debug and fix the immediate issue
-2. Second attempt: Try alternative approach
-3. Third attempt: Research the error online and in documentation
-4. If still failing:
-   - Document the blocker in `tasks/errors-log.md`
-   - Skip to next independent task
-   - Return to blocked tasks after completing others
-
-## Research Persistence
-
-ALL research findings MUST be saved to files:
-- `tasks/research/[feature]/libraries.md` - Library APIs and usage
-- `tasks/research/[feature]/patterns.md` - Code examples and patterns
-- `tasks/research/[feature]/dependencies.md` - Package versions and setup
-- `tasks/research/[feature]/testing-strategy.md` - Test commands and approach
-- `tasks/errors-log.md` - Errors encountered and solutions
-
-This ensures knowledge persists across Claude sessions.
+2. Find the first incomplete sub-task with all dependencies satisfied
+3. If a task has dependencies, verify they are complete before proceeding
+4. Implement the task following the completion protocol
+5. Update the task list and request user permission before continuing
+6. Only work on one sub-task at a time with user approval between each
