@@ -8,13 +8,27 @@ These commands provide a structured approach to feature development:
 1. **Create PRD** - Generate a Product Requirements Document from user input
 2. **Generate Tasks** - Convert a PRD into an actionable task list
 3. **Process Tasks** - Execute tasks systematically with progress tracking
+4. **Commit and Push** - Run quality checks, commit with good message, and push to remote
 
 ## Installation
+
+### Automatic Install (Recommended)
 
 Run this one-liner to download and install all commands:
 
 ```bash
-mkdir -p ~/.claude/commands && curl -s https://raw.githubusercontent.com/niekcandaele/claude-helpers/master/commands/{create-prd.md,generate-tasks.md,process-tasks.md} -o ~/.claude/commands/#1
+curl -sSL https://raw.githubusercontent.com/niekcandaele/claude-helpers/main/install.sh | bash
+```
+
+### Manual Install
+
+If you prefer to install manually:
+
+```bash
+# Download and extract commands folder
+curl -L https://github.com/niekcandaele/claude-helpers/archive/main.tar.gz | tar -xz --strip-components=1 claude-helpers-main/commands
+# Move to Claude Code commands directory
+mkdir -p ~/.claude && mv commands ~/.claude/
 ```
 
 ## Commands
@@ -87,9 +101,37 @@ Executes tasks from a task list with progress tracking.
 /process-tasks tasks/tasks-prd-user-profile-editing.md
 ```
 
+### 4. Commit and Push (`/commit-and-push`)
+
+Automatically runs quality checks, creates a clean commit, and pushes to remote.
+
+**Usage:**
+```
+/commit-and-push
+```
+
+**What it does:**
+- Analyzes repository to discover available linting, formatting, and build tools
+- Runs quality checks in optimal order (format → lint → typecheck → build)
+- Stages all changes for commit
+- Generates descriptive commit message based on changes
+- Creates commit with proper Claude Code attribution
+- Pushes to remote origin
+
+**Features:**
+- Dynamic tool discovery (works with any project type)
+- Supports npm scripts, Makefile targets, and direct tool invocation
+- Stops if any quality check fails
+- Handles common git errors gracefully
+
+**Example:**
+```
+/commit-and-push
+```
+
 ## Complete Workflow Example
 
-Here's how to use all three commands together:
+Here's how to use all four commands together for a complete development cycle:
 
 ```bash
 # 1. Create a PRD for a new feature
@@ -111,15 +153,25 @@ Here's how to use all three commands together:
 # - Ask if you want parallel or sequential execution
 # - Work through each task systematically
 # - Update progress and ask for approval between tasks
+
+# 4. Commit and push the completed work
+/commit-and-push
+
+# Claude will:
+# - Run available quality checks (linting, formatting, build)
+# - Create a descriptive commit message
+# - Push to remote repository
 ```
 
 ## Benefits
 
-- **Structured Development**: Move from idea to implementation systematically
+- **Complete Development Cycle**: From requirements to deployed code in structured steps
 - **Clear Requirements**: PRDs ensure all stakeholders understand the feature
 - **Task Management**: Break complex features into manageable chunks
 - **Dependency Tracking**: Ensure tasks are completed in the correct order
 - **Progress Visibility**: See exactly what's been done and what's remaining
+- **Quality Assurance**: Automated linting, formatting, and build checks before commit
+- **Clean Git History**: Descriptive commit messages with proper attribution
 - **Junior Developer Friendly**: Clear, explicit instructions in all outputs
 
 ## Notes
