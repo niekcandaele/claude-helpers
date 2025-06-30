@@ -90,8 +90,7 @@ Executes tasks from a task list with progress tracking.
 
 **What it does:**
 - Reads the task list and checks dependencies
-- Offers parallel or sequential execution modes
-- Implements one task at a time (or multiple in parallel)
+- Implements tasks one at a time in sequential order
 - Updates task completion status
 - Asks for user approval between tasks
 - Maintains a list of modified files
@@ -150,8 +149,7 @@ Here's how to use all four commands together for a complete development cycle:
 /process-tasks tasks/tasks-prd-shopping-cart.md
 
 # Claude will:
-# - Ask if you want parallel or sequential execution
-# - Work through each task systematically
+# - Work through each task systematically in sequential order
 # - Update progress and ask for approval between tasks
 
 # 4. Commit and push the completed work
