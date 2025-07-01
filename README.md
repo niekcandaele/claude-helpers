@@ -10,6 +10,7 @@ These commands provide a structured approach to feature development:
 3. **Process Tasks** - Execute tasks systematically with progress tracking
 4. **Commit and Push** - Run quality checks, commit with good message, and push to remote
 5. **Create PR** - Create a pull request with automatic branch management and platform detection
+6. **Check CI** - Monitor CI/CD status and get fixes for any failures
 
 ## Installation
 
@@ -159,6 +160,39 @@ Creates a pull request with automatic branch management and platform detection.
 /create-pr
 ```
 
+### 6. Check CI (`/check-ci`)
+
+Monitors CI/CD pipeline status after commits and provides fixes for failures.
+
+**Usage:**
+```
+/check-ci [commit-sha or branch]
+```
+
+**What it does:**
+- Detects CI platform (GitHub Actions, GitLab CI, CircleCI, etc.)
+- Monitors pipeline status with real-time updates
+- Analyzes failure logs when CI fails
+- Identifies error patterns (test failures, build errors, linting)
+- Proposes specific code fixes for identified issues
+- Provides clear next steps to resolve problems
+
+**Features:**
+- Automatic CI platform detection
+- Real-time status monitoring
+- Smart error pattern recognition
+- Actionable fix proposals with code snippets
+- Support for multiple CI platforms
+
+**Example:**
+```
+/check-ci
+# Monitor latest commit's CI status
+
+/check-ci feature-branch
+# Check CI for specific branch
+```
+
 ## Complete Workflow Example
 
 Here's how to use all commands together for a complete development cycle:
@@ -199,6 +233,15 @@ Here's how to use all commands together for a complete development cycle:
 # - Detect your git platform (GitHub/GitLab)
 # - Create PR with generated description
 # - Display the PR URL
+
+# 6. Monitor CI and fix any failures
+/check-ci
+
+# Claude will:
+# - Detect your CI platform automatically
+# - Monitor the pipeline status in real-time
+# - If failures occur, analyze logs and propose fixes
+# - Provide specific code changes to resolve issues
 ```
 
 ## Benefits
@@ -210,6 +253,7 @@ Here's how to use all commands together for a complete development cycle:
 - **Progress Visibility**: See exactly what's been done and what's remaining
 - **Quality Assurance**: Automated linting, formatting, and build checks before commit
 - **Clean Git History**: Descriptive commit messages with proper attribution
+- **CI/CD Integration**: Automatic monitoring and fixing of pipeline failures
 - **Junior Developer Friendly**: Clear, explicit instructions in all outputs
 
 ## Notes

@@ -2,7 +2,7 @@
 
 ## Goal
 
-To streamline the pull request creation workflow by automatically handling branch management, committing changes, pushing to remote, and creating a pull request with appropriate CLI tools. This command ensures you're on a feature branch, your changes are committed and pushed, and creates a PR against the default branch.
+To streamline the pull request creation workflow by automatically creating a feature branch, handling uncommitted changes, pushing to remote, and creating a pull request with appropriate CLI tools. This command always creates a new feature branch from your current branch, commits any changes on that feature branch, and creates a PR back to your original branch.
 
 ## Input
 
@@ -10,12 +10,13 @@ Optional PR title: $ARGUMENTS (e.g., `"Add user authentication feature"`)
 
 ## Process
 
-1. **Check Current Branch:** Determine if on main/master branch or feature branch
-2. **Create Feature Branch (if needed):** Generate and switch to appropriately named branch
-3. **Run Commit and Push:** Execute the commit-and-push workflow for any uncommitted changes
-4. **Detect Git Platform:** Identify whether using GitHub, GitLab, or Bitbucket
-5. **Create Pull Request:** Use appropriate CLI tool to create PR against default branch
-6. **Display PR URL:** Show the created PR URL for easy access
+1. **Store Original Branch:** Save the current branch name as the PR target branch
+2. **Create Feature Branch:** Always generate and switch to a new feature branch
+3. **Handle Uncommitted Changes:** If changes exist, commit them on the new feature branch
+4. **Push Feature Branch:** Push the feature branch to remote with upstream tracking
+5. **Detect Git Platform:** Identify whether using GitHub, GitLab, or Bitbucket
+6. **Create Pull Request:** Use appropriate CLI tool to create PR from feature branch to original branch
+7. **Display PR URL:** Show the created PR URL for easy access
 
 ## Platform Detection
 
@@ -35,14 +36,19 @@ The command automatically detects the git platform by examining the remote URL:
 
 ## Branch Management
 
-### Branch Detection and Creation
+### Branch Flow
 
-1. **Current Branch Check:**
+1. **Store Original Branch:**
    - Get current branch with `git branch --show-current`
-   - Identify if on default branch (main, master, develop)
+   - Save as `ORIGINAL_BRANCH` for PR target
+   - This ensures PR goes back to whatever branch you started from
 
-2. **Feature Branch Creation (if on default branch):**
-   - Analyze changes to generate branch name:
+2. **Feature Branch Creation (always):**
+   - Generate branch name based on:
+     - PR title if provided in $ARGUMENTS
+     - Analysis of uncommitted changes
+     - Recent commits on current branch
+   - Branch naming patterns:
      - New feature → `feature/brief-description`
      - Bug fix → `fix/issue-description`
      - Documentation → `docs/update-description`
@@ -50,32 +56,35 @@ The command automatically detects the git platform by examining the remote URL:
    - Create and switch: `git checkout -b [branch-name]`
 
 3. **Branch Name Generation:**
-   - Extract from staged/unstaged changes and recent commits
+   - Extract from PR title or changes
    - Convert to kebab-case
    - Limit to 50 characters
    - Ensure valid git branch name
+   - Add timestamp suffix if branch already exists
 
 ## Commit and Push Integration
 
-Before creating a PR, ensure all changes are committed and pushed:
+After creating the feature branch, handle any uncommitted changes:
 
 1. **Check for Uncommitted Changes:**
    ```bash
    git status --porcelain
    ```
 
-2. **If Changes Exist:**
+2. **If Changes Exist (commit on feature branch):**
    - Follow the same workflow as `/commit-and-push` command:
      - Run quality checks (linting, formatting, build)
      - Stage all changes
      - Generate descriptive commit message
      - Create commit with attribution
-     - Push to remote
+   - Important: All commits happen on the new feature branch, not the original branch
 
-3. **Set Upstream (if needed):**
+3. **Push Feature Branch:**
    ```bash
-   git push -u origin [current-branch]
+   git push -u origin [feature-branch]
    ```
+   - Always set upstream tracking for the new branch
+   - This enables easy PR creation and updates
 
 ## Pull Request Creation
 
@@ -91,8 +100,9 @@ Before creating a PR, ensure all changes are committed and pushed:
    gh pr create \
      --title "[Title from commits or user input]" \
      --body "[Generated description]" \
-     --base [default-branch]
+     --base [original-branch]
    ```
+   - Note: `--base` is set to the branch you started from, not the default branch
 
 3. **PR Description Template:**
    ```markdown
@@ -126,8 +136,9 @@ Before creating a PR, ensure all changes are committed and pushed:
    glab mr create \
      --title "[Title]" \
      --description "[Description]" \
-     --target-branch [default-branch]
+     --target-branch [original-branch]
    ```
+   - Note: `--target-branch` is set to the branch you started from
 
 ### Bitbucket and Others
 
@@ -155,7 +166,8 @@ Display comprehensive information about the created PR:
 
 📋 PR Details:
   - Title: Add user authentication feature
-  - Source: feature/user-auth → main
+  - Source: feature/user-auth → develop
+  - Original Branch: develop
   - Platform: GitHub
   
 🔗 PR URL: https://github.com/user/repo/pull/123
@@ -176,14 +188,17 @@ While the basic usage is `/create-pr`, the command supports:
 
 ## Final Instructions
 
-1. Always ensure you're on a feature branch before creating a PR
-2. Run all quality checks before pushing (via commit-and-push integration)
-3. Generate meaningful PR titles and descriptions
-4. Include proper attribution in commits
-5. Handle platform differences gracefully
-6. Provide clear error messages and next steps
-7. Never create duplicate PRs - check if one already exists
-8. Set up tracking between local and remote branches
+1. Always create a new feature branch - never commit directly to the original branch
+2. Store the original branch name to use as the PR target
+3. Commit any uncommitted changes on the feature branch, not the original
+4. Run all quality checks before pushing (via commit-and-push integration)
+5. Generate meaningful PR titles and descriptions
+6. Include proper attribution in commits
+7. Handle platform differences gracefully
+8. Provide clear error messages and next steps
+9. Never create duplicate PRs - check if one already exists
+10. Set up tracking between local and remote branches
+11. Make it clear which branch the PR targets (show "feature → original" flow)
 
 ## Platform-Specific Installation
 
