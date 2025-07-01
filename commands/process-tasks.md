@@ -72,8 +72,9 @@ Before starting any task:
    - Update "Relevant Files" section if new files were created/modified
    - Mark parent task `[x]` if all its sub-tasks are now complete
 3. Save the updated task list file
-4. Ask user: "Sub-task [X.Y] completed. Ready for the next sub-task? (yes/y to continue)"
-5. Wait for user confirmation before proceeding
+4. **For early tasks that create user-visible functionality:** Add a reminder: "This feature should now be testable. Would you like to try it out before continuing?"
+5. Ask user: "Sub-task [X.Y] completed. Ready for the next sub-task? (yes/y to continue)"
+6. Wait for user confirmation before proceeding
 
 ## Error Handling
 

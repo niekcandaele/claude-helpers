@@ -18,6 +18,7 @@ You should adapt your questions based on the prompt, but here are some common ar
 - **Problem/Goal:** "What problem does this feature solve for the user?" or "What is the main goal we want to achieve with this feature?"
 - **Target User:** "Who is the primary user of this feature?"
 - **Core Functionality:** "Can you describe the key actions a user should be able to perform with this feature?"
+- **Simplest Version:** "What's the simplest version of this feature that would be useful to see and test? What would make you say 'yes, it's working'?"
 - **User Stories:** "Could you provide a few user stories? (e.g., As a [type of user], I want to [perform an action] so that [benefit].)"
 - **Acceptance Criteria:** "How will we know when this feature is successfully implemented? What are the key success criteria?"
 - **Scope/Boundaries:** "Are there any specific things this feature *should not* do (non-goals)?"
