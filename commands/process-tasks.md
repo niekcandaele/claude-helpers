@@ -22,7 +22,7 @@ Task list file reference: $ARGUMENTS (e.g., `tasks/tasks-prd-user-profile-editin
    - Mark tasks and subtasks as completed (`[x]`) per the protocol above.
    - Add new tasks as they emerge.
 
-2. **Maintain the "Relevant Files" section:**
+2. **Maintain the "Relevant Files" section (at the bottom of the file):**
    - List every file created or modified.
    - Give each file a one‑line description of its purpose.
 

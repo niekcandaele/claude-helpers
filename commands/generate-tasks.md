@@ -27,7 +27,7 @@ PRD file reference: $ARGUMENTS (e.g., `tasks/prd-user-profile-editing.md`)
    - Build upon previous work incrementally
    - Use the `[depends on: X.Y]` notation where one task must be completed before another can begin
 6. **Identify Relevant Files:** Based on the tasks and PRD, identify potential files that will need to be created or modified. List these under the `Relevant Files` section, including corresponding test files if applicable.
-7. **Generate Final Output:** Combine the parent tasks, sub-tasks, relevant files, and notes into the final Markdown structure.
+7. **Generate Final Output:** Combine the parent tasks, sub-tasks into the main Tasks section, then add the relevant files and notes at the bottom of the final Markdown structure.
 8. **Save Task List:** Save the generated document in the `tasks/` directory with the filename `tasks-[prd-file-name].md`, where `[prd-file-name]` matches the base name of the input PRD file (e.g., if the input was `prd-user-profile-editing.md`, the output is `tasks-prd-user-profile-editing.md`).
 
 ## Output Format
@@ -35,6 +35,19 @@ PRD file reference: $ARGUMENTS (e.g., `tasks/prd-user-profile-editing.md`)
 The generated task list _must_ follow this structure:
 
 ```markdown
+## Tasks
+
+- [ ] 1.0 Parent Task Title
+  - [ ] 1.1 Sub-task description 1.1
+  - [ ] 1.2 [depends on: 3.4] Sub-task description 1.2
+- [ ] 2.0 Parent Task Title
+  - [ ] 2.1 [depends on: 1.0] Sub-task description 2.1
+- [ ] 3.0 Parent Task Title
+  - [ ] 3.1 Sub-task description 3.1
+  - [ ] 3.2 Sub-task description 3.2
+  - [ ] 3.3 Sub-task description 3.3
+  - [ ] 3.4 Sub-task description 3.4
+
 ## Relevant Files
 
 - `path/to/potential/file1.ts` - Brief description of why this file is relevant (e.g., Contains the main component for this feature).
@@ -48,19 +61,6 @@ The generated task list _must_ follow this structure:
 
 - Unit tests should typically be placed alongside the code files they are testing (e.g., `MyComponent.tsx` and `MyComponent.test.tsx` in the same directory).
 - Use `npx jest [optional/path/to/test/file]` to run tests. Running without a path executes all tests found by the Jest configuration.
-
-## Tasks
-
-- [ ] 1.0 Parent Task Title
-  - [ ] 1.1 Sub-task description 1.1
-  - [ ] 1.2 [depends on: 3.4] Sub-task description 1.2
-- [ ] 2.0 Parent Task Title
-  - [ ] 2.1 [depends on: 1.0] Sub-task description 2.1
-- [ ] 3.0 Parent Task Title
-  - [ ] 3.1 Sub-task description 3.1
-  - [ ] 3.2 Sub-task description 3.2
-  - [ ] 3.3 Sub-task description 3.3
-  - [ ] 3.4 Sub-task description 3.4
 ```
 
 ## Dependency Rules
