@@ -9,6 +9,7 @@ These commands provide a structured approach to feature development:
 2. **Generate Tasks** - Convert a PRD into an actionable task list
 3. **Process Tasks** - Execute tasks systematically with progress tracking
 4. **Commit and Push** - Run quality checks, commit with good message, and push to remote
+5. **Create PR** - Create a pull request with automatic branch management and platform detection
 
 ## Installation
 
@@ -128,9 +129,39 @@ Automatically runs quality checks, creates a clean commit, and pushes to remote.
 /commit-and-push
 ```
 
+### 5. Create PR (`/create-pr`)
+
+Creates a pull request with automatic branch management and platform detection.
+
+**Usage:**
+```
+/create-pr [optional PR title]
+```
+
+**What it does:**
+- Checks if you're on a feature branch (creates one if on main/master)
+- Runs commit-and-push workflow for uncommitted changes
+- Detects git platform (GitHub, GitLab, Bitbucket)
+- Creates PR using appropriate CLI tool (gh, glab)
+- Generates PR title and description from commits
+- Displays PR URL for easy access
+
+**Features:**
+- Automatic platform detection from remote URL
+- Smart branch naming (feature/*, fix/*, docs/*)
+- Integrates with commit-and-push for quality checks
+- Handles authentication and CLI tool installation guidance
+
+**Example:**
+```
+/create-pr "Add shopping cart feature"
+# or let it auto-generate title:
+/create-pr
+```
+
 ## Complete Workflow Example
 
-Here's how to use all four commands together for a complete development cycle:
+Here's how to use all commands together for a complete development cycle:
 
 ```bash
 # 1. Create a PRD for a new feature
@@ -159,6 +190,15 @@ Here's how to use all four commands together for a complete development cycle:
 # - Run available quality checks (linting, formatting, build)
 # - Create a descriptive commit message
 # - Push to remote repository
+
+# 5. Create a pull request
+/create-pr "Add shopping cart functionality"
+
+# Claude will:
+# - Ensure you're on a feature branch
+# - Detect your git platform (GitHub/GitLab)
+# - Create PR with generated description
+# - Display the PR URL
 ```
 
 ## Benefits
