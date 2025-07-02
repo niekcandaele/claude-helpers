@@ -34,6 +34,144 @@ The command automatically detects the git platform by examining the remote URL:
    - If not installed, provide installation instructions
    - For platforms without CLI tools, use web URL to create PR
 
+## Label Assignment
+
+Automatically query available repository labels and intelligently assign them to the pull request:
+
+### 1. Label Discovery
+
+**GitHub:**
+```bash
+# Get repository owner and name from remote URL
+REPO_INFO=$(gh repo view --json owner,name)
+OWNER=$(echo $REPO_INFO | jq -r .owner.login)
+REPO=$(echo $REPO_INFO | jq -r .name)
+
+# Fetch all available labels
+gh api repos/$OWNER/$REPO/labels --jq '.[].name' > /tmp/available_labels.txt
+```
+
+**GitLab:**
+```bash
+# Get project ID from remote URL
+PROJECT_ID=$(glab api projects --owned=true --jq '.[] | select(.ssh_url_to_repo == "'$(git remote get-url origin)'") | .id')
+
+# Fetch all available labels  
+glab api projects/$PROJECT_ID/labels --jq '.[].name' > /tmp/available_labels.txt
+```
+
+### 2. Intelligent Label Selection
+
+Analyze changes and assign relevant labels based on patterns:
+
+**Branch Pattern Analysis:**
+- `feature/*` or `feat/*` → "enhancement", "feature"
+- `fix/*` or `bugfix/*` → "bug", "bugfix"
+- `docs/*` or `documentation/*` → "documentation"
+- `refactor/*` → "refactoring"
+- `test/*` or `testing/*` → "testing"
+- `chore/*` → "maintenance", "chore"
+- `hotfix/*` → "hotfix", "critical"
+
+**Commit Message Analysis:**
+- `feat:` or `feature:` → "enhancement", "feature"
+- `fix:` → "bug", "bugfix"
+- `docs:` → "documentation"
+- `refactor:` → "refactoring"
+- `test:` → "testing"
+- `chore:` → "maintenance", "chore"
+- `perf:` → "performance"
+- `style:` → "style"
+
+**File Change Analysis:**
+```bash
+# Get list of changed files
+CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --cached --name-only)
+
+# Pattern matching for file types
+if echo "$CHANGED_FILES" | grep -q "\.md$\|README\|docs/"; then
+    LABELS="$LABELS documentation"
+fi
+
+if echo "$CHANGED_FILES" | grep -q "test/\|\.test\.\|\.spec\.\|__tests__/"; then
+    LABELS="$LABELS testing"
+fi
+
+if echo "$CHANGED_FILES" | grep -q "package\.json\|requirements\.txt\|Gemfile\|pom\.xml"; then
+    LABELS="$LABELS dependencies"
+fi
+
+if echo "$CHANGED_FILES" | grep -q "\.css$\|\.scss$\|\.sass$\|\.less$"; then
+    LABELS="$LABELS frontend styling"
+fi
+
+if echo "$CHANGED_FILES" | grep -q "\.js$\|\.jsx$\|\.ts$\|\.tsx$\|\.vue$\|\.svelte$"; then
+    LABELS="$LABELS frontend"
+fi
+
+if echo "$CHANGED_FILES" | grep -q "\.py$\|\.java$\|\.rb$\|\.php$\|\.go$\|\.rs$"; then
+    LABELS="$LABELS backend"
+fi
+
+if echo "$CHANGED_FILES" | grep -q "\.sql$\|migrations/\|schema/"; then
+    LABELS="$LABELS database"
+fi
+
+if echo "$CHANGED_FILES" | grep -q "Dockerfile\|docker-compose\|\.yml$\|\.yaml$"; then
+    LABELS="$LABELS infrastructure"
+fi
+```
+
+### 3. Label Filtering and Assignment
+
+Filter proposed labels against available repository labels:
+```bash
+# Filter labels to only include ones that exist in the repository
+FINAL_LABELS=""
+for label in $LABELS; do
+    if grep -q "^$label$" /tmp/available_labels.txt; then
+        FINAL_LABELS="$FINAL_LABELS --label \"$label\""
+    fi
+done
+```
+
+### 4. Error Handling for Label Assignment
+
+Gracefully handle label-related failures without blocking PR creation:
+
+```bash
+# Attempt to fetch labels with error handling
+fetch_labels() {
+    local platform=$1
+    
+    case $platform in
+        "github")
+            if ! gh api repos/$(gh repo view --json owner,name --jq '.owner.login + "/" + .name')/labels --jq '.[].name' > /tmp/available_labels.txt 2>/dev/null; then
+                echo "Warning: Could not fetch repository labels. Proceeding without automatic labeling." >&2
+                return 1
+            fi
+            ;;
+        "gitlab")
+            PROJECT_ID=$(glab api projects --owned=true --jq '.[] | select(.ssh_url_to_repo == "'$(git remote get-url origin)'") | .id' 2>/dev/null)
+            if [[ -z "$PROJECT_ID" ]] || ! glab api projects/$PROJECT_ID/labels --jq '.[].name' > /tmp/available_labels.txt 2>/dev/null; then
+                echo "Warning: Could not fetch repository labels. Proceeding without automatic labeling." >&2
+                return 1
+            fi
+            ;;
+    esac
+    return 0
+}
+
+# Use labels only if successfully fetched
+if fetch_labels "$PLATFORM"; then
+    # Run label assignment logic
+    assign_labels
+else
+    # Skip labeling and continue with PR creation
+    FINAL_LABELS=""
+fi
+```
+
 ## Branch Management
 
 ### Branch Flow
@@ -100,9 +238,11 @@ After creating the feature branch, handle any uncommitted changes:
    gh pr create \
      --title "[Title from commits or user input]" \
      --body "[Generated description]" \
-     --base [original-branch]
+     --base [original-branch] \
+     $FINAL_LABELS
    ```
    - Note: `--base` is set to the branch you started from, not the default branch
+   - `$FINAL_LABELS` contains the filtered `--label` flags for applicable repository labels
 
 3. **PR Description Template:**
    ```markdown
@@ -136,9 +276,11 @@ After creating the feature branch, handle any uncommitted changes:
    glab mr create \
      --title "[Title]" \
      --description "[Description]" \
-     --target-branch [original-branch]
+     --target-branch [original-branch] \
+     $FINAL_LABELS
    ```
    - Note: `--target-branch` is set to the branch you started from
+   - `$FINAL_LABELS` contains the filtered `--label` flags for applicable repository labels
 
 ### Bitbucket and Others
 
@@ -169,6 +311,7 @@ Display comprehensive information about the created PR:
   - Source: feature/user-auth → develop
   - Original Branch: develop
   - Platform: GitHub
+  - Labels: enhancement, backend, security
   
 🔗 PR URL: https://github.com/user/repo/pull/123
 
