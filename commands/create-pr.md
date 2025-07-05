@@ -336,12 +336,11 @@ While the basic usage is `/create-pr`, the command supports:
 3. Commit any uncommitted changes on the feature branch, not the original
 4. Run all quality checks before pushing (via commit-and-push integration)
 5. Generate meaningful PR titles and descriptions
-6. Include proper attribution in commits
-7. Handle platform differences gracefully
-8. Provide clear error messages and next steps
-9. Never create duplicate PRs - check if one already exists
-10. Set up tracking between local and remote branches
-11. Make it clear which branch the PR targets (show "feature → original" flow)
+6. Handle platform differences gracefully
+7. Provide clear error messages and next steps
+8. Never create duplicate PRs - check if one already exists
+9. Set up tracking between local and remote branches
+10. Make it clear which branch the PR targets (show "feature → original" flow)
 
 ## Platform-Specific Installation
 

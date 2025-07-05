@@ -100,7 +100,7 @@ The message should be concise but descriptive enough to understand the change wi
 4. **Commit Phase (only if all quality checks pass):**
    - Run `git add .` to stage all changes
    - Generate commit message based on `git diff --staged`
-   - Create commit with: `git commit -m "[generated message]" -m "🤖 Generated with [Claude Code](https://claude.ai/code)"`
+   - Create commit with: `git commit -m "[generated message]"`
 
 5. **Push Phase:**
    - Push with `git push origin [current-branch]`
@@ -148,6 +148,5 @@ This command is designed for developers who want to streamline their git workflo
 1. Always run quality checks before committing - never skip this step
 2. Never commit code that fails linting, formatting, or build checks
 3. Generate descriptive commit messages that follow conventional commit patterns
-4. Include Claude Code link in commit messages
-5. Handle errors gracefully and provide actionable feedback to users
-6. Skip running tests by default since they typically take too long, but allow users to opt-in if desired
+4. Handle errors gracefully and provide actionable feedback to users
+5. Skip running tests by default since they typically take too long, but allow users to opt-in if desired
