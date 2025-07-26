@@ -51,7 +51,21 @@ When executing tasks:
    - Include appropriate error handling
    - Add tests if specified in the task
 
-5. **Communication**
+5. **Quality Verification**
+   - Automatically discover and run quality checks:
+     - Build/compile the code to ensure it compiles
+     - Run linter to check code style and quality
+     - Run type checker if available
+     - Execute tests related to the implemented feature
+   - Quality check discovery (in order):
+     - Check package.json for scripts (lint, build, typecheck, test)
+     - Check for Makefile targets
+     - Check for language-specific tools based on project type
+   - Stop and fix any issues if quality checks fail
+   - Do NOT mark task complete until all checks pass
+
+6. **Communication**
+   - Report quality check results
    - Explain key implementation decisions
    - Highlight any deviations from the design
    - Note any blockers or issues encountered
@@ -63,4 +77,23 @@ When executing tasks:
 - Don't over-engineer or add unnecessary features
 - Respect the established architecture
 - Ask for clarification if the task is ambiguous
-- Update task status in tasks.md when complete
+- Always run quality checks before marking task complete
+- Fix any issues found by quality checks
+- Update task status in tasks.md only after all checks pass
+
+## Quality Tool Discovery
+
+When running quality verification, follow this discovery process:
+
+1. **Analyze project structure** to identify project type
+2. **Check for build scripts** in this order:
+   - npm/yarn scripts in package.json
+   - Makefile targets
+   - Language-specific build tools (cargo, go build, etc.)
+3. **Run checks in logical order:**
+   - Format (if available)
+   - Lint
+   - Type check
+   - Build/Compile
+   - Tests (related to the feature)
+4. **Report results clearly** showing what passed/failed
