@@ -83,14 +83,30 @@ main() {
 	print_status "Installing commands to $INSTALL_DIR..."
 	mv commands "$INSTALL_DIR"
 
+	# Check if agents directory exists and install it
+	if [ -d "agents" ]; then
+		AGENTS_DIR="$HOME/.claude/agents"
+		print_status "Installing agents to $AGENTS_DIR..."
+		mv agents "$AGENTS_DIR"
+	fi
+
 	# Verify installation
 	COMMAND_COUNT=$(find "$INSTALL_DIR" -name "*.md" | wc -l)
+	AGENT_COUNT=0
+	if [ -d "$HOME/.claude/agents" ]; then
+		AGENT_COUNT=$(find "$HOME/.claude/agents" -name "*.md" | wc -l)
+	fi
 
-	print_success "Successfully installed $COMMAND_COUNT commands!"
+	print_success "Successfully installed $COMMAND_COUNT commands and $AGENT_COUNT agents!"
 	echo
 	echo "📋 Available commands:"
 	find "$INSTALL_DIR" -name "*.md" -exec basename {} .md \; | sed 's/^/  - /'
 	echo
+	if [ $AGENT_COUNT -gt 0 ]; then
+		echo "🤖 Available agents:"
+		find "$HOME/.claude/agents" -name "*.md" -exec basename {} .md \; | sed 's/^/  - /'
+		echo
+	fi
 	echo "🚀 Usage:"
 	echo "  Use commands in Claude Code with: /command-name"
 	echo "  Example: /create-prd Add user authentication"
