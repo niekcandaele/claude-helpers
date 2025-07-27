@@ -56,6 +56,14 @@ main() {
 		rm -rf "$INSTALL_DIR"
 	fi
 
+	# Check if agents directory already exists
+	AGENTS_DIR="$HOME/.claude/agents"
+	if [ -d "$AGENTS_DIR" ]; then
+		print_warning "Agents directory already exists at $AGENTS_DIR"
+		print_status "Removing existing agents directory"
+		rm -rf "$AGENTS_DIR"
+	fi
+
 	# Create Claude directory structure
 	print_status "Creating directory structure..."
 	mkdir -p "$(dirname "$INSTALL_DIR")"
@@ -85,16 +93,18 @@ main() {
 
 	# Check if agents directory exists and install it
 	if [ -d "agents" ]; then
-		AGENTS_DIR="$HOME/.claude/agents"
+		print_status "Found agents directory in archive"
 		print_status "Installing agents to $AGENTS_DIR..."
 		mv agents "$AGENTS_DIR"
+	else
+		print_warning "No agents directory found in archive"
 	fi
 
 	# Verify installation
 	COMMAND_COUNT=$(find "$INSTALL_DIR" -name "*.md" | wc -l)
 	AGENT_COUNT=0
-	if [ -d "$HOME/.claude/agents" ]; then
-		AGENT_COUNT=$(find "$HOME/.claude/agents" -name "*.md" | wc -l)
+	if [ -d "$AGENTS_DIR" ]; then
+		AGENT_COUNT=$(find "$AGENTS_DIR" -name "*.md" | wc -l)
 	fi
 
 	print_success "Successfully installed $COMMAND_COUNT commands and $AGENT_COUNT agents!"
@@ -104,7 +114,7 @@ main() {
 	echo
 	if [ $AGENT_COUNT -gt 0 ]; then
 		echo "🤖 Available agents:"
-		find "$HOME/.claude/agents" -name "*.md" -exec basename {} .md \; | sed 's/^/  - /'
+		find "$AGENTS_DIR" -name "*.md" -exec basename {} .md \; | sed 's/^/  - /'
 		echo
 	fi
 	echo "🚀 Usage:"
