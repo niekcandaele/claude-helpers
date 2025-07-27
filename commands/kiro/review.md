@@ -1,5 +1,5 @@
 ---
-description: Review and enhance Kiro specs with expert feedback from integration, security, architecture, QA, and documentation perspectives
+description: Review and enhance Kiro specs with expert feedback from integration, architecture, QA, and documentation perspectives
 argument-hint: [feature name]
 ---
 
@@ -41,29 +41,23 @@ This command provides comprehensive review of Kiro specifications using speciali
    - Focus on cross-feature connections and consistency
    - Identify missing integrations, events, and data flows
 
-3. **Security Review Phase**
-   - Use the security-reviewer agent to analyze security implications
-   - Identify vulnerabilities and security risks
-   - Recommend security controls and best practices
-   - Assess compliance requirements
-
-4. **Architecture Review Phase** (if design.md exists)
+3. **Architecture Review Phase** (if design.md exists)
    - Use the architect agent to review technical design
    - Validate extension decisions and patterns
    - Assess technical soundness and risks
 
-5. **QA Review Phase**
-   - Use the qa-engineer agent to assess testability
-   - Identify test coverage gaps and edge cases
-   - Review acceptance criteria for completeness
-   - Recommend test strategies
+4. **QA Review Phase**
+   - Use the qa-engineer agent to generate test cases
+   - Create comprehensive test suites for the feature
+   - Identify edge cases and error scenarios
+   - Provide actionable test descriptions
 
-6. **Documentation Phase**
+5. **Documentation Phase**
    - Use the technical-writer agent to create user documentation
    - Generate appropriate docs based on feature type
    - Save to `.kiro/specs/{feature_name}/documentation.md`
 
-7. **Consolidate Feedback**
+6. **Consolidate Feedback**
    - Create comprehensive review report
    - Prioritize actionable improvements
    - Save to `.kiro/specs/{feature_name}/review.md`
@@ -77,7 +71,6 @@ The review report should include:
 
 ## Executive Summary
 - Overall assessment
-- Security risk level: {None/Low/Medium/High/Critical}
 - Test coverage assessment: {Comprehensive/Adequate/Insufficient/Poor}
 - Key findings
 - Recommended actions
@@ -85,28 +78,22 @@ The review report should include:
 ## Feature Integration Review
 {Feature integration specialist findings}
 
-## Security Review
-### Risk Assessment
-- Overall risk level
-- Critical findings
-- Security recommendations
-
 ## Architecture Review
 {Architect findings if design exists}
 
 ## QA Review
-### Test Coverage Analysis
-- Testability assessment
-- Missing test scenarios
-- Testing recommendations
+### Test Cases
+- Generated test suites with specific test cases
+- Organized by component/feature
+- Covers all scenarios and edge cases
 
 ## Documentation Status
 - Documentation created: {yes/no}
 - Location: documentation.md
 
 ## Consolidated Recommendations
-### Critical (Security/Safety)
-- Urgent security or safety issues
+### Critical
+- Urgent issues requiring immediate attention
 
 ### High Priority
 - Critical improvements needed
