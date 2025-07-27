@@ -1,5 +1,5 @@
 ---
-description: Review and enhance Kiro specs with expert feedback from integration, architecture, QA, and documentation perspectives
+description: Review and enhance Kiro specs with expert feedback from integration, architecture, and QA perspectives
 argument-hint: [feature name]
 ---
 
@@ -52,12 +52,7 @@ This command provides comprehensive review of Kiro specifications using speciali
    - Identify edge cases and error scenarios
    - Provide actionable test descriptions
 
-5. **Documentation Phase**
-   - Use the technical-writer agent to create user documentation
-   - Generate appropriate docs based on feature type
-   - Save to `.kiro/specs/{feature_name}/documentation.md`
-
-6. **Consolidate Feedback**
+5. **Consolidate Feedback**
    - Create comprehensive review report
    - Prioritize actionable improvements
    - Save to `.kiro/specs/{feature_name}/review.md`
@@ -87,10 +82,6 @@ The review report should include:
 - Organized by component/feature
 - Covers all scenarios and edge cases
 
-## Documentation Status
-- Documentation created: {yes/no}
-- Location: documentation.md
-
 ## Consolidated Recommendations
 ### Critical
 - Urgent issues requiring immediate attention
@@ -112,7 +103,7 @@ The review report should include:
 
 - Always start by checking if specs exist
 - Run all applicable reviews based on available documents
-- Create documentation even if specs need improvement
+- Provide feedback even if specs need improvement
 - Be constructive and specific in feedback
 - Focus on actionable improvements
 - Present findings clearly and concisely

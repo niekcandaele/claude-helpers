@@ -104,11 +104,6 @@ When the user asks for a design document, follow this process:
       - Create comprehensive test suites
       - Cover all test scenarios and edge cases
    
-   d. **Documentation Planning**
-      - Use the technical-writer agent to plan documentation
-      - Add "Documentation Plan" section
-      - Identify key user-facing documentation needs
-
 4. **Consolidate and Finalize**
    
    Merge all expert feedback into the final design document with these sections:
@@ -188,13 +183,6 @@ When the user asks for a design document, follow this process:
    - Clear test names describing expected behavior
    - Following existing test patterns and structures
    
-   **Documentation Plan** (Added by Technical Writer)
-   - User documentation requirements
-   - API documentation needs
-   - Migration guide requirements
-   - Example code and tutorials needed
-   - Documentation maintenance plan
-
 5. **Final Review and Iteration**
    - Present the comprehensive design to the user
    - Highlight all extension points being used
@@ -234,7 +222,7 @@ When invoking agents during the design process:
 
 1. **After creating initial design sections**, explicitly invoke each agent:
    - "I'll now use the feature-integration agent to analyze system integration..."
-   - Continue for all four agents
+   - Continue for all three agents
 
 2. **Present each agent's feedback** before incorporating it into the design
 
