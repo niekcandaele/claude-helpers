@@ -81,20 +81,53 @@ When the user asks for a design document, follow this process:
       - Identify reusable components
       - Document integration patterns they use
 
-2. **Create Design Document**
+2. **Create Initial Design Document**
    
-   Create a comprehensive design document at `.kiro/specs/{feature_name}/design.md` with these sections:
+   Create an initial design document at `.kiro/specs/{feature_name}/design.md` with the core sections.
+
+3. **Expert Review Phase**
+   
+   Invoke specialized agents to review and enhance the design:
+   
+   a. **Feature Integration Review**
+      - Use the feature-integration agent to analyze system integration
+      - Add "Feature Integration & Consistency" section
+      - Ensure feature connects properly with existing systems
+   
+   b. **Security Review**
+      - Use the security-reviewer agent to identify vulnerabilities
+      - Add "Security Considerations" section with threat model
+      - Include security controls and mitigations
+   
+   c. **Architecture Validation**
+      - Use the architect agent to validate technical design
+      - Enhance architecture sections
+      - Ensure extension-first principle is followed
+   
+   d. **QA Strategy Review**
+      - Use the qa-engineer agent to assess testability
+      - Enhance "Testing Strategy" section
+      - Add comprehensive test scenarios
+   
+   e. **Documentation Planning**
+      - Use the technical-writer agent to plan documentation
+      - Add "Documentation Plan" section
+      - Identify key user-facing documentation needs
+
+4. **Consolidate and Finalize**
+   
+   Merge all expert feedback into the final design document with these sections:
 
    ### Required Sections (in order):
    
-   **Codebase Analysis** (NEW - FIRST SECTION)
+   **Codebase Analysis**
    - Summary of discovered patterns and conventions
    - Existing systems that will be extended
    - Architectural patterns to follow
    - Specific files/modules that serve as implementation patterns
    - Code style and convention requirements
    
-   **Extension vs. Creation Analysis** (NEW - SECOND SECTION)
+   **Extension vs. Creation Analysis**
    - List of existing systems considered for extension
    - Detailed explanation of how feature will extend existing code
    - Justification for any new components (only if absolutely necessary)
@@ -106,11 +139,19 @@ When the user asks for a design document, follow this process:
    - Non-goals and scope limitations
    - How this fits into the existing system
    
+   **Feature Integration & Consistency** (Added by Feature Integration Specialist)
+   - Integration with existing features
+   - Event system participation
+   - Import/export compatibility
+   - API consistency requirements
+   - Cross-feature dependencies
+   
    **Architecture**
    - How the feature integrates with existing architecture
    - Extensions to current component relationships
    - Data flow showing integration with existing flows
    - Specific existing components being extended
+   - Architecture validation notes (from architect review)
    
    **Components and Interfaces**
    - Existing components being extended and how
@@ -124,6 +165,13 @@ When the user asks for a design document, follow this process:
    - API formats matching existing conventions
    - Database migration approach
    
+   **Security Considerations** (Added by Security Reviewer)
+   - Threat model
+   - Security controls
+   - Authentication/authorization approach
+   - Data protection measures
+   - Security testing requirements
+   
    **Implementation Details**
    - Specific patterns from codebase to follow
    - References to similar implementations
@@ -134,17 +182,27 @@ When the user asks for a design document, follow this process:
    - Integration with current logging systems
    - Consistent error message formatting
    
-   **Testing Strategy**
-   - Unit and integration tests for the feature
+   **Testing Strategy** (Enhanced by QA Engineer)
+   - Test approach and coverage goals
+   - Unit, integration, and e2e test scenarios
+   - Edge cases and boundary conditions
+   - Performance testing considerations
+   - Test data requirements
    - Following existing test patterns and structures
-   - Test file naming and location conventions
-   - Use of existing test utilities and helpers
+   
+   **Documentation Plan** (Added by Technical Writer)
+   - User documentation requirements
+   - API documentation needs
+   - Migration guide requirements
+   - Example code and tutorials needed
+   - Documentation maintenance plan
 
-3. **Review and Iteration**
-   - Present the design to the user
+5. **Final Review and Iteration**
+   - Present the comprehensive design to the user
    - Highlight all extension points being used
+   - Show how expert feedback was incorporated
    - Justify any new systems/components
-   - Incorporate feedback
+   - Incorporate user feedback
    - Refine until approved
 
 ## Extension Examples
@@ -170,3 +228,20 @@ Always include concrete examples like:
 - Include code snippets showing pattern adherence
 - Demonstrate integration with existing systems
 - Maintain consistency with current architecture
+
+## Agent Usage Instructions
+
+When invoking agents during the design process:
+
+1. **After creating initial design sections**, explicitly invoke each agent:
+   - "I'll now use the feature-integration agent to analyze system integration..."
+   - "Let me invoke the security-reviewer agent to analyze security implications..."
+   - Continue for all five agents
+
+2. **Present each agent's feedback** before incorporating it into the design
+
+3. **Show the enhanced sections** after incorporating feedback
+
+4. **Create a summary** of how each agent's input improved the design
+
+This transparent process helps users understand the value each perspective brings to the design.
