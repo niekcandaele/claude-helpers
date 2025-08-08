@@ -36,21 +36,22 @@ This command provides comprehensive review of Kiro specifications using speciali
    - Verify that requirements.md exists (minimum requirement)
    - Check for design.md and tasks.md
 
-2. **Feature Integration Review Phase**
-   - Use the feature-integration agent to review system integration
-   - Focus on cross-feature connections and consistency
-   - Identify missing integrations, events, and data flows
+2. **Requirements Review**
+   - Analyze completeness and clarity of requirements
+   - Check for ambiguities or missing acceptance criteria
+   - Validate user stories and business rules
 
-3. **Architecture Review Phase** (if design.md exists)
-   - Use the architect agent to review technical design
-   - Validate extension decisions and patterns
-   - Assess technical soundness and risks
+3. **Design Review** (if design.md exists)
+   - Review technical architecture and component design
+   - Validate extension-first approach
+   - Check for consistency with existing patterns
+   - Assess implementation complexity and risks
 
-4. **QA Review Phase**
-   - Use the qa-engineer agent to generate test cases
-   - Create comprehensive test suites for the feature
-   - Identify edge cases and error scenarios
-   - Provide actionable test descriptions
+4. **Test Coverage Analysis**
+   - Generate comprehensive test cases for the feature
+   - Cover happy paths, edge cases, and error scenarios
+   - Ensure all requirements have corresponding tests
+   - Create actionable test descriptions
 
 5. **Consolidate Feedback**
    - Create comprehensive review report
@@ -70,19 +71,24 @@ The review report should include:
 - Key findings
 - Recommended actions
 
-## Feature Integration Review
-{Feature integration specialist findings}
+## Requirements Analysis
+- Completeness and clarity assessment
+- Missing or ambiguous requirements
+- Acceptance criteria review
 
-## Architecture Review
-{Architect findings if design exists}
+## Design Review
+- Architecture assessment
+- Extension approach validation
+- Implementation complexity analysis
+- Technical risks identified
 
-## QA Review
-### Test Cases
-- Generated test suites with specific test cases
+## Test Coverage
+### Generated Test Cases
+- Test suites with specific test cases
 - Organized by component/feature
-- Covers all scenarios and edge cases
+- Coverage of all scenarios and edge cases
 
-## Consolidated Recommendations
+## Recommendations
 ### Critical
 - Urgent issues requiring immediate attention
 

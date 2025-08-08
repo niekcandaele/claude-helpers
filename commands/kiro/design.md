@@ -27,207 +27,269 @@ You talk like a human, not like a bot. You reflect the user's input style in you
 
 # Feature Design Document
 
-## Core Principles
+## Core Philosophy
 
-### Extension First
-**Always prefer extending existing systems over creating new ones.** When designing features, your primary goal is to integrate seamlessly with the existing codebase by extending current components, patterns, and systems.
+A design document is a technical report that convinces the reader (and yourself) that the proposed design is optimal within the context of trade-offs and constraints. The goal is to take the reader's mind from their current state to believing your design is good.
 
-### Focus on Implementation, Not Operations
-**Keep design documents focused on HOW to build the feature, not operational concerns.** Unless specifically requested in the requirements, avoid including:
-- Performance testing strategies (use standard testing approaches)
-- Deployment procedures (follow standard deployment process)
-- Monitoring and alerting (use existing monitoring)
-- Rollback procedures (follow standard operations)
-- Infrastructure requirements (unless feature-specific)
+## Three-Layer Design Structure
+
+Design documents follow a three-layer onion structure where each layer builds upon and justifies the next:
+
+1. **Layer 1: Problem & Requirements** - Understanding what needs to be solved
+2. **Layer 2: Functional Specification** - How the system works externally  
+3. **Layer 3: Technical Specification** - How to implement internally
+
+**Critical Rule**: If one layer has a fatal flaw, don't proceed to the next. Each layer must justify and support the subsequent layers.
 
 ## Process
 
-When the user asks for a design document, follow this process:
+### Phase 1: Codebase Analysis
 
-1. **Comprehensive Codebase Analysis Phase**
-   
-   Perform systematic analysis with these specific actions:
-   
-   a. **Project Structure Analysis**
-      - Map directory organization and module boundaries
-      - Identify architectural layers (presentation, business, data)
-      - Document naming conventions for files and directories
-      - Find configuration and build system patterns
-   
-   b. **Extension Point Discovery**
-      - Locate existing interfaces and base classes
-      - Identify plugin or extension mechanisms
-      - Find configuration systems that can be extended
-      - Map existing registries, factories, or service locators
-   
-   c. **Pattern and Convention Detection**
-      - Analyze code style and formatting rules
-      - Document common design patterns in use
-      - Identify error handling patterns
-      - Study logging and monitoring conventions
-      - Review testing patterns and structures
-   
-   d. **Existing System Inventory**
-      - Settings/configuration systems
-      - UI component libraries and patterns
-      - API routing and controller structures
-      - Data models and schema patterns
-      - Authentication/authorization systems
-      - Event systems or message buses
-   
-   e. **Similar Feature Analysis**
-      - Find features with similar functionality
-      - Study their implementation approach
-      - Identify reusable components
-      - Document integration patterns they use
+Before writing any design, perform comprehensive analysis:
 
-2. **Create Initial Design Document**
-   
-   Create an initial design document at `.kiro/specs/{feature_name}/design.md` with the core sections.
+1. **Current State (AS-IS) Documentation**
+   - Map existing system architecture
+   - Document current workflows with screenshots/diagrams
+   - Identify pain points and limitations
+   - Understand existing patterns and conventions
 
-3. **Expert Review Phase**
-   
-   Invoke specialized agents to review and enhance the design:
-   
-   a. **Feature Integration Review**
-      - Use the feature-integration agent to analyze system integration
-      - Add "Feature Integration & Consistency" section
-      - Ensure feature connects properly with existing systems
-   
-   b. **Architecture Validation**
-      - Use the architect agent to validate technical design
-      - Enhance architecture sections
-      - Ensure extension-first principle is followed
-   
-   c. **QA Test Generation**
-      - Use the qa-engineer agent to generate test cases
-      - Create comprehensive test suites
-      - Cover all test scenarios and edge cases
-   
-4. **Consolidate and Finalize**
-   
-   Merge all expert feedback into the final design document with these sections:
+2. **Extension Point Discovery**
+   - Find existing interfaces and base classes
+   - Identify plugin or extension mechanisms
+   - Locate configuration systems
+   - Map registries, factories, service locators
 
-   ### Required Sections (in order):
-   
-   **Codebase Analysis**
-   - Summary of discovered patterns and conventions
-   - Existing systems that will be extended
-   - Architectural patterns to follow
-   - Specific files/modules that serve as implementation patterns
-   - Code style and convention requirements
-   
-   **Extension vs. Creation Analysis**
-   - List of existing systems considered for extension
-   - Detailed explanation of how feature will extend existing code
-   - Justification for any new components (only if absolutely necessary)
-   - Example: "Extending existing SettingsManager at src/core/settings.js rather than creating new settings system"
-   
-   **Overview**
-   - High-level description of the feature
-   - Key objectives and goals
-   - Non-goals and scope limitations
-   - How this fits into the existing system
-   
-   **Feature Integration & Consistency** (Added by Feature Integration Specialist)
-   - Integration with existing features
-   - Event system participation
-   - Import/export compatibility
-   - API consistency requirements
-   - Cross-feature dependencies
-   
-   **Architecture**
-   - How the feature integrates with existing architecture
-   - Extensions to current component relationships
-   - Data flow showing integration with existing flows
-   - Specific existing components being extended
-   - Architecture validation notes (from architect review)
-   
-   **Components and Interfaces**
-   - Existing components being extended and how
-   - Any new components (with justification)
-   - API contracts following existing patterns
-   - Module boundaries respecting current structure
-   
-   **Data Models**
-   - Extensions to existing schemas/models
-   - How new data integrates with current structures
-   - API formats matching existing conventions
-   - Database migration approach
-   
-   **API Interface Changes** (Required for any HTTP API modifications)
-   - New endpoints: method, path, purpose
-   - Modified endpoints: what changed and why
-   - Request schemas with examples
-   - Response formats with examples
-   - Status codes and error responses
-   - Authentication/authorization requirements
-   - Rate limiting if applicable
-   - Breaking changes clearly marked with migration path
-   
-   **Implementation Details**
-   - Specific patterns from codebase to follow
-   - References to similar implementations
-   - Security patterns matching current approach
-   
-   **Error Handling**
-   - Following existing error handling patterns
-   - Integration with current logging systems
-   - Consistent error message formatting
-   
-   **Testing Strategy** (Test cases generated by QA Engineer)
-   - Comprehensive test suites with specific test cases
-   - Organized by component/feature with describe blocks
-   - Covers happy paths, edge cases, and error scenarios
-   - Integration test cases for cross-feature functionality
-   - Clear test names describing expected behavior
-   - Following existing test patterns and structures
-   
-5. **Final Review and Iteration**
-   - Present the comprehensive design to the user
-   - Highlight all extension points being used
-   - Show how expert feedback was incorporated
-   - Justify any new systems/components
-   - Incorporate user feedback
-   - Refine until approved
+3. **Pattern Analysis**
+   - Document design patterns in use
+   - Identify naming conventions
+   - Study error handling approaches
+   - Review testing structures
 
-## Extension Examples
+### Phase 2: Create Design Document
 
-Always include concrete examples like:
-- "Adding new setting to existing SettingsPage component at src/ui/settings/SettingsPage.jsx"
-- "Extending BaseAPIController at src/api/base.js for new endpoint"
-- "Adding new field to existing User model at src/models/User.js"
-- "Registering new handler in existing EventBus at src/core/events.js"
+Create `.kiro/specs/{feature_name}/design.md` with this exact structure:
 
-## Guidelines
+```markdown
+# Design: {Feature Name}
 
-- **Extension First**: Always try to extend before creating new
-- **Avoid Over-Engineering**: Focus on feature implementation, not operational concerns
-- **API Changes**: The "API Interface Changes" section is REQUIRED for any feature that adds or modifies HTTP endpoints
-- **Only include these sections if specifically requested in requirements:**
-  - Performance testing strategies
-  - Deployment or migration strategies
-  - Monitoring and rollback procedures
-  - Infrastructure considerations
-- Document why new components are needed (if any)
-- Show deep understanding of existing codebase
-- Reference specific files and line numbers
-- Include code snippets showing pattern adherence
-- Demonstrate integration with existing systems
-- Maintain consistency with current architecture
+## Layer 1: Problem & Requirements
 
-## Agent Usage Instructions
+### Problem Statement
+[Clear, concise description of the problem being solved]
+[Why this problem matters and its impact]
 
-When invoking agents during the design process:
+### Current Situation (AS-IS)
+[Description of how things work today]
+[Include annotated screenshots or diagrams]
+[Specific pain points with evidence]
 
-1. **After creating initial design sections**, explicitly invoke each agent:
-   - "I'll now use the feature-integration agent to analyze system integration..."
-   - Continue for all three agents
+### Stakeholders
+- **Primary**: [Who directly uses this feature]
+- **Secondary**: [Who is affected indirectly]
+- **Technical**: [Who maintains/operates it]
 
-2. **Present each agent's feedback** before incorporating it into the design
+### Goals
+- [What we're trying to achieve]
+- [Measurable success criteria]
 
-3. **Show the enhanced sections** after incorporating feedback
+### Non-Goals
+- [What we're explicitly NOT doing]
+- [Scope boundaries]
 
-4. **Create a summary** of how each agent's input improved the design
+### Constraints
+- [Technical limitations]
+- [Time/resource constraints]
+- [Compatibility requirements]
 
-This transparent process helps users understand the value each perspective brings to the design.
+### Requirements
+
+#### Functional Requirements
+- REQ-001: The system SHALL [specific behavior]
+- REQ-002: WHEN [condition] the system SHALL [response]
+- REQ-003: IF [state] THEN the system SHALL [action]
+
+#### Non-Functional Requirements
+- NFR-001: Performance - [specific metrics]
+- NFR-002: Security - [specific requirements]
+- NFR-003: Usability - [specific criteria]
+
+## Layer 2: Functional Specification
+
+### Overview
+[How the feature works from external perspective]
+[User-facing behavior and interactions]
+
+### User Workflows
+1. **Workflow Name**
+   - User action
+   - System response
+   - Expected outcome
+
+### External Interfaces
+[APIs, UIs, or integration points users interact with]
+[Include mockups or interface definitions]
+
+### Alternatives Considered
+1. **Alternative A**: [Description]
+   - **Pros**: [Benefits]
+   - **Cons**: [Drawbacks]
+   - **Why not chosen**: [Specific reasoning]
+
+2. **Alternative B**: [Description]
+   - **Pros**: [Benefits]
+   - **Cons**: [Drawbacks]
+   - **Why not chosen**: [Specific reasoning]
+
+### Why This Solution
+[Justify why the chosen approach best meets requirements]
+[Reference specific requirements being addressed]
+
+## Layer 3: Technical Specification
+
+### Architecture Overview
+[High-level technical design]
+[Component relationships diagram]
+[Data flow visualization]
+
+### Extension vs Creation Analysis
+| Component | Extend/Create | Justification |
+|-----------|---------------|---------------|
+| [Component] | Extend | Uses existing [system] at [path] |
+| [Component] | Create | Required because [specific reason] |
+
+### Components
+
+#### Existing Components (Extended)
+- **[Component Name]** ([path/to/file])
+  - Current responsibility
+  - Planned extensions
+  - Integration approach
+
+#### New Components (If Required)
+- **[Component Name]**
+  - Purpose and responsibility
+  - Why it can't be an extension
+  - Integration with existing system
+
+### Data Models
+```
+[Schema definitions or model changes]
+[Migration approach if applicable]
+```
+
+### API Changes
+[Only if HTTP endpoints are modified]
+
+#### New Endpoints
+- `METHOD /path` - [Purpose]
+  - Request: [Schema with example]
+  - Response: [Schema with example]
+  - Auth: [Requirements]
+
+#### Modified Endpoints
+- `METHOD /path` - [What changed]
+  - Breaking change: [Yes/No]
+  - Migration path: [If breaking]
+
+### Implementation Details
+
+#### Key Algorithms
+[Core logic or complex calculations]
+[Reference to similar implementations]
+
+#### Security Considerations
+[Authentication/authorization approach]
+[Data validation and sanitization]
+[Following existing patterns from [reference]]
+
+#### Error Handling
+[Error scenarios and responses]
+[Logging approach]
+[User-facing error messages]
+
+### Testing Strategy
+
+#### Unit Tests
+```javascript
+describe('Component', () => {
+  it('handles normal case', () => {})
+  it('validates input', () => {})
+  it('handles edge case', () => {})
+})
+```
+
+#### Integration Tests
+[Cross-component testing approach]
+[API endpoint testing]
+[End-to-end scenarios]
+
+### Rollout Plan
+[Phased approach if needed]
+[Feature flags or gradual enablement]
+[Rollback strategy]
+
+## Appendix
+
+### Technical Details
+[Complex calculations or detailed proofs]
+[Performance benchmarks]
+[Detailed API specifications]
+
+### References
+- [Link to related documentation]
+- [Similar features for reference]
+- [External resources]
+```
+
+## Writing Guidelines
+
+### Structure & Flow
+- **Logical Progression**: Each sentence connects to the previous
+- **Short Paragraphs**: One key idea per paragraph
+- **Visual Over Text**: Use diagrams, tables, screenshots
+- **Concise Writing**: Remove ~30% after first draft
+
+### Quality Checks
+- Does Layer 1 clearly define the problem?
+- Does Layer 2 follow from the requirements?
+- Does Layer 3 implement Layer 2's specification?
+- Can a reviewer stop at any layer if flawed?
+
+### Extension First Principle
+- Always prefer extending existing systems
+- Document why new components are necessary
+- Reference specific existing patterns to follow
+- Include concrete examples with file paths
+
+### What to Avoid
+- Over-engineering or unnecessary complexity
+- Operational concerns unless required
+- Vague statements without evidence
+- Technical jargon without context
+
+## Review Process
+
+1. **Self-Review Questions**
+   - Is the problem well-understood?
+   - Are requirements necessary and sufficient?
+   - Does the functional spec meet all requirements?
+   - Is the technical implementation sound?
+
+2. **Iterate with Feedback**
+   - Present design for review after each layer
+   - Incorporate feedback before proceeding
+   - Don't advance if foundational issues exist
+
+3. **Final Validation**
+   - Verify each layer justifies the next
+   - Ensure design convinces reader of optimality
+   - Confirm all constraints are addressed
+
+## Example References
+
+Good extension examples:
+- "Extending existing SettingsManager at src/core/settings.js"
+- "Adding field to User model at src/models/User.js"
+- "Registering handler in EventBus at src/core/events.js"
+
+Remember: The design document should convince readers through clear reasoning, not clever complexity.
