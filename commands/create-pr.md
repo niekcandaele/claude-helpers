@@ -15,8 +15,9 @@ Optional PR title: $ARGUMENTS (e.g., `"Add user authentication feature"`)
 3. **Handle Uncommitted Changes:** If changes exist, commit them on the new feature branch
 4. **Push Feature Branch:** Push the feature branch to remote with upstream tracking
 5. **Detect Git Platform:** Identify whether using GitHub, GitLab, or Bitbucket
-6. **Create Pull Request:** Use appropriate CLI tool to create PR from feature branch to original branch
-7. **Display PR URL:** Show the created PR URL for easy access
+6. **Fetch Repository Labels:** Query available labels from the repository BEFORE attempting to assign any
+7. **Create Pull Request:** Use appropriate CLI tool to create PR with valid labels from feature branch to original branch
+8. **Display PR URL:** Show the created PR URL for easy access
 
 ## Platform Detection
 
@@ -36,28 +37,41 @@ The command automatically detects the git platform by examining the remote URL:
 
 ## Label Assignment
 
-Automatically query available repository labels and intelligently assign them to the pull request:
+**IMPORTANT: You MUST fetch the repository's actual labels FIRST before attempting to assign any labels to the PR. Never assume labels exist - always verify!**
 
-### 1. Label Discovery
+### 1. Label Discovery (REQUIRED FIRST STEP)
 
-**GitHub:**
+**GitHub (EXECUTE THIS FIRST):**
 ```bash
-# Get repository owner and name from remote URL
-REPO_INFO=$(gh repo view --json owner,name)
-OWNER=$(echo $REPO_INFO | jq -r .owner.login)
-REPO=$(echo $REPO_INFO | jq -r .name)
+# Method 1: Using gh label list (simpler and more reliable)
+gh label list --json name --jq '.[].name' > /tmp/available_labels.txt
 
-# Fetch all available labels
-gh api repos/$OWNER/$REPO/labels --jq '.[].name' > /tmp/available_labels.txt
+# Alternative Method 2: Using API directly
+gh api repos/{owner}/{repo}/labels --jq '.[].name' > /tmp/available_labels.txt
+
+# Store in a variable for immediate use
+AVAILABLE_LABELS=$(gh label list --json name --jq '.[].name')
 ```
 
-**GitLab:**
+**GitLab (EXECUTE THIS FIRST):**
 ```bash
-# Get project ID from remote URL
-PROJECT_ID=$(glab api projects --owned=true --jq '.[] | select(.ssh_url_to_repo == "'$(git remote get-url origin)'") | .id')
+# Method 1: Using glab label list (simpler)
+glab label list --repo {owner}/{repo} | cut -f1 > /tmp/available_labels.txt
 
-# Fetch all available labels  
+# Alternative Method 2: Using API
+PROJECT_ID=$(glab api projects --owned=true --jq '.[] | select(.ssh_url_to_repo == "'$(git remote get-url origin)'") | .id')
 glab api projects/$PROJECT_ID/labels --jq '.[].name' > /tmp/available_labels.txt
+
+# Store in a variable for immediate use  
+AVAILABLE_LABELS=$(glab label list | cut -f1)
+```
+
+**CRITICAL: If label fetching fails, proceed WITHOUT labels rather than using invalid ones:**
+```bash
+if ! gh label list --json name --jq '.[].name' > /tmp/available_labels.txt 2>/dev/null; then
+    echo "Warning: Could not fetch repository labels. Creating PR without labels."
+    AVAILABLE_LABELS=""
+fi
 ```
 
 ### 2. Intelligent Label Selection
@@ -122,17 +136,32 @@ if echo "$CHANGED_FILES" | grep -q "Dockerfile\|docker-compose\|\.yml$\|\.yaml$"
 fi
 ```
 
-### 3. Label Filtering and Assignment
+### 3. Label Filtering and Assignment (CRITICAL STEP)
 
-Filter proposed labels against available repository labels:
+**ONLY apply labels that actually exist in the repository:**
 ```bash
-# Filter labels to only include ones that exist in the repository
+# IMPORTANT: Only use labels that were confirmed to exist
+# Never apply a label without verifying it exists first!
+
+PROPOSED_LABELS="enhancement bug documentation"  # Based on your analysis
 FINAL_LABELS=""
-for label in $LABELS; do
-    if grep -q "^$label$" /tmp/available_labels.txt; then
+
+# Check each proposed label against the ACTUAL repository labels
+for label in $PROPOSED_LABELS; do
+    if grep -qx "$label" /tmp/available_labels.txt; then
+        # Label exists - safe to use
         FINAL_LABELS="$FINAL_LABELS --label \"$label\""
+        echo "✓ Label '$label' exists in repository"
+    else
+        # Label doesn't exist - skip it
+        echo "✗ Label '$label' not found in repository - skipping"
     fi
 done
+
+# If no valid labels found, proceed without any
+if [[ -z "$FINAL_LABELS" ]]; then
+    echo "Note: No matching labels found. Creating PR without labels."
+fi
 ```
 
 ### 4. Error Handling for Label Assignment
@@ -200,6 +229,122 @@ fi
    - Ensure valid git branch name
    - Add timestamp suffix if branch already exists
 
+## PR Title Generation for Changelogs
+
+**CRITICAL: PR titles appear in changelogs and release notes. They must be user-facing, not technical.**
+
+### Core Principles
+
+1. **Write for end users, not developers**
+   - Describe the user impact, not the code change
+   - Focus on benefits and improvements users will notice
+   - Avoid technical implementation details
+
+2. **Use clear, action-oriented language**
+   - Start with verbs when possible
+   - Be specific about what changed from the user's perspective
+   - Keep it concise but meaningful
+
+3. **Remember the changelog context**
+   - Users read these in release notes to understand what's new
+   - Titles should make sense without viewing the code
+   - Each title should communicate value
+
+### Good vs Bad Examples
+
+#### Features
+- ❌ **Bad:** "feat: implement Redis caching layer"
+- ✅ **Good:** "Speed up page loading times"
+
+- ❌ **Bad:** "feat: add WebSocket support to notification service"
+- ✅ **Good:** "Receive instant notifications without refreshing"
+
+- ❌ **Bad:** "feat: integrate Stripe payment API"
+- ✅ **Good:** "Enable secure credit card payments"
+
+#### Bug Fixes
+- ❌ **Bad:** "fix: CacheManager has wrong keys set"
+- ✅ **Good:** "Ensure displayed user data is always fresh"
+
+- ❌ **Bad:** "fix: null pointer exception in UserService"
+- ✅ **Good:** "Prevent app crashes when viewing profiles"
+
+- ❌ **Bad:** "fix: race condition in async handler"
+- ✅ **Good:** "Fix occasional duplicate form submissions"
+
+#### Performance
+- ❌ **Bad:** "perf: optimize database queries in product listing"
+- ✅ **Good:** "Load product catalog 3x faster"
+
+- ❌ **Bad:** "perf: reduce bundle size by 40%"
+- ✅ **Good:** "Improve initial page load speed on mobile devices"
+
+#### Security
+- ❌ **Bad:** "security: add CSRF token validation"
+- ✅ **Good:** "Protect against cross-site request forgery attacks"
+
+- ❌ **Bad:** "security: implement rate limiting on auth endpoints"
+- ✅ **Good:** "Prevent brute force login attempts"
+
+#### Refactoring
+- ❌ **Bad:** "refactor: move auth logic to middleware"
+- ✅ **Good:** "Improve login reliability and performance"
+
+- ❌ **Bad:** "refactor: migrate from callbacks to promises"
+- ✅ **Good:** "Enhanced stability in data processing"
+
+### Title Templates by Change Type
+
+**New Features:**
+- "Enable [user capability]"
+- "Add support for [user action]"
+- "Allow users to [specific action]"
+- "Introduce [user-facing feature]"
+
+**Bug Fixes:**
+- "Fix [user-visible problem]"
+- "Resolve issue where [problem description]"
+- "Prevent [undesired behavior]"
+- "Correct [specific user-facing issue]"
+
+**Improvements:**
+- "Improve [aspect] of [feature]"
+- "Enhance [user experience area]"
+- "Speed up [user action]"
+- "Simplify [user task]"
+
+**Breaking Changes:**
+- "Update [feature] to [new behavior]"
+- "Change how [feature] works"
+- "Require [new user action] for [feature]"
+
+### Analyzing Code to Generate User-Facing Titles
+
+When analyzing changes to create a title:
+
+1. **Ask: "What will users notice?"**
+   - Will pages load faster?
+   - Will something work that was broken?
+   - Can they do something new?
+
+2. **Translate technical changes to user benefits:**
+   - Database optimization → Faster search results
+   - API integration → New functionality available
+   - Bug fix → Specific problem solved
+   - Refactoring → Better reliability/performance
+
+3. **Avoid these technical terms in titles:**
+   - Class names, function names, file names
+   - Technical patterns (middleware, service, controller)
+   - Implementation details (cache, queue, worker)
+   - Internal architecture terms
+
+4. **Use these user-focused terms instead:**
+   - Speed, performance, reliability
+   - Features, capabilities, options
+   - Experience, interface, workflow
+   - Security, privacy, safety
+
 ## Commit and Push Integration
 
 After creating the feature branch, handle any uncommitted changes:
@@ -233,16 +378,35 @@ After creating the feature branch, handle any uncommitted changes:
    which gh || echo "GitHub CLI not installed"
    ```
 
-2. **Create PR:**
+2. **FIRST: Fetch Available Labels (MANDATORY):**
    ```bash
+   # This MUST be done before attempting to create the PR
+   echo "Fetching repository labels..."
+   if gh label list --json name --jq '.[].name' > /tmp/available_labels.txt; then
+       echo "Successfully fetched $(wc -l < /tmp/available_labels.txt) labels"
+   else
+       echo "Warning: Could not fetch labels. Proceeding without labels."
+       FINAL_LABELS=""
+   fi
+   ```
+
+3. **Create PR (with user-facing title and validated labels):**
+   ```bash
+   # Generate a user-facing title following the changelog guidelines
+   # Example: "Speed up dashboard loading" not "fix: optimize SQL queries"
+   PR_TITLE="[User-facing title per guidelines above]"
+   
+   # Only include labels that were verified to exist
    gh pr create \
-     --title "[Title from commits or user input]" \
+     --title "$PR_TITLE" \
      --body "[Generated description]" \
      --base [original-branch] \
      $FINAL_LABELS
    ```
+   - **IMPORTANT:** Title must be user-facing for changelogs (see PR Title Generation section)
    - Note: `--base` is set to the branch you started from, not the default branch
-   - `$FINAL_LABELS` contains the filtered `--label` flags for applicable repository labels
+   - `$FINAL_LABELS` contains ONLY validated labels that exist in the repository
+   - If no valid labels found, `$FINAL_LABELS` will be empty (PR created without labels)
 
 3. **PR Description Template:**
    ```markdown
@@ -271,16 +435,35 @@ After creating the feature branch, handle any uncommitted changes:
    which glab || echo "GitLab CLI not installed"
    ```
 
-2. **Create MR (Merge Request):**
+2. **FIRST: Fetch Available Labels (MANDATORY):**
    ```bash
+   # This MUST be done before attempting to create the MR
+   echo "Fetching repository labels..."
+   if glab label list | cut -f1 > /tmp/available_labels.txt; then
+       echo "Successfully fetched $(wc -l < /tmp/available_labels.txt) labels"
+   else
+       echo "Warning: Could not fetch labels. Proceeding without labels."
+       FINAL_LABELS=""
+   fi
+   ```
+
+3. **Create MR (with user-facing title and validated labels):**
+   ```bash
+   # Generate a user-facing title following the changelog guidelines
+   # Example: "Improve search accuracy" not "refactor: update search algorithm"
+   MR_TITLE="[User-facing title per guidelines above]"
+   
+   # Only include labels that were verified to exist
    glab mr create \
-     --title "[Title]" \
+     --title "$MR_TITLE" \
      --description "[Description]" \
      --target-branch [original-branch] \
      $FINAL_LABELS
    ```
+   - **IMPORTANT:** Title must be user-facing for changelogs (see PR Title Generation section)
    - Note: `--target-branch` is set to the branch you started from
-   - `$FINAL_LABELS` contains the filtered `--label` flags for applicable repository labels
+   - `$FINAL_LABELS` contains ONLY validated labels that exist in the repository
+   - If no valid labels found, `$FINAL_LABELS` will be empty (MR created without labels)
 
 ### Bitbucket and Others
 
@@ -307,7 +490,7 @@ Display comprehensive information about the created PR:
 🚀 Pull Request Created Successfully!
 
 📋 PR Details:
-  - Title: Add user authentication feature
+  - Title: Allow users to sign in with email and password
   - Source: feature/user-auth → develop
   - Original Branch: develop
   - Platform: GitHub
@@ -335,12 +518,22 @@ While the basic usage is `/create-pr`, the command supports:
 2. Store the original branch name to use as the PR target
 3. Commit any uncommitted changes on the feature branch, not the original
 4. Run all quality checks before pushing (via commit-and-push integration)
-5. Generate meaningful PR titles and descriptions
-6. Handle platform differences gracefully
-7. Provide clear error messages and next steps
-8. Never create duplicate PRs - check if one already exists
-9. Set up tracking between local and remote branches
-10. Make it clear which branch the PR targets (show "feature → original" flow)
+5. **CRITICAL: Fetch available repository labels BEFORE creating the PR**
+   - Use `gh label list` or `glab label list` to get actual labels
+   - ONLY apply labels that exist in the fetched list
+   - If label fetching fails, create PR without any labels
+   - Never assume common labels like "bug" or "enhancement" exist
+6. **Generate user-facing PR titles for changelogs**
+   - Write titles that describe user impact, not technical changes
+   - Avoid implementation details and technical jargon
+   - Focus on benefits and improvements users will notice
+   - Remember: these titles appear in release notes
+7. Generate meaningful PR descriptions with technical details
+8. Handle platform differences gracefully
+9. Provide clear error messages and next steps
+10. Never create duplicate PRs - check if one already exists
+11. Set up tracking between local and remote branches
+12. Make it clear which branch the PR targets (show "feature → original" flow)
 
 ## Platform-Specific Installation
 
