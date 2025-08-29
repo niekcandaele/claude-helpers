@@ -137,8 +137,52 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 5. **Testable**: Each component should be independently testable
 6. **Pseudocode Only**: Use simple pseudocode, avoid full code implementations
 
-## Deliverable
+## Deliverables
 
-Save the completed design document as `.design/YYYY-MM-DD-$ARGUMENTS/design.md` where YYYY-MM-DD is today's date.
+1. Save the completed design document as `.design/YYYY-MM-DD-$ARGUMENTS/design.md` where YYYY-MM-DD is today's date.
 
-Ask clarifying questions if needed before creating the document.
+2. Generate a feedback file at `.design/YYYY-MM-DD-$ARGUMENTS/feedback.md` containing:
+   - Questions about ambiguous requirements
+   - Concerns about potential implementation issues
+   - Requests for clarification on design decisions
+   - Areas where multiple approaches exist and guidance is needed
+
+### Feedback File Format
+
+```markdown
+# Design Feedback: [Feature Name]
+
+*Please review the questions below and add your responses inline under "**Human Response:**". Your feedback will be used to refine the design document.*
+
+## Questions & Clarifications
+
+### 1. [Topic/Component Name]
+**Question**: [Specific question about the design or requirement]
+**Context**: [Why this clarification is important for implementation]
+**Human Response**: 
+
+### 2. [Another Topic]
+**Concern**: [Potential issue or risk identified]
+**Impact**: [What could go wrong or be affected]
+**Suggested Approach**: [Possible solution if any]
+**Human Response**: 
+
+### 3. [Technical Decision]
+**Clarification Needed**: [Area needing more specification]
+**Options**: 
+- Option A: [description]
+- Option B: [description]
+**Trade-offs**: [Key considerations]
+**Human Response**: 
+```
+
+Include 3-5 meaningful questions focusing on:
+- Ambiguous requirements that could be interpreted multiple ways
+- Technical decisions with significant trade-offs
+- Integration points that need validation
+- Performance or security considerations
+- User experience choices
+
+After creating both files, inform the user to:
+1. Review and respond to questions in `feedback.md`
+2. Run `/cata-proj/feedback [feature-name]` to ingest responses and update the design
