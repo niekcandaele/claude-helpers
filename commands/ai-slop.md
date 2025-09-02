@@ -21,6 +21,55 @@ Optional scope: $ARGUMENTS (e.g., `docs`, `code`, `comments`, `all`)
 
 ## Detection Patterns
 
+### 🚨 THE BOLD BULLET EPIDEMIC (Highest Priority AI Tell)
+
+This is the single most obvious AI slop pattern. If your document is full of these, it's almost certainly AI-generated:
+
+#### The Classic AI Bullet Pattern
+```markdown
+# SCREAMING AI SLOP:
+- **Feature Name:** Description of what the feature does
+- **Another Thing:** Explanation of this thing  
+- **Configuration:** How to configure this item
+- **Performance:** Details about performance characteristics
+- **Security:** Information about security aspects
+
+# Why this is AI slop:
+1. Humans write "Feature X does Y" not "**Feature X:** Does Y"
+2. The colon creates unnecessary visual separation
+3. It's formulaic and robotic
+4. Real documentation flows naturally
+```
+
+#### When Bullets Are Actually OK
+```markdown
+# GOOD - Simple lists without forced structure:
+- redis
+- postgresql  
+- mongodb
+- elasticsearch
+
+# GOOD - Action items:
+- Fix the login bug
+- Update dependencies
+- Review PR #234
+
+# BAD - Forced categorization:
+- **Redis:** In-memory data store for caching
+- **PostgreSQL:** Relational database for persistent storage
+- **MongoDB:** Document database for flexible schemas
+```
+
+#### The Slop Variations
+```markdown
+# All of these scream AI:
+* **Overview:** This section provides...
+1. **Step One:** First, you need to...
+- **Note:** It's important to remember...
+• **Warning:** Be careful when...
+→ **Tip:** You can optimize by...
+```
+
 ### Text Slop Indicators
 
 #### Formulaic Structure Red Flags
@@ -28,9 +77,9 @@ Optional scope: $ARGUMENTS (e.g., `docs`, `code`, `comments`, `all`)
 # Every Section Follows This Pattern:
 
 ## Overview
-[Three bullet points]
+[Exactly three bullet points with bold prefixes]
 
-## Key Features
+## Key Features  
 - **Feature Name:** Description that always starts with "Enables"
 - **Another Feature:** Description that always starts with "Provides"
 - **Third Feature:** Description that always starts with "Allows"
@@ -185,7 +234,25 @@ If you encounter...
 
 ## Verification Commands
 
-### Text Pattern Scanning
+### Bold Bullet Detection (PRIORITY ONE)
+```bash
+# Find the classic bold-colon pattern
+grep -r "^\s*[-*•→▸▪︎]\s*\*\*[^:]*:\*\*" --include="*.md" --include="*.txt"
+
+# Find numbered lists with bold patterns
+grep -r "^[0-9]\+\.\s*\*\*[^:]*:\*\*" --include="*.md"
+
+# Count bold bullet occurrences per file (high numbers = AI slop)
+for f in *.md; do echo "$f: $(grep -c "^\s*[-*]\s*\*\*.*:\*\*" "$f" 2>/dev/null || echo 0)"; done | sort -t: -k2 -rn
+
+# Find all variations of bold patterns
+grep -r "\*\*[A-Z][^:]*:\*\*" --include="*.md" | head -20
+
+# Detect "Enables/Provides/Allows" pattern starts
+grep -r "^\s*[-*]\s*\*\*.*:\*\*\s*\(Enables\|Provides\|Allows\|Offers\|Delivers\|Ensures\)" --include="*.md"
+```
+
+### Text Pattern Scanning  
 ```bash
 # Find AI phrase indicators
 grep -r "Furthermore,\|Moreover,\|It's worth noting\|In essence\|Comprehensive solution\|Robust implementation" --include="*.md" --include="*.txt"
@@ -195,9 +262,6 @@ grep -r "may\|might\|could\|possibly\|potentially\|can\|should" --include="*.js"
 
 # Find numbered function variations
 grep -r "function.*[0-9]\|function.*Temp\|function.*New\|function.*Old" --include="*.js" --include="*.ts"
-
-# Find rigid bullet patterns
-grep -r "^\s*-\s*\*\*.*:\*\*" --include="*.md"
 ```
 
 ### Comment Analysis
@@ -230,18 +294,20 @@ grep -r "## Overview" --include="*.md" | wc -l
 ## Slop Scoring System
 
 ### 🔴 **CRITICAL SLOP** (Immediate Refactoring Needed)
+- Bold bullet patterns ("**Term:** Description") throughout documentation
 - Every function has a comment explaining what it does
 - Numbered function names (func1, func2, func3)
 - Triple-nested bullet points in documentation
 - "Furthermore/Moreover" in every paragraph
 - Comments explaining language syntax
+- More than 5 bold-colon bullets in a single document section
 
 ### 🟡 **HIGH SLOP** (Significant AI Patterns)
 - Excessive use of "comprehensive," "robust," "elegant"
 - Over-qualified statements (may, might, could everywhere)
 - Rigid template structure across all docs
 - Defensive programming without justification
-- Bolded first words in bullet lists
+- Lists where every item starts with the same verb
 
 ### 🟠 **MEDIUM SLOP** (Moderate AI Influence)
 - Unnecessary categorization depth
@@ -271,7 +337,16 @@ grep -r "## Overview" --include="*.md" | wc -l
 
 🔴 CRITICAL SLOP FINDINGS:
 
-1. EXCESSIVE OBVIOUS COMMENTS
+1. BOLD BULLET EPIDEMIC
+   File: README.md
+   Count: 47 instances of "**Term:** Description" pattern
+   Example:
+     - **Installation:** Steps to install the package
+     - **Configuration:** How to configure the settings
+     - **Usage:** Instructions for using the tool
+   Why it's slop: No human writes documentation this robotically
+   
+2. EXCESSIVE OBVIOUS COMMENTS
    File: src/utils/calculator.js
    Lines: 23-45
    Pattern: Every single line has a comment explaining basic operations
@@ -279,19 +354,12 @@ grep -r "## Overview" --include="*.md" | wc -l
      let x = 0;  // Initialize x to zero
      x++;        // Increment x by one
    
-2. AI REFACTOR TRACES
+3. AI REFACTOR TRACES
    File: src/api/handler.js
    Pattern: Comments documenting AI changes
    Example:
      // processRequest function (refactored for clarity)
      // Now uses async/await pattern (improved from callbacks)
-   
-3. FORMULAIC DOCUMENTATION
-   File: README.md
-   Pattern: Every section follows identical structure
-   - Always 3 bullet points
-   - Always starts with "This [component] provides..."
-   - Always ends with "Best Practices" section
 
 🟡 HIGH PRIORITY SLOP:
 
@@ -307,12 +375,17 @@ grep -r "## Overview" --include="*.md" | wc -l
 
 📝 REFACTORING RECOMMENDATIONS:
 
-1. ❗ Remove all obvious comments (save 200+ lines)
-2. ❗ Consolidate numbered functions into single parameterized function
-3. ❗ Rewrite docs in natural language without templates
-4. ⚠️ Remove unnecessary null checks
-5. ⚠️ Replace "Furthermore/Moreover" with natural transitions
-6. ⚠️ Unindent excessive categorization
+1. ❗ ELIMINATE ALL BOLD BULLET PATTERNS
+   Before: - **Feature:** This feature does X
+   After: The feature does X
+   Or just: - Feature X
+   
+2. ❗ Remove all obvious comments (save 200+ lines)
+3. ❗ Convert forced bullet lists to natural paragraphs
+4. ❗ Consolidate numbered functions into single parameterized function
+5. ⚠️ Remove unnecessary null checks
+6. ⚠️ Replace "Furthermore/Moreover" with natural transitions
+7. ⚠️ Unindent excessive categorization
 
 🎯 AI SLOP SCORE: 73% - HIGHLY ARTIFICIAL
 
@@ -406,17 +479,51 @@ Support `.aisloprc` configuration:
 - Comments that trail off with "..."
 - Suggested imports that don't exist
 
+## Refactoring Bold Bullets: Before and After
+
+### Example 1: Documentation
+```markdown
+# AI SLOP VERSION:
+## Features
+- **Authentication:** Provides secure user authentication with JWT tokens
+- **Authorization:** Enables role-based access control for resources  
+- **Session Management:** Handles user sessions with Redis backing
+
+# HUMAN VERSION:
+## Features
+We handle authentication using JWT tokens, with role-based access control
+and Redis-backed session management.
+
+# OR EVEN SIMPLER:
+## Features
+- JWT authentication
+- Role-based access control
+- Redis sessions
+```
+
+### Example 2: Configuration
+```markdown
+# AI SLOP VERSION:
+- **Database:** PostgreSQL for persistent data storage
+- **Cache:** Redis for high-performance caching layer
+- **Queue:** RabbitMQ for asynchronous job processing
+
+# HUMAN VERSION:
+The system uses PostgreSQL for data storage, Redis for caching, 
+and RabbitMQ for job processing.
+```
+
 ## Final Instructions
 
-1. Focus on patterns, not individual instances
-2. Look for repetition across files
-3. Check git history for bulk AI-generated commits
-4. Identify template following versus natural variation
-5. Flag formulaic structure over organic growth
-6. Detect when comments explain the language, not the logic
-7. Find defensive patterns without justification
-8. Recognize theatrical adjectives and corporate speak
-9. Identify rigid categorization versus practical organization
-10. Remember: Good code is often inconsistent in its consistency
+1. **PRIORITY ONE:** Hunt down and eliminate bold bullet patterns
+2. Focus on patterns, not individual instances
+3. Look for repetition across files
+4. Check git history for bulk AI-generated commits
+5. Identify template following versus natural variation
+6. Flag formulaic structure over organic growth
+7. Detect when comments explain the language, not the logic
+8. Find defensive patterns without justification
+9. Recognize theatrical adjectives and corporate speak
+10. Remember: Good documentation reads like a human wrote it
 
-The goal: Help developers identify and remove artificial patterns to create more authentic, maintainable code.
+The goal: Help developers identify and remove artificial patterns to create more authentic, maintainable code. The bold bullet pattern is the most obvious tell - if you see it everywhere, the document is AI slop.
