@@ -1,12 +1,14 @@
 ---
-description: Execute demo of the most recently completed phase
+description: Execute demo of the most recently completed phase using cata-tester agent
 argument-hint: [feature name or tasks file path]
-allowed-tools: Read, Bash, Grep, Glob, LS
+allowed-tools: Task
 ---
 
 # Execute Phase Demo
 
 Run the demonstration for the most recently completed phase of: **$ARGUMENTS**
+
+This command launches the `cata-tester` agent to execute the demo with strict no-fix testing philosophy.
 
 ## Process
 
@@ -199,3 +201,23 @@ Input: "payment-integration"
 - **Preserve state**: Don't clean up or reset between attempts
 
 The demo command proves that each phase delivers what it promises. If it can't be demonstrated, it's not really done.
+
+## Implementation
+
+Launch the cata-tester agent with the Task tool:
+
+```
+Use the Task tool to launch the cata-tester agent with:
+- subagent_type: "cata-tester"
+- description: "Execute phase demo"
+- prompt: "Execute the demo for: $ARGUMENTS
+
+Follow the demo process outlined above:
+1. Locate the tasks.md file
+2. Identify the last completed phase
+3. Prepare and execute the demo exactly as specified
+4. Report results without attempting any fixes
+5. If it fails, provide detailed failure analysis
+
+Remember: Test and report only - never fix issues during demo."
+```
