@@ -1,7 +1,7 @@
 ---
 description: Plan, execute, and test tasks phase-by-phase with approval workflow
 argument-hint: [feature name or tasks file path] [optional: phase number]
-allowed-tools: Read, Grep, Glob, Task, ExitPlanMode
+allowed-tools: Read, Write, Edit, MultiEdit, Bash, Grep, Glob, WebSearch, WebFetch, TodoWrite, Task, ExitPlanMode
 ---
 
 # Execute Tasks by Phase
@@ -9,6 +9,14 @@ allowed-tools: Read, Grep, Glob, Task, ExitPlanMode
 Execute implementation tasks for: **$ARGUMENTS**
 
 This command orchestrates a complete development cycle: planning, execution, and testing. It ensures thoughtful implementation with automatic verification.
+
+## Core Philosophy
+
+**ABSOLUTELY NO WORKAROUNDS** - When you encounter blockers:
+1. STOP immediately
+2. Analyze the root cause thoroughly
+3. Report the exact blocker with detailed analysis
+4. Wait for human guidance
 
 ## Workflow Overview
 
@@ -18,7 +26,7 @@ This command orchestrates a complete development cycle: planning, execution, and
    - Create execution plan
    - Get user approval
 
-2. **Execution Phase** (cata-coder agent)
+2. **Execution Phase** (You handle this directly)
    - Implement according to approved plan
    - Follow strict no-workarounds protocol
    - Update task progress
@@ -45,23 +53,57 @@ Then present the plan using ExitPlanMode for approval.
 
 ### Step 2: Execution Phase
 
-After plan approval, launch the cata-coder agent:
+After plan approval, execute the implementation directly:
 
-```
-Use the Task tool to launch the cata-coder agent with:
-- subagent_type: "cata-coder"
-- description: "Execute approved plan"
-- prompt: "Execute the implementation tasks for: $ARGUMENTS
+1. **Initial Setup**
+   - Locate and read the design document (in `.design/*/design.md`)
+   - Locate and read the tasks.md file
+   - Check current git status to understand the codebase state
+   - Use TodoWrite to track your progress through phases and tasks
 
-Here is the approved plan:
-[Include the detailed plan that was approved]
+2. **Phase Execution**
+   For each phase:
+   - Identify the target phase (from arguments or first incomplete phase)
+   - Read the phase goal and demo objective
+   - Execute each task in sequence:
+     - Read task details carefully
+     - Implement EXACTLY as specified
+     - Handle any code removal requirements
+     - Verify task completion
+     - Update TodoWrite progress
 
-Follow your strict no-workarounds protocol. Execute each task exactly as planned. Report progress clearly and stop immediately if you encounter any blockers."
-```
+3. **Debugging Approach**
+   When encountering issues:
+   - Use `docker compose logs` to check service logs
+   - Add print/console.log statements for debugging
+   - Execute code to see actual behavior
+   - Search online for documentation and solutions
+   - But NEVER implement workarounds
+
+4. **Blocker Reporting**
+   When blocked, provide:
+   ```
+   ❌ Task Blocked: [Task name]
+
+   Blocker: [What's preventing implementation]
+   Root Cause: [Why this is happening]
+   Impact: [What can't be completed]
+
+   Debugging Steps Taken:
+   - [Step 1 and result]
+   - [Step 2 and result]
+
+   Required to Proceed:
+   - [Specific requirement 1]
+   - [Specific requirement 2]
+
+   Human Action Needed:
+   [Clear description of what needs to be done]
+   ```
 
 ### Step 3: Testing Phase
 
-After cata-coder completes successfully, automatically launch the cata-tester:
+After execution completes successfully, automatically launch the cata-tester:
 
 ```
 Use the Task tool to launch the cata-tester agent with:
@@ -72,6 +114,35 @@ Use the Task tool to launch the cata-tester agent with:
 The phase was just completed. Execute the demo to verify everything works as expected. Report any failures without attempting fixes."
 ```
 
+## Unacceptable Practices
+
+❌ Creating mocks when real integration is specified
+❌ Hardcoding values that should come from config
+❌ Implementing "simpler" alternatives
+❌ Using TODO comments instead of proper implementation
+❌ Working around missing dependencies
+❌ Skipping error handling
+❌ Making assumptions about ambiguous requirements
+
+## Required Practices
+
+✓ Search online for up-to-date documentation
+✓ Check docker logs for service issues
+✓ Use print debugging to understand code flow
+✓ Read existing code patterns before implementing
+✓ Run ALL quality checks (lint, build, test)
+✓ Update tasks.md only after verification passes
+✓ Report blockers immediately with full analysis
+
+## Online Research
+
+Always search for:
+- Latest library documentation
+- Known issues and solutions
+- Best practices for the technology
+- Security considerations
+- Performance implications
+
 ## Usage
 
 ```
@@ -81,9 +152,8 @@ The phase was just completed. Execute the demo to verify everything works as exp
 /cata-proj/execute [path/to/tasks.md] [phase-number]
 ```
 
-## What the Agent Does
+## What You Will Do
 
-The cata-coder agent will:
 1. Locate and read the design document and tasks.md file
 2. Identify the target phase to execute
 3. Execute each task exactly as specified
@@ -91,9 +161,9 @@ The cata-coder agent will:
 5. Update progress in the tasks.md file
 6. Report any blockers with detailed analysis
 
-## Agent Philosophy
+## Implementation Philosophy
 
-The cata-coder agent follows a strict NO WORKAROUNDS policy:
+Follow a strict NO WORKAROUNDS policy:
 - Implements exactly what's specified
 - Stops and reports when blocked
 - Provides detailed blocker analysis
@@ -102,10 +172,11 @@ The cata-coder agent follows a strict NO WORKAROUNDS policy:
 
 ## Process
 
-1. **Launch the Agent**: Use the Task tool to invoke the cata-coder agent with your arguments
-2. **Monitor Progress**: The agent will report its progress through each phase
-3. **Handle Blockers**: If blocked, the agent will stop and provide detailed analysis
-4. **Review Results**: Agent will confirm what can be demonstrated after each phase
+1. **Research and Plan**: Analyze requirements and create execution plan
+2. **Get Approval**: Present plan and wait for user confirmation
+3. **Execute Tasks**: Implement each task exactly as planned
+4. **Handle Blockers**: Stop and report with detailed analysis when blocked
+5. **Run Tests**: Launch cata-tester to verify implementation
 
 ## Examples
 
@@ -142,8 +213,8 @@ The cata-coder agent follows a strict NO WORKAROUNDS policy:
    - Create detailed plan
    - Exit plan mode for approval
 3. Upon approval:
-   - cata-coder executes the plan
-   - Updates tasks.md on success
+   - Execute the plan directly
+   - Update tasks.md on success
 4. Automatically:
    - cata-tester runs the demo
    - Reports success or failure
@@ -151,3 +222,5 @@ The cata-coder agent follows a strict NO WORKAROUNDS policy:
 ```
 
 This ensures thoughtful, tested, and verified implementation at every phase.
+
+Remember: The goal is correct implementation, not quick implementation. A blocked task with good analysis is better than a working workaround that will cause problems later.
