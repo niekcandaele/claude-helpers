@@ -19,6 +19,7 @@ Before analyzing the codebase, research modern approaches and industry standards
    - Review modern frameworks and libraries that solve similar problems
    - Identify established patterns and common approaches
    - Find recent articles, guides, and official documentation (prefer 2023+)
+   - **MUST track and save URLs** for every source consulted
 
 2. **Pattern Discovery**
    - Research proven implementation patterns
@@ -43,6 +44,13 @@ Before analyzing the codebase, research modern approaches and industry standards
 - Technologies/libraries to consider
 - Anti-patterns to avoid
 - Industry standards to follow
+
+**Source Citation Requirements**:
+- EVERY research finding MUST include a source URL
+- Use markdown link format: `[Article/Doc Title](https://url)`
+- Include publication date when available
+- Prefer: Official documentation > Recent articles (2023+) > Blog posts
+- All claims in the design doc must be traceable to sources
 
 ### Phase 1: Codebase Analysis
 
@@ -78,21 +86,39 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 ### Industry Findings
 [Summary of web research on modern approaches to this feature type]
 
+**Key Sources Consulted**:
+- [Source Title 1](https://example.com/article) - Publication Date
+- [Source Title 2](https://example.com/docs) - Official Documentation
+- [Source Title 3](https://example.com/guide) - 2024 Guide
+
 ### Recommended Patterns
-1. **[Pattern Name]** ([Source/Reference])
+1. **[Pattern Name]**
+   - Source: [Article/Doc Title](https://url)
    - Description and benefits
    - How it applies to this feature
-   - Example use cases
+   - Example use cases from the source
+
+2. **[Another Pattern]**
+   - Source: [Official Docs](https://url)
+   - Why it's recommended
+   - Implementation considerations
 
 ### Technologies to Consider
 - **[Library/Framework]**: [Why it's relevant]
-- **[Tool/Service]**: [Benefits and trade-offs]
+  - Reference: [Official Docs/Article](https://url)
+  - Benefits and trade-offs
+- **[Tool/Service]**: [Description]
+  - Reference: [Source](https://url)
 
 ### Anti-Patterns to Avoid
-- **[Bad Pattern]**: [Why to avoid, based on research]
+- **[Bad Pattern]**: [Why to avoid]
+  - Source: [Article explaining pitfalls](https://url)
+  - Common problems and alternatives
 
 ### Standards & Compliance
 [Relevant industry standards, security requirements, accessibility guidelines]
+- [Standard Name]: [Requirement] - [Official Spec](https://url)
+- [Security Practice]: [Description] - [OWASP/NIST Guide](https://url)
 
 ## Layer 1: Problem & Requirements
 
@@ -185,10 +211,10 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 
 ## Key Principles
 
-1. **Research-Informed**: Base design on proven patterns and modern best practices
+1. **Research-Informed**: Base design on proven patterns and modern best practices - cite all sources with URLs
 2. **Extension First**: Always prefer extending existing systems
 3. **Remove When Possible**: Delete obsolete code when adding new features
-4. **Evidence-Based**: Support claims with code references and research findings
+4. **Evidence-Based**: Support ALL claims with code references and research findings - include clickable source URLs
 5. **Incremental**: Design for phased delivery
 6. **Testable**: Each component should be independently testable
 7. **Pseudocode Only**: Use simple pseudocode, avoid full code implementations
