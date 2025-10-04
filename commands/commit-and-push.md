@@ -2,7 +2,7 @@
 
 ## Goal
 
-To automatically run linting, formatting, and build steps, then create a clean git commit with a descriptive message and push changes to the remote repository. This command streamlines the workflow of preparing, committing, and pushing code changes while ensuring code quality standards are met.
+To automatically run linting, formatting, and build steps, then create a clean git commit with a descriptive message, push changes to the remote repository, and monitor CI/CD pipeline status. This command streamlines the complete workflow of preparing, committing, pushing, and verifying code changes while ensuring code quality standards are met.
 
 ## Process
 
@@ -12,6 +12,7 @@ To automatically run linting, formatting, and build steps, then create a clean g
 4. **Generate Commit Message:** Create a descriptive commit message based on the changes being made
 5. **Create Commit:** Make a git commit with proper attribution
 6. **Push to Remote:** Push the commit to the remote origin repository
+7. **Monitor CI Status:** Automatically run the `/check-ci` command to monitor CI/CD pipeline status
 
 ## Repository Analysis and Script Discovery
 
@@ -106,6 +107,12 @@ The message should be concise but descriptive enough to understand the change wi
    - Push with `git push origin [current-branch]`
    - Handle common push errors (upstream not set, conflicts, etc.)
 
+6. **CI Monitoring Phase:**
+   - After successful push, automatically monitor CI/CD pipeline status
+   - Use the SlashCommand tool to execute `/check-ci`
+   - This will provide real-time CI status updates and automatic failure analysis
+   - If CI fails, you'll get specific fix proposals without having to manually check
+
 ## Success Output
 
 Upon successful completion, display:
@@ -114,6 +121,7 @@ Upon successful completion, display:
 - **Generated Commit Message:** The commit message that was created
 - **Commit Hash:** The hash of the created commit
 - **Push Confirmation:** Confirmation with branch name and remote details
+- **CI Status:** Real-time updates from the CI/CD pipeline (via `/check-ci` command)
 
 ## Example Discovery Output
 
@@ -137,6 +145,9 @@ Upon successful completion, display:
 
 💾 Commit Created: abc1234 - "feat: add user authentication module"
 🚀 Pushed to origin/feature-branch
+
+🔄 Monitoring CI/CD Pipeline...
+[Output from /check-ci command will appear here]
 ```
 
 ## Target Audience
@@ -150,3 +161,5 @@ This command is designed for developers who want to streamline their git workflo
 3. Generate descriptive commit messages that follow conventional commit patterns
 4. Handle errors gracefully and provide actionable feedback to users
 5. Skip running tests by default since they typically take too long, but allow users to opt-in if desired
+6. After successfully pushing, automatically execute the `/check-ci` command using the SlashCommand tool
+7. Ensure the CI monitoring happens seamlessly as part of the commit-and-push workflow
