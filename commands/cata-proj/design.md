@@ -1,7 +1,7 @@
 ---
 description: Create a technical design document for a feature
 argument-hint: [feature name]
-allowed-tools: Read, Write, Grep, Glob, LS, Bash
+allowed-tools: Read, Write, Grep, Glob, LS, Bash, WebSearch
 ---
 
 # Create Design Document
@@ -9,6 +9,40 @@ allowed-tools: Read, Write, Grep, Glob, LS, Bash
 You'll create a comprehensive technical design document for the feature: **$ARGUMENTS**
 
 ## Process
+
+### Phase 0: Research Modern Best Practices
+
+Before analyzing the codebase, research modern approaches and industry standards:
+
+1. **Industry Research**
+   - Search for current best practices for this type of feature
+   - Review modern frameworks and libraries that solve similar problems
+   - Identify established patterns and common approaches
+   - Find recent articles, guides, and official documentation (prefer 2023+)
+
+2. **Pattern Discovery**
+   - Research proven implementation patterns
+   - Identify anti-patterns and common pitfalls to avoid
+   - Look for case studies of successful implementations
+   - Find benchmarks and performance considerations
+
+3. **Technology Landscape**
+   - Survey modern tools and libraries available
+   - Review what leading companies/projects use for similar features
+   - Check for emerging standards or specifications
+   - Identify compatibility and integration requirements
+
+4. **Security & Performance**
+   - Research security best practices specific to this feature type
+   - Find performance optimization techniques
+   - Review accessibility standards if UI-related
+   - Check for compliance requirements (GDPR, WCAG, etc.)
+
+**Research Output**: Document 3-5 key findings that will inform the design, including:
+- Modern patterns to adopt
+- Technologies/libraries to consider
+- Anti-patterns to avoid
+- Industry standards to follow
 
 ### Phase 1: Codebase Analysis
 
@@ -38,6 +72,27 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 
 ```markdown
 # Design: [Feature Name]
+
+## Research & Best Practices
+
+### Industry Findings
+[Summary of web research on modern approaches to this feature type]
+
+### Recommended Patterns
+1. **[Pattern Name]** ([Source/Reference])
+   - Description and benefits
+   - How it applies to this feature
+   - Example use cases
+
+### Technologies to Consider
+- **[Library/Framework]**: [Why it's relevant]
+- **[Tool/Service]**: [Benefits and trade-offs]
+
+### Anti-Patterns to Avoid
+- **[Bad Pattern]**: [Why to avoid, based on research]
+
+### Standards & Compliance
+[Relevant industry standards, security requirements, accessibility guidelines]
 
 ## Layer 1: Problem & Requirements
 
@@ -130,12 +185,13 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 
 ## Key Principles
 
-1. **Extension First**: Always prefer extending existing systems
-2. **Remove When Possible**: Delete obsolete code when adding new features
-3. **Evidence-Based**: Support claims with code references
-4. **Incremental**: Design for phased delivery
-5. **Testable**: Each component should be independently testable
-6. **Pseudocode Only**: Use simple pseudocode, avoid full code implementations
+1. **Research-Informed**: Base design on proven patterns and modern best practices
+2. **Extension First**: Always prefer extending existing systems
+3. **Remove When Possible**: Delete obsolete code when adding new features
+4. **Evidence-Based**: Support claims with code references and research findings
+5. **Incremental**: Design for phased delivery
+6. **Testable**: Each component should be independently testable
+7. **Pseudocode Only**: Use simple pseudocode, avoid full code implementations
 
 ## Deliverables
 
