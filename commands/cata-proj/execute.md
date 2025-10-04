@@ -1,7 +1,7 @@
 ---
 description: Plan, execute, and test tasks phase-by-phase with approval workflow
 argument-hint: [feature name or tasks file path] [optional: phase number]
-allowed-tools: Read, Write, Edit, MultiEdit, Bash, Grep, Glob, WebSearch, WebFetch, TodoWrite, Task, ExitPlanMode
+allowed-tools: Read, Write, Edit, MultiEdit, Bash, Grep, Glob, WebSearch, WebFetch, TodoWrite, Task, ExitPlanMode, SlashCommand
 ---
 
 # Execute Tasks by Phase
@@ -31,8 +31,9 @@ This command orchestrates a complete development cycle: planning, execution, and
    - Follow strict no-workarounds protocol
    - Update task progress
 
-3. **Testing Phase** (cata-tester agent)
-   - Run demo for completed phase
+3. **Testing Phase** (automatic via /cata-proj:demo)
+   - Automatically invoke demo command
+   - Demo runs via cata-tester agent
    - Verify functionality
    - Report results
 
@@ -101,18 +102,26 @@ After plan approval, execute the implementation directly:
    [Clear description of what needs to be done]
    ```
 
-### Step 3: Testing Phase
+### Step 3: Testing Phase - AUTOMATIC DEMO EXECUTION
 
-After execution completes successfully, automatically launch the cata-tester:
+**MANDATORY**: After execution completes successfully, you MUST automatically run the demo:
 
-```
-Use the Task tool to launch the cata-tester agent with:
-- subagent_type: "cata-tester"
-- description: "Test completed phase"
-- prompt: "Run the demo for: $ARGUMENTS
+1. **Extract the feature name** from $ARGUMENTS:
+   - If $ARGUMENTS is a path like `.design/2024-01-15-user-auth/tasks.md`, extract `user-auth`
+   - If $ARGUMENTS is already a feature name like `user-auth`, use it directly
+   - If $ARGUMENTS includes a phase number (e.g., `user-auth 2`), use only the feature name
 
-The phase was just completed. Execute the demo to verify everything works as expected. Report any failures without attempting fixes."
-```
+2. **Automatically invoke the demo command** using SlashCommand:
+   ```
+   Use the SlashCommand tool with:
+   command: "/cata-proj:demo [feature-name]"
+   ```
+
+3. **Wait for demo results**:
+   - If demo passes: Phase is complete and verified
+   - If demo fails: Implementation has issues that must be fixed
+
+**This is NOT optional** - every phase implementation must be automatically verified through the demo command. Do not ask the user to run the demo manually.
 
 ## Unacceptable Practices
 
@@ -159,7 +168,8 @@ Always search for:
 3. Execute each task exactly as specified
 4. Run all quality checks and verifications
 5. Update progress in the tasks.md file
-6. Report any blockers with detailed analysis
+6. Automatically invoke /cata-proj:demo to verify the implementation
+7. Report any blockers with detailed analysis
 
 ## Implementation Philosophy
 
@@ -176,7 +186,7 @@ Follow a strict NO WORKAROUNDS policy:
 2. **Get Approval**: Present plan and wait for user confirmation
 3. **Execute Tasks**: Implement each task exactly as planned
 4. **Handle Blockers**: Stop and report with detailed analysis when blocked
-5. **Run Tests**: Launch cata-tester to verify implementation
+5. **Run Demo**: Automatically invoke /cata-proj:demo to verify implementation
 
 ## Examples
 
@@ -215,10 +225,11 @@ Follow a strict NO WORKAROUNDS policy:
 3. Upon approval:
    - Execute the plan directly
    - Update tasks.md on success
-4. Automatically:
-   - cata-tester runs the demo
-   - Reports success or failure
-5. Human decides next steps based on results
+4. Automatically invoke demo:
+   - Use SlashCommand to run /cata-proj:demo feature-name
+   - Demo command launches cata-tester agent
+   - Demo executes and reports success or failure
+5. Human decides next steps based on demo results
 ```
 
 This ensures thoughtful, tested, and verified implementation at every phase.
