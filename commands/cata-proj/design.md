@@ -72,6 +72,10 @@ Before writing the design, analyze the existing codebase to understand:
    - Look for deprecated patterns that can be replaced
    - Document what can be safely deleted
 
+4. **Development Infrastructure**
+   - Check if testing framework, CI, linting, and formatters exist
+   - Note if any setup is needed before implementation starts
+
 ### Phase 2: Design Document Creation
 
 Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this structure:
@@ -164,10 +168,15 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 #### Security
 [Auth, validation, following security patterns [13]]
 
-### Testing Strategy
-- Unit tests: [approach - cite testing best practices [14]]
-- Integration tests: [scenarios]
-- E2E tests: [critical paths]
+### Test-Driven Implementation
+For each component, write tests first or alongside implementation:
+- Unit tests: [test cases for each component - cite testing best practices [14]]
+- Integration tests: [scenarios to verify component interactions]
+- E2E tests: [critical user workflows]
+
+**Important Notes**:
+- Tests should be written as part of development, not as a separate phase after implementation
+- Focus on functional testing (does it work correctly?) unless user explicitly requests performance, load, or other specialized testing
 
 ### Rollout Plan
 [Phased approach, feature flags, rollback strategy - reference deployment patterns [15]]
@@ -215,7 +224,7 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 3. **Remove When Possible**: Delete obsolete code when adding new features
 4. **Evidence-Based**: Support ALL claims with code references and research findings - include clickable source URLs
 5. **Incremental**: Design for phased delivery
-6. **Testable**: Each component should be independently testable
+6. **Test-Driven**: Write tests alongside implementation, not as a separate phase after
 7. **Pseudocode Only**: Use simple pseudocode, avoid full code implementations
 
 ## Deliverables
