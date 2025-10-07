@@ -78,55 +78,18 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 
 ## Document Structure
 
+**Citation Style**: Use inline numbered citations `[1]` `[2]` throughout the document that reference the numbered sources in the References section at the end.
+
 ```markdown
 # Design: [Feature Name]
-
-## Research & Best Practices
-
-### Industry Findings
-[Summary of web research on modern approaches to this feature type]
-
-**Key Sources Consulted**:
-- [Source Title 1](https://example.com/article) - Publication Date
-- [Source Title 2](https://example.com/docs) - Official Documentation
-- [Source Title 3](https://example.com/guide) - 2024 Guide
-
-### Recommended Patterns
-1. **[Pattern Name]**
-   - Source: [Article/Doc Title](https://url)
-   - Description and benefits
-   - How it applies to this feature
-   - Example use cases from the source
-
-2. **[Another Pattern]**
-   - Source: [Official Docs](https://url)
-   - Why it's recommended
-   - Implementation considerations
-
-### Technologies to Consider
-- **[Library/Framework]**: [Why it's relevant]
-  - Reference: [Official Docs/Article](https://url)
-  - Benefits and trade-offs
-- **[Tool/Service]**: [Description]
-  - Reference: [Source](https://url)
-
-### Anti-Patterns to Avoid
-- **[Bad Pattern]**: [Why to avoid]
-  - Source: [Article explaining pitfalls](https://url)
-  - Common problems and alternatives
-
-### Standards & Compliance
-[Relevant industry standards, security requirements, accessibility guidelines]
-- [Standard Name]: [Requirement] - [Official Spec](https://url)
-- [Security Practice]: [Description] - [OWASP/NIST Guide](https://url)
 
 ## Layer 1: Problem & Requirements
 
 ### Problem Statement
-[Clear description of the problem and why it matters]
+[Clear description of the problem and why it matters. Reference research findings with inline citations like [1] [2]]
 
 ### Current State
-[How things work today with specific pain points]
+[How things work today with specific pain points. Include code references and cite any research about current approaches [3]]
 
 ### Requirements
 #### Functional
@@ -134,9 +97,9 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 - REQ-002: WHEN [condition] THEN [response]
 
 #### Non-Functional
-- Performance: [metrics]
-- Security: [requirements]
-- Usability: [criteria]
+- Performance: [metrics - cite performance standards if applicable [4]]
+- Security: [requirements - reference security best practices [5]]
+- Usability: [criteria - cite accessibility standards if applicable [6]]
 
 ### Constraints
 [Technical limitations, compatibility needs]
@@ -149,25 +112,26 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 ### User Workflows
 1. **[Workflow Name]**
    - User action → System response → Outcome
+   - [Reference UX patterns or research if applicable [7]]
 
 ### External Interfaces
-[APIs, UIs, integration points with examples]
+[APIs, UIs, integration points with examples. Cite relevant API design standards [8]]
 
 ### Alternatives Considered
 | Option | Pros | Cons | Why Not Chosen |
 |--------|------|------|----------------|
-| A | [benefits] | [drawbacks] | [reasoning] |
+| A | [benefits] | [drawbacks - cite anti-patterns if applicable [9]] | [reasoning] |
 
 ## Layer 3: Technical Specification
 
 ### Architecture
-[Component diagram and data flow]
+[Component diagram and data flow. Reference architectural patterns used [10]]
 
 ### Code Change Analysis
 | Component | Action | Justification |
 |-----------|--------|---------------|
 | [name] | Extend | Uses [existing system] at [path] |
-| [name] | Create | Required because [reason] |
+| [name] | Create | Required because [reason] - follows pattern from [11] |
 | [name] | Remove | Obsolete due to [new feature replacing it] |
 
 ### Code to Remove
@@ -183,7 +147,7 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 #### Components
 - **[Component]** ([path/to/file])
   - Current role
-  - Planned changes
+  - Planned changes following [pattern name] [12]
   - Integration approach
   - Example logic (pseudocode only):
     ```
@@ -198,15 +162,50 @@ Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this 
 [Schema changes with migration notes - structure only, no full implementations]
 
 #### Security
-[Auth, validation, following patterns from [reference]]
+[Auth, validation, following security patterns [13]]
 
 ### Testing Strategy
-- Unit tests: [approach]
+- Unit tests: [approach - cite testing best practices [14]]
 - Integration tests: [scenarios]
 - E2E tests: [critical paths]
 
 ### Rollout Plan
-[Phased approach, feature flags, rollback strategy]
+[Phased approach, feature flags, rollback strategy - reference deployment patterns [15]]
+
+## References
+
+[List all sources consulted during research, numbered in order of first citation]
+
+1. [Article/Doc Title](https://example.com/article) - Publication Date or "Official Documentation"
+   - Summary: [Brief description of what this source covers]
+   - Key takeaway: [What specifically you used from this source]
+
+2. [Source Title 2](https://example.com/docs) - Official Documentation
+   - Summary: [Brief description]
+   - Key takeaway: [Specific pattern or guidance applied]
+
+3. [Framework/Library Documentation](https://example.com/guide) - 2024
+   - Summary: [What it covers]
+   - Key takeaway: [How it informed the design]
+
+[Continue numbering all research sources...]
+
+### Research Summary
+
+**Recommended Patterns Applied**:
+- [Pattern Name] from [1]: [How it's used in this design]
+- [Another Pattern] from [2]: [Application in this feature]
+
+**Anti-Patterns Avoided**:
+- [Bad Pattern] per [5]: [Why avoided and alternative chosen]
+
+**Technologies Considered**:
+- [Library/Framework]: Recommended by [3] for [reason]
+- [Tool/Service]: Industry standard per [7]
+
+**Standards Compliance**:
+- [Standard Name]: [How design meets requirement] - Reference [8]
+- [Security Practice]: [Implementation approach] - Per [9]
 ```
 
 ## Key Principles

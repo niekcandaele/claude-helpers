@@ -31,11 +31,12 @@ This command orchestrates a complete development cycle: planning, execution, and
    - Follow strict no-workarounds protocol
    - Update task progress
 
-3. **Testing Phase** (automatic via /cata-proj:demo)
-   - Automatically invoke demo command
-   - Demo runs via cata-tester agent
-   - Verify functionality
-   - Report results
+3. **Verification & Testing Phase** (automatic multi-agent review)
+   - Launch cata-reviewer agent for code review
+   - Invoke /cata-proj:demo (runs cata-tester agent)
+   - If demo fails: Launch cata-debugger for root cause analysis
+   - Combine all outputs into unified report
+   - Present comprehensive assessment to human
 
 ## Implementation
 
@@ -102,26 +103,80 @@ After plan approval, execute the implementation directly:
    [Clear description of what needs to be done]
    ```
 
-### Step 3: Testing Phase - AUTOMATIC DEMO EXECUTION
+### Step 3: Verification & Testing Phase - AUTOMATIC MULTI-AGENT REVIEW
 
-**MANDATORY**: After execution completes successfully, you MUST automatically run the demo:
+**MANDATORY**: After execution completes successfully, automatically run comprehensive verification:
 
 1. **Extract the feature name** from $ARGUMENTS:
    - If $ARGUMENTS is a path like `.design/2024-01-15-user-auth/tasks.md`, extract `user-auth`
    - If $ARGUMENTS is already a feature name like `user-auth`, use it directly
    - If $ARGUMENTS includes a phase number (e.g., `user-auth 2`), use only the feature name
 
-2. **Automatically invoke the demo command** using SlashCommand:
+2. **Code Review - Launch cata-reviewer agent**:
+   ```
+   Use the Task tool to launch the cata-reviewer agent with:
+   - subagent_type: "cata-reviewer"
+   - description: "Review phase implementation"
+   - prompt: "Review the implementation for [feature-name].
+     Find and read the design doc in .design/*/design.md.
+     Use git diff to see changes made in this phase.
+     Verify design adherence, check for over-engineering and AI slop.
+     Provide detailed code review."
+   ```
+   - Capture the reviewer's output for the final report
+
+3. **Functional Testing - Invoke demo command**:
    ```
    Use the SlashCommand tool with:
    command: "/cata-proj:demo [feature-name]"
    ```
+   - Demo runs via cata-tester agent
+   - Capture test results for the final report
 
-3. **Wait for demo results**:
-   - If demo passes: Phase is complete and verified
-   - If demo fails: Implementation has issues that must be fixed
+4. **Debug Analysis - If demo fails**:
+   ```
+   Use the Task tool to launch the cata-debugger agent with:
+   - subagent_type: "cata-debugger"
+   - description: "Analyze demo failures"
+   - prompt: "The demo failed for [feature-name].
+     Analyze the root cause of the test failures.
+     Use git, logs, and available tools to investigate.
+     Provide detailed diagnostic report without fixing anything."
+   ```
+   - Capture debugger's diagnostic report for the final report
 
-**This is NOT optional** - every phase implementation must be automatically verified through the demo command. Do not ask the user to run the demo manually.
+5. **Generate Unified Report**:
+   Combine all agent outputs into a comprehensive assessment:
+
+   ```markdown
+   # Phase Implementation Review: [Feature - Phase X]
+
+   ## Code Review (cata-reviewer)
+   [Insert reviewer agent output - design adherence, quality issues, AI slop]
+
+   ## Functional Testing (cata-tester)
+   [Insert demo test results - pass/fail, specific failures]
+
+   ## Debug Analysis (cata-debugger)
+   [Only if demo failed - insert root cause analysis]
+
+   ## Overall Assessment
+   **Status:** ✅ READY / ⚠️ ISSUES FOUND / ❌ FAILED
+
+   **Critical Issues:** [Count from all agents]
+   **Major Issues:** [Count from all agents]
+   **Minor Issues:** [Count from all agents]
+
+   **Recommendation:**
+   - ✅ Phase complete and verified - proceed to next phase
+   - ⚠️ Address issues found before proceeding
+   - ❌ Must fix critical failures before phase is complete
+
+   ## Next Steps for Human
+   [Specific actions based on combined results]
+   ```
+
+**This is NOT optional** - every phase gets full multi-agent verification and a unified assessment report.
 
 ## Unacceptable Practices
 
@@ -168,8 +223,11 @@ Always search for:
 3. Execute each task exactly as specified
 4. Run all quality checks and verifications
 5. Update progress in the tasks.md file
-6. Automatically invoke /cata-proj:demo to verify the implementation
-7. Report any blockers with detailed analysis
+6. Automatically launch cata-reviewer for code review
+7. Automatically invoke /cata-proj:demo to verify implementation
+8. If demo fails: Automatically launch cata-debugger for analysis
+9. Generate unified report combining all agent outputs
+10. Report any blockers with detailed analysis
 
 ## Implementation Philosophy
 
@@ -186,7 +244,7 @@ Follow a strict NO WORKAROUNDS policy:
 2. **Get Approval**: Present plan and wait for user confirmation
 3. **Execute Tasks**: Implement each task exactly as planned
 4. **Handle Blockers**: Stop and report with detailed analysis when blocked
-5. **Run Demo**: Automatically invoke /cata-proj:demo to verify implementation
+5. **Multi-Agent Verification**: Automatically run code review, functional testing, and debugging (if needed), then generate unified report
 
 ## Examples
 
@@ -209,9 +267,9 @@ Follow a strict NO WORKAROUNDS policy:
 
 - **Planning is mandatory**: Always create and get approval before execution
 - **No workarounds**: Implementation follows the plan exactly
-- **Automatic testing**: Demo runs automatically after execution
-- **Quality gates**: Each phase must pass demo before moving on
-- **Clear reporting**: Blockers and failures are reported immediately
+- **Multi-agent verification**: Code review, testing, and debugging run automatically after execution
+- **Quality gates**: Each phase must pass all verification before moving on
+- **Unified reporting**: Combined assessment from all agents with clear recommendations
 
 ## Process Flow
 
@@ -225,11 +283,14 @@ Follow a strict NO WORKAROUNDS policy:
 3. Upon approval:
    - Execute the plan directly
    - Update tasks.md on success
-4. Automatically invoke demo:
+4. Automatically run multi-agent verification:
+   - Launch cata-reviewer agent to verify design adherence and code quality
    - Use SlashCommand to run /cata-proj:demo feature-name
-   - Demo command launches cata-tester agent
-   - Demo executes and reports success or failure
-5. Human decides next steps based on demo results
+   - Demo command launches cata-tester agent for functional testing
+   - If demo fails: Launch cata-debugger agent for root cause analysis
+   - Combine all agent outputs into unified report
+5. Present comprehensive assessment to human with recommendations
+6. Human decides next steps based on multi-agent report
 ```
 
 This ensures thoughtful, tested, and verified implementation at every phase.
