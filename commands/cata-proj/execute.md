@@ -112,7 +112,11 @@ After plan approval, execute the implementation directly:
    - If $ARGUMENTS is already a feature name like `user-auth`, use it directly
    - If $ARGUMENTS includes a phase number (e.g., `user-auth 2`), use only the feature name
 
-2. **Code Review - Launch cata-reviewer agent**:
+2. **Run Code Review and Functional Testing IN PARALLEL**:
+
+   **IMPORTANT**: Launch both agents in parallel using a single message with multiple tool calls.
+
+   a. **Code Review - Launch cata-reviewer agent**:
    ```
    Use the Task tool to launch the cata-reviewer agent with:
    - subagent_type: "cata-reviewer"
@@ -123,17 +127,17 @@ After plan approval, execute the implementation directly:
      Verify design adherence, check for over-engineering and AI slop.
      Provide detailed code review."
    ```
-   - Capture the reviewer's output for the final report
 
-3. **Functional Testing - Invoke demo command**:
+   b. **Functional Testing - Invoke demo command**:
    ```
    Use the SlashCommand tool with:
    command: "/cata-proj:demo [feature-name]"
    ```
    - Demo runs via cata-tester agent
-   - Capture test results for the final report
 
-4. **Debug Analysis - If demo fails**:
+   Capture both outputs for the final report
+
+3. **Debug Analysis - If demo fails**:
    ```
    Use the Task tool to launch the cata-debugger agent with:
    - subagent_type: "cata-debugger"
@@ -145,7 +149,7 @@ After plan approval, execute the implementation directly:
    ```
    - Capture debugger's diagnostic report for the final report
 
-5. **Generate Unified Report**:
+4. **Generate Unified Report**:
    Combine all agent outputs into a comprehensive assessment:
 
    ```markdown
@@ -176,7 +180,28 @@ After plan approval, execute the implementation directly:
    [Specific actions based on combined results]
    ```
 
-**This is NOT optional** - every phase gets full multi-agent verification and a unified assessment report.
+5. **STOP HERE - MANDATORY PAUSE**:
+
+   **🛑 CRITICAL: After presenting the unified report, you MUST STOP and wait for human input.**
+
+   **DO NOT:**
+   - ❌ Act on any recommendations from the agents
+   - ❌ Make any fixes based on the reports
+   - ❌ Implement any changes suggested by reviewers
+   - ❌ Address any issues found by testers
+   - ❌ Apply any debugger findings
+   - ❌ Continue to the next phase
+   - ❌ Make any code changes whatsoever
+
+   **WHAT YOU SHOULD DO:**
+   - ✅ Present the unified report clearly
+   - ✅ Wait for the human to review the findings
+   - ✅ Wait for explicit instructions from the human
+   - ✅ Only proceed when the human tells you what to do next
+
+   **The agent reports are FOR HUMAN REVIEW ONLY. Your job is to gather the information and present it, not to act on it.**
+
+**This is NOT optional** - every phase gets full multi-agent verification and a unified assessment report, followed by a mandatory pause for human review.
 
 ## Unacceptable Practices
 
@@ -223,11 +248,12 @@ Always search for:
 3. Execute each task exactly as specified
 4. Run all quality checks and verifications
 5. Update progress in the tasks.md file
-6. Automatically launch cata-reviewer for code review
-7. Automatically invoke /cata-proj:demo to verify implementation
-8. If demo fails: Automatically launch cata-debugger for analysis
-9. Generate unified report combining all agent outputs
-10. Report any blockers with detailed analysis
+6. Automatically launch cata-reviewer and /cata-proj:demo IN PARALLEL
+7. If demo fails: Automatically launch cata-debugger for analysis
+8. Generate unified report combining all agent outputs
+9. 🛑 STOP and present report to human - DO NOT act on findings
+10. Wait for human to provide next instructions
+11. Report any blockers with detailed analysis
 
 ## Implementation Philosophy
 
@@ -244,7 +270,8 @@ Follow a strict NO WORKAROUNDS policy:
 2. **Get Approval**: Present plan and wait for user confirmation
 3. **Execute Tasks**: Implement each task exactly as planned
 4. **Handle Blockers**: Stop and report with detailed analysis when blocked
-5. **Multi-Agent Verification**: Automatically run code review, functional testing, and debugging (if needed), then generate unified report
+5. **Multi-Agent Verification**: Automatically run code review and functional testing in parallel, debugging if needed, then generate unified report
+6. **🛑 STOP**: Present report and wait for human review - DO NOT act on agent findings
 
 ## Examples
 
@@ -270,6 +297,7 @@ Follow a strict NO WORKAROUNDS policy:
 - **Multi-agent verification**: Code review, testing, and debugging run automatically after execution
 - **Quality gates**: Each phase must pass all verification before moving on
 - **Unified reporting**: Combined assessment from all agents with clear recommendations
+- **🛑 MANDATORY STOP after reporting**: After presenting the unified agent report, you MUST STOP and wait for human input. DO NOT act on agent findings. DO NOT make any fixes or changes. The reports are for human review only.
 
 ## Process Flow
 
@@ -283,14 +311,15 @@ Follow a strict NO WORKAROUNDS policy:
 3. Upon approval:
    - Execute the plan directly
    - Update tasks.md on success
-4. Automatically run multi-agent verification:
+4. Automatically run multi-agent verification (IN PARALLEL):
    - Launch cata-reviewer agent to verify design adherence and code quality
-   - Use SlashCommand to run /cata-proj:demo feature-name
-   - Demo command launches cata-tester agent for functional testing
+   - Use SlashCommand to run /cata-proj:demo feature-name (launches cata-tester agent)
    - If demo fails: Launch cata-debugger agent for root cause analysis
-   - Combine all agent outputs into unified report
-5. Present comprehensive assessment to human with recommendations
-6. Human decides next steps based on multi-agent report
+5. Combine all agent outputs into unified report
+6. Present comprehensive assessment to human
+7. 🛑 STOP - DO NOT act on agent findings
+8. Wait for human to review and provide next instructions
+9. Human decides next steps based on multi-agent report
 ```
 
 This ensures thoughtful, tested, and verified implementation at every phase.
