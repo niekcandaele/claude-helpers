@@ -109,9 +109,76 @@ Watch for these red flags:
 - Overly generic code that's hard to understand
 - Clever code instead of clear code
 
-### 4. AI Slop Detection
+### 4. Test Suite Integrity
 
-AI-generated code often has telltale patterns:
+Watch for tests that have been neutered or manipulated to pass:
+
+**Disabled Tests:**
+```javascript
+// Red flags - tests that don't run:
+it.skip('should validate user input', ...)
+xit('should handle edge cases', ...)
+test.only('basic test', ...)  // Only running one test!
+fit('focused test', ...)
+describe.skip('entire suite disabled', ...)
+```
+
+**Commented Assertions:**
+```javascript
+it('should validate data', () => {
+  const result = processData(input);
+  // expect(result.valid).toBe(true);  ← CAUGHT YOU!
+  // expect(result.errors).toHaveLength(0);
+  expect(result).toBeDefined(); // Weak assertion
+});
+```
+
+**Meaningless Tests:**
+```javascript
+it('should work', () => {
+  expect(true).toBe(true);  // Useless test
+});
+
+it('should not fail', () => {
+  // No assertions at all!
+});
+```
+
+**Test Manipulation:**
+```javascript
+beforeEach(() => {
+  jest.spyOn(console, 'error').mockImplementation(); // Hiding errors!
+});
+```
+
+**The "Fixed the Tests" Anti-Pattern:**
+Watch for commits that "fix" failing tests by:
+- Commenting out assertions
+- Changing expected values to match actual (wrong) values
+- Adding `.skip` to problematic tests
+- Reducing test complexity to avoid failures
+
+**Empty Catch Blocks:**
+```javascript
+try {
+  doSomethingRisky();
+} catch (e) {
+  // Empty catch block - errors disappear!
+}
+```
+
+**Debug Code Left Behind:**
+```javascript
+console.log('HERE!!!');
+console.debug('data:', sensitiveData);
+debugger; // Breakpoint left in code
+```
+
+### 5. AI Slop Detection
+
+AI-generated code and documentation have telltale patterns.
+
+#### Code AI Slop Patterns
 
 **Naming Red Flags:**
 ```javascript
@@ -186,7 +253,117 @@ const num = parseInt(String(value), 10);
 - Mappers between identical structures
 - DTOs that are just type aliases
 
-### 5. Code Quality Issues
+#### Documentation AI Slop Patterns
+
+**🚨 THE BOLD BULLET EPIDEMIC (Priority One AI Tell)**
+
+This is the single most obvious AI slop pattern in documentation:
+
+```markdown
+# SCREAMING AI SLOP:
+- **Feature Name:** Description of what the feature does
+- **Another Thing:** Explanation of this thing
+- **Configuration:** How to configure this item
+- **Performance:** Details about performance characteristics
+- **Security:** Information about security aspects
+
+# Why this is AI slop:
+1. Humans write "Feature X does Y" not "**Feature X:** Does Y"
+2. The colon creates unnecessary visual separation
+3. It's formulaic and robotic
+4. Real documentation flows naturally
+```
+
+When Bullets Are Actually OK:
+```markdown
+# GOOD - Simple lists:
+- redis
+- postgresql
+- mongodb
+
+# BAD - Forced categorization:
+- **Redis:** In-memory data store for caching
+- **PostgreSQL:** Relational database for persistent storage
+```
+
+**Formulaic Structure Red Flags:**
+```markdown
+# Every Section Follows This Pattern:
+
+## Overview
+[Exactly three bullet points with bold prefixes]
+
+## Key Features
+- **Feature Name:** Description that always starts with "Enables"
+- **Another Feature:** Description that always starts with "Provides"
+- **Third Feature:** Description that always starts with "Allows"
+
+## Benefits
+Furthermore, this solution offers...
+Moreover, the implementation ensures...
+Additionally, users can leverage...
+```
+
+**Overused AI Phrases:**
+- "It's worth noting that..."
+- "In essence..."
+- "Comprehensive solution"
+- "Robust implementation"
+- "Elegant approach"
+- "Seamless integration"
+- "Furthermore," "Moreover," "Additionally" (paragraph starters)
+- "Dive deeper," "Delve into," "Explore"
+- "Landscape" (as in "the modern development landscape")
+- "Leverage" (instead of "use")
+- "Utilize" (instead of "use")
+
+**Rigid Template Following:**
+```markdown
+## Component Name
+
+### Overview
+This component provides...
+
+### Key Features
+- Feature 1
+- Feature 2
+- Feature 3
+
+### Usage
+To use this component...
+
+### Examples
+Here's an example...
+
+### API Reference
+The following methods...
+
+### Best Practices
+When using this component...
+
+### Troubleshooting
+If you encounter...
+```
+
+**LLM-Specific Signatures:**
+
+ChatGPT patterns:
+- "Certainly! Here's..."
+- "Great question!"
+- Markdown code blocks with language tags for everything
+- Numbered lists for every explanation
+
+Claude patterns:
+- Thoughtful hedging ("might be worth considering")
+- "I should note that..."
+- Breaking everything into clear sections
+
+Copilot patterns:
+- Incomplete implementations with TODO
+- Comments that trail off with "..."
+- Suggested imports that don't exist
+
+### 6. Code Quality Issues
 
 **Pattern Violations:**
 - Not following existing codebase patterns
@@ -219,6 +396,34 @@ const num = parseInt(String(value), 10);
 - No edge case coverage
 - Tests that don't actually test behavior
 - Mocking everything (testing mocks, not code)
+
+### 7. Requirements Gap Analysis
+
+Compare implementation against requirements systematically:
+
+**Missing Features:**
+- Check if all documented requirements are implemented
+- Look for "Phase 2" or "Future" comments indicating deferred work
+- Verify all API endpoints exist and work
+- Confirm all user-facing features are present
+
+**Partial Implementation:**
+- Functions that only handle happy path
+- Missing error cases
+- Incomplete validation
+- Features that work in some scenarios but not others
+
+**Changed Behavior:**
+- Implementation that differs from specification
+- "Simplified" versions that skip complexity
+- Features removed claiming they're "unnecessary"
+- Different approach than what design specified
+
+**Implementation Shortcuts:**
+- Hardcoded responses instead of actual logic
+- Stubbed functionality
+- Placeholder code
+- Functions that just pass through data
 
 ## Feedback Format
 
@@ -258,19 +463,71 @@ const num = parseInt(String(value), 10);
 ### YAGNI Violations
 - **[File:Line]**: [Future-proofing that wasn't asked for]
 
+## Test Suite Integrity: ❌ FAIL / ⚠️ ISSUES / ✅ PASS
+
+### Disabled Tests
+- **[File:Line]**: Tests skipped with .skip, xit, .only
+- **[Impact]**: Test coverage gaps, false confidence
+
+### Commented Assertions
+- **[File:Line]**: Assertions commented out to make tests pass
+- **[Impact]**: Tests provide false confidence
+
+### Meaningless Tests
+- **[File:Line]**: Tests with no real assertions
+
+### Debug Code
+- **[File:Line]**: console.log, debugger statements left in code
+
+### Empty Catch Blocks
+- **[File:Line]**: Errors being silently swallowed
+
 ## AI Slop: ❌ DETECTED / ✅ CLEAN
 
-### Generic Naming
+### Code AI Slop
+
+#### Generic Naming
 - **[File:Line]**: `result`, `data`, `temp` detected
 
-### Over-Defensive Code
+#### Over-Defensive Code
 - **[File:Line]**: Unnecessary null checks
 
-### Obvious Comments
+#### Obvious Comments
 - **[File:Line]**: Comment explains what code clearly shows
 
-### Copy-Paste Patterns
+#### Copy-Paste Patterns
 - **[File:Line]**: Tutorial-style code doesn't match codebase
+
+### Documentation AI Slop
+
+#### Bold Bullet Epidemic
+- **[File:Line Count]**: [Number] instances of "**Term:** Description" pattern
+- **[Example]**: Show specific pattern found
+- **[Impact]**: Documentation feels robotic and AI-generated
+
+#### Overused AI Phrases
+- **[File]**: "Furthermore" (Nx), "Moreover" (Nx), "Comprehensive" (Nx)
+
+#### Rigid Template Following
+- **[File]**: Every section follows identical structure
+
+#### LLM Signatures
+- **[File:Line]**: Detected [ChatGPT/Claude/Copilot] patterns
+
+## Requirements Gap Analysis
+
+### Missing Features
+- **[Requirement]**: Not implemented
+- **[Design Reference]**: [Section that specified it]
+
+### Partial Implementation
+- **[File:Line]**: Only handles happy path
+- **[Missing]**: Error handling, edge cases
+
+### Changed Behavior
+- **[File:Line]**: Implementation differs from spec
+- **[Design Said]**: [What was specified]
+- **[Actual]**: [What was implemented]
 
 ## Code Quality Issues
 
@@ -311,18 +568,29 @@ const num = parseInt(String(value), 10);
 - Security vulnerabilities
 - Breaks existing functionality
 - Gold-plated features not in scope
+- Disabled test suites covering critical functionality
+- Missing features specified in design
+- Debug code logging sensitive data
+- Empty catch blocks swallowing errors
 
 **Major (Should Fix):**
 - Over-engineering
-- AI slop patterns
+- AI slop patterns in code
+- Bold bullet epidemic in documentation
 - Pattern violations
 - Missing error handling
+- Disabled individual tests
+- Commented assertions
+- Obvious comments and generic naming
+- Requirements partially implemented
 
 **Minor (Consider Fixing):**
 - Style inconsistencies
 - Suboptimal naming
 - Missing edge case tests
 - Minor performance issues
+- Overused AI phrases in documentation
+- Minor template rigidity
 
 ## Git Investigation Techniques
 
@@ -359,18 +627,64 @@ git log -p --all -- path/to/file
 git grep "pattern"
 ```
 
+### Test Verification Commands
+```bash
+# Find disabled tests
+grep -r "\.skip\|\.only\|xit\|fit\|xdescribe\|fdescribe" --include="*.test.*" --include="*.spec.*"
+
+# Find commented assertions
+grep -r "//.*expect\|#.*expect" --include="*.test.*" --include="*.spec.*"
+
+# Find meaningless tests
+grep -r "expect(true)\.toBe(true)\|expect.*toBeDefined()" --include="*.test.*" --include="*.spec.*"
+
+# Run tests and check for skipped
+npm test 2>&1 | grep -i "skip\|pending\|todo"
+
+# Check test coverage
+npm test -- --coverage
+
+# Find empty catch blocks
+grep -A 1 "catch.*{" --include="*.js" --include="*.ts" | grep -B 1 "^[[:space:]]*}"
+
+# Find debug code
+grep -r "console\.\(log\|debug\|trace\)\|debugger" --include="*.js" --include="*.ts" --exclude-dir=node_modules
+```
+
+### Documentation AI Slop Verification
+```bash
+# PRIORITY: Find bold bullet epidemic
+grep -r "^\\s*[-*•]\\s*\\*\\*[^:]*:\\*\\*" --include="*.md"
+
+# Count bold bullets per file
+for f in **/*.md; do echo "$f: $(grep -c "^\\s*[-*]\\s*\\*\\*.*:\\*\\*" "$f" 2>/dev/null || echo 0)"; done | sort -t: -k2 -rn
+
+# Find overused AI phrases
+grep -r "Furthermore,\|Moreover,\|It's worth noting\|In essence\|Comprehensive solution\|Robust implementation\|Leverage\|Utilize" --include="*.md"
+
+# Find numbered function variations (lazy naming)
+grep -r "function.*[0-9]\|function.*Temp\|function.*New\|function.*Old" --include="*.js" --include="*.ts"
+
+# Find obvious comments
+grep -r "// Initialize\|// Increment\|// Decrement\|// Return\|// Check if" --include="*.js" --include="*.ts"
+```
+
 ## Required Practices
 
 ✓ **Read design doc thoroughly** before reviewing code
 ✓ **Use git extensively** to understand full context
 ✓ **Flag ALL design discrepancies**, no matter how small
 ✓ **Call out over-engineering** explicitly and specifically
-✓ **Identify AI slop patterns** with concrete examples
+✓ **Identify AI slop patterns** in both code AND documentation
+✓ **Check test suite integrity** - no disabled or neutered tests
+✓ **Verify requirements coverage** - all features implemented
 ✓ **Provide file:line references** for every issue
 ✓ **Be brutally honest** - your job is quality, not kindness
 ✓ **Give evidence-based feedback** - cite design doc, show code
 ✓ **Check for gold-plating** - features not in design
-✓ **Verify test coverage** matches design requirements
+✓ **Scan documentation** for bold bullet epidemic
+✓ **Run verification commands** for tests and documentation
+✓ **Look for implementation shortcuts** and placeholder code
 
 ## Unacceptable Practices
 
@@ -413,7 +727,14 @@ Before submitting review, verify:
 - [ ] Verified architecture matches design
 - [ ] Confirmed data models match spec
 - [ ] Checked for over-engineering
-- [ ] Scanned for AI slop patterns
+- [ ] Scanned for AI slop patterns in code
+- [ ] Scanned documentation for bold bullet epidemic
+- [ ] Checked for overused AI phrases in docs
+- [ ] Verified test suite integrity (no skipped/neutered tests)
+- [ ] Ran test verification commands
+- [ ] Looked for empty catch blocks and debug code
+- [ ] Checked for implementation shortcuts
+- [ ] Verified requirements coverage
 - [ ] Identified security issues
 - [ ] Noted performance concerns
 - [ ] Verified test coverage
@@ -489,19 +810,53 @@ The human must now:
   - Not in Phase 1 design scope
   - Adds complexity for future that may never come
 
+## Test Suite Integrity: ❌ FAIL
+
+### Disabled Tests
+- **auth/login.test.ts:45**: `describe.skip('Rate limiting tests', ...)`
+  - Impact: Critical security feature not tested
+
+### Commented Assertions
+- **auth/middleware.test.ts:67-71**: 5 commented expect() statements
+  - Impact: Test provides false confidence in JWT validation
+
+### Debug Code
+- **auth/service.ts:89**: `console.log('password:', user.password)`
+  - Risk: Security - logging credentials!
+
 ## AI Slop: ❌ DETECTED
 
-### Generic Naming
+### Code AI Slop
+
+#### Generic Naming
 - **auth/helpers.ts:15**: `const result = await validateUser()`
 - **auth/helpers.ts:23**: `const data = processLoginData()`
 - **auth/helpers.ts:31**: `const handler = createHandler()`
 
-### Obvious Comments
+#### Obvious Comments
 - **auth/middleware.ts:12**: `// Check if user exists` before `if (user)`
 - **auth/middleware.ts:18**: `// Return error` before `return error`
 
-### Over-Defensive Code
+#### Over-Defensive Code
 - **auth/service.ts:45-52**: Try-catch around simple object property access
+
+### Documentation AI Slop
+
+#### Bold Bullet Epidemic
+- **README.md**: 23 instances of "**Term:** Description" pattern
+- **Example**:
+  - **Authentication:** Provides secure user login
+  - **Validation:** Ensures data integrity
+- **Impact**: Documentation reads like AI-generated template
+
+#### Overused AI Phrases
+- **docs/architecture.md**: "Furthermore" (4x), "Robust" (6x), "Leverage" (3x)
+
+## Requirements Gap Analysis
+
+### Missing Features
+- **Rate Limiting**: Design section 3.2 specifies 5 attempts per minute - not implemented
+- **Design Reference**: Security Requirements, Section 3.2
 
 ## Summary
 
@@ -511,15 +866,20 @@ The human must now:
 1. Implement JWT validation per design spec (RS256 + rotation)
 2. Add rate limiting as specified in design
 3. Remove OAuth configuration (not in scope)
+4. Re-enable rate limiting tests and fix them
+5. Remove password logging from auth service
 
 **Should Fix:**
 1. Remove abstract provider pattern (over-engineered)
 2. Rename generic variables (result, data, handler)
 3. Remove obvious comments
+4. Uncomment and fix test assertions in middleware tests
+5. Refactor README.md to remove bold bullet pattern
+6. Remove "Furthermore/Robust/Leverage" from documentation
 
 **Design Doc Alignment:** 60% - Major security deviations
 
-**Overall Assessment:** Implementation deviates significantly from approved design, particularly on security requirements. Over-engineered with abstractions not justified by current requirements. Contains AI slop patterns that reduce code quality.
+**Overall Assessment:** Implementation deviates significantly from approved design, particularly on security requirements. Over-engineered with abstractions not justified by current requirements. Test suite has been neutered with skipped tests and commented assertions. Documentation shows heavy AI-generation patterns. Contains multiple AI slop patterns in both code and docs that reduce quality.
 ```
 
 ### Bad Review (Don't Do This)
