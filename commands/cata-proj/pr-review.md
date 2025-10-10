@@ -28,21 +28,70 @@ gh pr list --state open --json number,title,headRefName,author
 # If argument provided, verify PR exists
 ```
 
+---
+
+## ⚠️ CRITICAL: Prevent JSON Truncation
+
+**ALWAYS pipe GitHub API calls through jq immediately. NEVER fetch raw JSON without formatting.**
+
+### Why This Matters
+
+GitHub API responses can return massive JSON payloads (10,000+ characters). When you fetch raw JSON without piping through jq, the output gets truncated, hiding most comments.
+
+### The Rule
+
+✅ **CORRECT** - Parse immediately:
+```bash
+gh api "repos/$REPO_INFO/pulls/$PR_NUMBER/comments" | jq -r '.[] | "formatted output"'
+```
+
+❌ **WRONG** - Fetch raw JSON (will truncate):
+```bash
+gh api "repos/$REPO_INFO/pulls/$PR_NUMBER/comments"  # Don't do this!
+```
+
+### When to Use Each Format
+
+**For displaying to user** (use `| jq -r` for formatted text):
+```bash
+gh api "..." | jq -r '.[] | "@\(.user.login) \(.path):\n\(.body)\n"'
+```
+
+**For saving to files** (use `--jq` for structured JSON):
+```bash
+gh api "..." --jq '.[] | {id, path, body}' > file.json
+```
+
+**Key Principle**: Parse while fetching, not after. Format immediately to prevent truncation.
+
+---
+
 ### Step 2: Fetch PR Comments and Reactions
 
-Gather all review feedback using GitHub API:
+Gather all review feedback using GitHub API. Use `--jq` to parse immediately and save structured data.
+
+#### Setup: Get Repository Info
 
 ```bash
 # Get repository owner and name
 REPO_INFO=$(gh repo view --json owner,name --jq '.owner.login + "/" + .name')
 PR_NUMBER=[from step 1]
 
+echo "Fetching comments from $REPO_INFO PR #$PR_NUMBER..."
+```
+
+#### Fetch and Save Structured Data
+
+These commands save structured JSON for later processing. Using `--jq` ensures immediate parsing:
+
+```bash
 # Fetch inline code review comments with reactions
+# Note: Using --jq (not | jq) to save structured JSON to file
 gh api "repos/$REPO_INFO/pulls/$PR_NUMBER/comments" \
   --jq '.[] | {
     id: .id,
     path: .path,
-    line: .line,
+    line: (.line // .original_line),  # Handle both line and original_line
     body: .body,
     author: .user.login,
     created_at: .created_at,
@@ -69,7 +118,36 @@ gh api "repos/$REPO_INFO/pulls/$PR_NUMBER" \
     head: .head.ref,
     state: .state
   }' > /tmp/pr_details.json
+
+echo "✓ Saved comments to /tmp files for processing"
 ```
+
+### Step 2A: Quick Preview of Comments (Optional but Recommended)
+
+Before processing, display a preview of all comments in human-readable format. This confirms all comments were fetched without truncation.
+
+```bash
+# Preview inline comments (formatted immediately to prevent truncation)
+echo ""
+echo "=== Inline Code Review Comments ==="
+gh api "repos/$REPO_INFO/pulls/$PR_NUMBER/comments" | \
+  jq -r '.[] | "---\n@\(.user.login) \(.path)#\(.line // .original_line):\n\(.body[0:200])\(if (.body | length) > 200 then "..." else "" end)\n"'
+
+# Preview PR-level comments
+echo ""
+echo "=== PR-Level Comments ==="
+gh api "repos/$REPO_INFO/issues/$PR_NUMBER/comments" | \
+  jq -r '.[] | "---\n@\(.user.login) (PR-level comment):\n\(.body[0:200])\(if (.body | length) > 200 then "..." else "" end)\n"'
+
+echo ""
+echo "✓ Preview complete. All comments fetched successfully."
+```
+
+**Why this step matters:**
+- Immediately shows if all comments were retrieved (no truncation)
+- Provides quick visibility into comment count and authors
+- Uses `| jq -r` for human-readable output (not file storage)
+- Truncates long comment bodies to 200 chars for preview
 
 ### Step 3: Identify Current User
 
@@ -324,6 +402,38 @@ if ! gh auth status &>/dev/null; then
 fi
 ```
 
+### JSON Truncation Detection
+
+If you suspect output was truncated (missing comments, incomplete data):
+
+**Symptoms:**
+- Output ends abruptly with `...`
+- Comment count seems too low
+- Known comments are missing from preview
+
+**Recovery Steps:**
+
+```bash
+# 1. Check if jq is being used (required!)
+# If you see raw JSON output, you forgot to pipe through jq
+
+# 2. Re-run with formatted output (prevents truncation)
+gh api "repos/$REPO_INFO/pulls/$PR_NUMBER/comments" | \
+  jq -r '.[] | "---\n@\(.user.login) \(.path)#\(.line // .original_line):\n\(.body)\n"'
+
+# 3. Count comments to verify completeness
+COMMENT_COUNT=$(gh api "repos/$REPO_INFO/pulls/$PR_NUMBER/comments" | jq '. | length')
+echo "Total comments: $COMMENT_COUNT"
+
+# If count matches what you see in the preview, no truncation occurred
+```
+
+**Prevention:**
+- Always use `| jq -r` for display output
+- Always use `--jq` for saving to files
+- Never fetch raw JSON without parsing
+- Follow Step 2A to verify all comments were retrieved
+
 ## Usage Examples
 
 ### Analyze latest PR
@@ -393,6 +503,80 @@ Before completing, verify:
 - ✓ All bots identified correctly
 - ✓ Action items are specific and clear
 - ✓ Report is well-formatted and readable
+
+## Best Practices for GitHub API Calls
+
+### The Golden Rule: Parse While Fetching
+
+**Never fetch raw JSON. Always parse immediately using jq.**
+
+When you fetch GitHub API data without piping through jq, you risk truncation that hides most of the data. This is the #1 cause of missing PR comments.
+
+### Two Formats for Two Purposes
+
+#### 1. For Display (Human-Readable)
+Use `| jq -r` to format immediately:
+
+```bash
+gh api "repos/$REPO_INFO/pulls/$PR_NUMBER/comments" | \
+  jq -r '.[] | "@\(.user.login) \(.path):\n\(.body)\n"'
+```
+
+**Why `-r` flag:** Removes JSON quotes, produces clean text output
+
+**When to use:** Previewing, logging, showing to user
+
+#### 2. For Storage (Structured Data)
+Use `--jq` to parse and save:
+
+```bash
+gh api "repos/$REPO_INFO/pulls/$PR_NUMBER/comments" \
+  --jq '.[] | {id, path, body}' > /tmp/comments.json
+```
+
+**Why `--jq` flag:** Parses and filters before saving to file
+
+**When to use:** Saving for later processing, building data structures
+
+### Common Mistakes to Avoid
+
+❌ **Wrong:** Fetch then parse
+```bash
+# This will truncate!
+COMMENTS=$(gh api "repos/$REPO/pulls/$PR/comments")
+echo "$COMMENTS" | jq '.[] | .body'  # Too late, already truncated
+```
+
+✅ **Correct:** Parse while fetching
+```bash
+# This works perfectly
+gh api "repos/$REPO/pulls/$PR/comments" | jq -r '.[] | .body'
+```
+
+### Verification Checklist
+
+Before processing any PR comments, verify:
+- [ ] All API calls use `| jq` or `--jq`
+- [ ] No raw JSON output visible to user
+- [ ] Comment count in preview matches expected count
+- [ ] Step 2A preview shows all expected comments
+- [ ] No output ends with `...` (truncation indicator)
+
+### Character Limits
+
+GitHub API responses can exceed 10,000 characters. Without jq:
+- **Raw JSON:** Truncates at ~10,000 chars → Missing comments
+- **With jq:** Parses immediately → No truncation
+
+### Quick Test
+
+To verify you're doing it right:
+```bash
+# Count comments using jq (always reliable)
+gh api "repos/$REPO/pulls/$PR/comments" | jq '. | length'
+
+# If this number matches your preview, you're good!
+```
 
 ## Important Notes
 
