@@ -1,8 +1,8 @@
-# Check CI Status and Fix Failures
+# Check CI Status and Investigate Failures
 
 ## Goal
 
-To monitor CI/CD pipeline status after pushing commits, automatically analyze any failures, and propose specific fixes for identified issues. This command streamlines the debugging process by parsing CI logs, identifying error patterns, and suggesting actionable solutions.
+Monitor CI/CD pipeline status after pushing commits. When failures occur, delegate to the cata-debugger agent for systematic investigation and evidence-based root cause analysis.
 
 ## Input
 
@@ -14,9 +14,10 @@ Optional commit reference: $ARGUMENTS (e.g., `HEAD`, `abc1234`, `feature-branch`
 1. **Identify Recent Commits:** Get the latest commit(s) to check CI status for
 2. **Detect CI Platform:** Identify which CI/CD system is in use
 3. **Monitor CI Status:** Poll for CI pipeline completion with real-time updates
-4. **Analyze Failures:** If CI fails, extract and parse error logs
-5. **Propose Fixes:** Generate specific code changes to resolve identified issues
-6. **Present Solutions:** Display actionable fixes with clear next steps
+4. **Handle Results:**
+   - If success → Present success summary
+   - If failure → Launch cata-debugger agent to investigate
+5. **Present Report:** Show agent's investigation findings or success status
 
 ## CI Platform Detection
 
@@ -102,149 +103,42 @@ Display status updates every 5-10 seconds:
   - Deploy: Pending
 ```
 
-## Error Analysis Patterns
+## Failure Investigation
 
-The command recognizes and analyzes common CI failure patterns:
+When CI fails, delegate investigation to the cata-debugger agent:
 
-### 1. Test Failures
+### Agent Invocation
 
-**Pattern Recognition:**
-- Unit test failures: `FAIL:`, `AssertionError`, `Expected .* but got`
-- Integration test failures: `Connection refused`, `timeout`
-- Test file not found: `No such file or directory`
+Use the Task tool to launch the cata-debugger agent with:
+- CI job/pipeline ID
+- Failed job names
+- Relevant log excerpts
+- Commit information
 
-**Analysis Approach:**
-- Extract failing test names and assertions
-- Identify changed files that might have broken tests
-- Check for missing test dependencies
+Example prompt for agent:
+```
+Investigate CI failure for commit [SHA]:
+- Failed jobs: [job names]
+- CI platform: [GitHub Actions/GitLab CI/etc]
+- Job logs available via: [command to fetch logs]
 
-### 2. Build Errors
+Please gather evidence about:
+1. What specifically failed (tests, build, lint, etc.)
+2. Exact error messages and stack traces
+3. Which files/changes are involved
+4. Root cause based on evidence
 
-**Pattern Recognition:**
-- Compilation errors: `error:`, `cannot find symbol`
-- Module not found: `Module not found`, `Cannot resolve`
-- Syntax errors: `SyntaxError`, `unexpected token`
-
-**Analysis Approach:**
-- Parse error locations (file:line:column)
-- Check for missing imports or dependencies
-- Verify syntax in recently changed files
-
-### 3. Linting Issues
-
-**Pattern Recognition:**
-- ESLint: `error  [rule-name]`
-- Prettier: `Code style issues found`
-- Python linting: `flake8`, `pylint` errors
-
-**Analysis Approach:**
-- Extract specific rule violations
-- Map to fixable vs non-fixable issues
-- Generate formatting commands
-
-### 4. Dependency Problems
-
-**Pattern Recognition:**
-- npm/yarn: `npm ERR!`, `Module not found`
-- pip: `No matching distribution found`
-- Missing system dependencies: `command not found`
-
-**Analysis Approach:**
-- Identify missing packages
-- Check lock file consistency
-- Verify version compatibility
-
-## Fix Generation
-
-Based on the error analysis, generate specific fixes:
-
-### 1. Test Fixes
-
-```markdown
-## Test Failure Fix
-
-**Failed Test:** `test_user_authentication`
-**Error:** AssertionError: Expected status 200 but got 401
-
-**Proposed Fix:**
-1. Update the test to include authentication token:
-   ```python
-   headers = {'Authorization': 'Bearer test-token'}
-   response = client.get('/api/user', headers=headers)
-   ```
-
-2. Or update the implementation to handle missing auth:
-   ```python
-   if not request.headers.get('Authorization'):
-       return JsonResponse({'error': 'Unauthorized'}, status=401)
-   ```
+Provide a complete investigation report.
 ```
 
-### 2. Build Fixes
+### What the Agent Will Do
 
-```markdown
-## Build Error Fix
-
-**Error:** Cannot find module './utils/helper'
-**Location:** src/components/Dashboard.js:5
-
-**Proposed Fix:**
-1. Check if file was moved/renamed:
-   ```bash
-   find . -name "helper.js" -o -name "helper.ts"
-   ```
-
-2. Update import path:
-   ```javascript
-   // Change from:
-   import { helper } from './utils/helper';
-   // To:
-   import { helper } from '../utils/helper';
-   ```
-```
-
-### 3. Linting Fixes
-
-```markdown
-## Linting Fix
-
-**Issues Found:** 5 style violations
-
-**Auto-fix available:**
-```bash
-npm run lint -- --fix
-# or
-npx eslint . --fix
-```
-
-**Manual fixes needed:**
-- Line 45: Unused variable 'tempData' - remove or use it
-- Line 78: Missing return type - add explicit type annotation
-```
-
-### 4. Dependency Fixes
-
-```markdown
-## Dependency Fix
-
-**Error:** Module 'requests' not found
-
-**Proposed Fix:**
-1. Add to requirements.txt:
-   ```
-   requests==2.31.0
-   ```
-
-2. Install locally:
-   ```bash
-   pip install requests
-   ```
-
-3. Update CI config to install dependencies:
-   ```yaml
-   - run: pip install -r requirements.txt
-   ```
-```
+The cata-debugger agent will:
+1. Fetch complete CI logs for failed jobs
+2. Identify exact error messages and locations
+3. Trace the failure through execution flow
+4. Gather evidence about environment and context
+5. Present findings without proposing fixes
 
 ## Output Format
 
@@ -273,28 +167,17 @@ npx eslint . --fix
   ⚠️ Lint: 3 warnings (0m 15s)
   ✓ Security: No vulnerabilities (0m 38s)
 
-🔍 Analyzing failures...
-
-## Test Failures Detected
-
-### 1. test_user_profile_update
-**Error:** AssertionError: 404 != 200
-**File:** tests/test_api.py:45
-
-**Likely Cause:** The endpoint '/api/profile' may have been renamed or removed.
-
-**Proposed Fix:**
-[Detailed fix as shown above]
-
-### 2. test_data_validation
-[Additional test failure details]
-
-## Next Steps:
-1. Apply the proposed fixes above
-2. Run tests locally: `npm test`
-3. Commit fixes: `/commit-and-push`
-4. Re-run CI: `/check-ci`
+🔍 Launching cata-debugger agent to investigate...
 ```
+
+**Then present the agent's complete investigation report, which will include:**
+- Problem Investigation Report
+- Evidence Gathered (logs, errors, stack traces)
+- Root Cause Analysis (based on facts)
+- Affected Components
+- Recommendations for Resolution
+
+The agent's report provides evidence-based findings without implementing fixes.
 
 ## Error Handling
 
@@ -327,20 +210,33 @@ Users can customize behavior via environment variables:
 
 - `CI_CHECK_TIMEOUT`: Maximum time to wait for CI completion (default: 30m)
 - `CI_POLL_INTERVAL`: How often to check status (default: 10s)
-- `CI_AUTO_FIX`: Whether to auto-apply simple fixes (default: false)
 
 ## Final Instructions
 
+### Core Workflow
 1. Always start by checking the latest commit unless specified otherwise
 2. Detect CI platform automatically - don't assume GitHub Actions
 3. Monitor CI status continuously without requiring user input
-4. Parse all available logs thoroughly before proposing fixes
-5. Generate specific, actionable fixes rather than generic advice
-6. Present fixes in order of likelihood to resolve the issue
-7. Include commands that can be copy-pasted
-8. Never modify code automatically - always present fixes for review
-9. Handle multiple CI platforms if repository uses several
-10. Provide clear next steps after presenting fixes
+4. When CI completes:
+   - **Success** → Present success summary with timing details
+   - **Failure** → Launch cata-debugger agent immediately
+
+### Agent Delegation
+5. When launching cata-debugger:
+   - Provide commit SHA and job details
+   - Include command to fetch relevant logs
+   - Specify which jobs failed
+   - Let agent conduct systematic investigation
+
+### Reporting
+6. Present the agent's complete investigation report
+7. The agent's report will be evidence-based, not solution-based
+8. Never modify code or implement fixes automatically
+9. Wait for human decision on next steps after presenting findings
+
+### Error Handling
+10. Handle multiple CI platforms if repository uses several
+11. If CI is still running after 30 minutes, report timeout and current status
 
 ## Usage Examples
 
