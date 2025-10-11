@@ -202,6 +202,52 @@ if (user) { // Check if user exists
 }
 ```
 
+**Comments Referencing Removed Code:**
+```dockerfile
+# BAD: Comment references non-existent file
+# Copy dependency files (README not needed for uv sync)
+COPY pyproject.toml uv.lock ./
+
+# Why this is AI slop:
+# - Comment mentions README when there's NO README in the COPY command
+# - Explains why something is NOT there instead of documenting what IS there
+# - Leaves defensive "breadcrumbs" justifying the change
+# - Future readers are confused by references to non-existent code
+
+# GOOD: Comment describes current state
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+```
+
+```javascript
+// BAD: References removed code
+function processData(input) {
+  // Validation removed - not needed
+  return transform(input);
+}
+
+// BAD: Defensive explanation for absence
+const config = {
+  // OAuth settings excluded for security
+  apiKey: process.env.API_KEY
+};
+
+// GOOD: Documents what exists
+function processData(input) {
+  return transform(input);
+}
+
+const config = {
+  apiKey: process.env.API_KEY
+};
+```
+
+**Pattern to Detect:**
+- Comments mentioning files/variables/functions that don't appear in the code
+- "Not needed", "Excluded", "Removed", "Not required" in comments
+- Explanations for why something is absent rather than what is present
+- AI agents leaving traces of their decision-making process
+
 **Over-Defensive Code:**
 ```javascript
 // Unnecessary null checks everywhere
@@ -494,6 +540,7 @@ Compare implementation against requirements systematically:
 
 #### Obvious Comments
 - **[File:Line]**: Comment explains what code clearly shows
+- **[File:Line]**: Comment references removed/non-existent code (e.g., "README not needed")
 
 #### Copy-Paste Patterns
 - **[File:Line]**: Tutorial-style code doesn't match codebase
@@ -667,6 +714,9 @@ grep -r "function.*[0-9]\|function.*Temp\|function.*New\|function.*Old" --includ
 
 # Find obvious comments
 grep -r "// Initialize\|// Increment\|// Decrement\|// Return\|// Check if" --include="*.js" --include="*.ts"
+
+# Find comments referencing removed/non-existent code
+grep -r "[Nn]ot needed\|[Ee]xcluded\|[Rr]emoved\|[Nn]ot required" --include="*.js" --include="*.ts" --include="*.py" --include="Dockerfile" --include="*.sh"
 ```
 
 ## Required Practices
@@ -733,6 +783,7 @@ Before submitting review, verify:
 - [ ] Verified test suite integrity (no skipped/neutered tests)
 - [ ] Ran test verification commands
 - [ ] Looked for empty catch blocks and debug code
+- [ ] Checked for comments referencing removed/non-existent code
 - [ ] Checked for implementation shortcuts
 - [ ] Verified requirements coverage
 - [ ] Identified security issues
