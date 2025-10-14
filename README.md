@@ -5,12 +5,13 @@ A collection of productivity-enhancing commands for Claude Code that streamline 
 ## Overview
 
 These commands provide a structured approach to feature development:
-1. **Create PRD** - Generate a Product Requirements Document from user input
-2. **Generate Tasks** - Convert a PRD into an actionable task list
-3. **Process Tasks** - Execute tasks systematically with progress tracking
-4. **Commit and Push** - Run quality checks, commit with good message, and push to remote
-5. **Create PR** - Create a pull request with automatic branch management and platform detection
-6. **Check CI** - Monitor CI/CD status and get fixes for any failures
+1. **Create Issue** - Transform notes into well-structured GitHub issues with codebase context
+2. **Create PRD** - Generate a Product Requirements Document from user input
+3. **Generate Tasks** - Convert a PRD into an actionable task list
+4. **Process Tasks** - Execute tasks systematically with progress tracking
+5. **Commit and Push** - Run quality checks, commit with good message, and push to remote
+6. **Create PR** - Create a pull request with automatic branch management and platform detection
+7. **Check CI** - Monitor CI/CD status and get fixes for any failures
 
 ## Installation
 
@@ -35,7 +36,41 @@ mkdir -p ~/.claude && mv commands ~/.claude/
 
 ## Commands
 
-### 1. Create PRD (`/create-prd`)
+### 1. Create Issue (`/create-issue`)
+
+Transform notes, meeting minutes, or project documentation into well-structured GitHub issues.
+
+**Usage:**
+```
+/create-issue [file path or text description]
+```
+
+**What it does:**
+- Analyzes codebase to understand project context
+- Extracts issue details from notes or text
+- Generates clear, concise issue title (following best practices)
+- Creates comprehensive issue body with markdown formatting
+- Intelligently detects and applies relevant labels
+- Checks for similar existing issues
+- Creates issue via GitHub CLI (`gh`)
+- Returns issue URL and details
+
+**Features:**
+- Works with file paths (meeting notes, docs) or direct text input
+- Follows industry best practices for issue writing
+- Smart label detection based on content analysis
+- **Always adds 'ai' label** for transparency and tracking
+- Validates labels exist before applying them
+- References actual codebase components in issue description
+- Detects issue type automatically (bug, feature, docs, etc.)
+
+**Example:**
+```
+/create-issue meetings/sprint-planning.md
+/create-issue "Users report login page is slow on mobile devices"
+```
+
+### 2. Create PRD (`/create-prd`)
 
 Creates a detailed Product Requirements Document based on user input.
 
@@ -59,7 +94,7 @@ Creates a detailed Product Requirements Document based on user input.
 /create-prd Add user profile editing functionality
 ```
 
-### 2. Generate Tasks (`/generate-tasks`)
+### 3. Generate Tasks (`/generate-tasks`)
 
 Converts a PRD into a structured task list with dependencies.
 
@@ -81,7 +116,7 @@ Converts a PRD into a structured task list with dependencies.
 /generate-tasks tasks/prd-user-profile-editing.md
 ```
 
-### 3. Process Tasks (`/process-tasks`)
+### 4. Process Tasks (`/process-tasks`)
 
 Executes tasks from a task list with progress tracking.
 
@@ -102,7 +137,7 @@ Executes tasks from a task list with progress tracking.
 /process-tasks tasks/tasks-prd-user-profile-editing.md
 ```
 
-### 4. Commit and Push (`/commit-and-push`)
+### 5. Commit and Push (`/commit-and-push`)
 
 Automatically runs quality checks, creates a clean commit, and pushes to remote.
 
@@ -130,7 +165,7 @@ Automatically runs quality checks, creates a clean commit, and pushes to remote.
 /commit-and-push
 ```
 
-### 5. Create PR (`/create-pr`)
+### 6. Create PR (`/create-pr`)
 
 Creates a pull request with automatic branch management and platform detection.
 
@@ -160,7 +195,7 @@ Creates a pull request with automatic branch management and platform detection.
 /create-pr
 ```
 
-### 6. Check CI (`/check-ci`)
+### 7. Check CI (`/check-ci`)
 
 Monitors CI/CD pipeline status after commits and provides fixes for failures.
 
@@ -198,26 +233,35 @@ Monitors CI/CD pipeline status after commits and provides fixes for failures.
 Here's how to use all commands together for a complete development cycle:
 
 ```bash
-# 1. Create a PRD for a new feature
+# 1. Create issues from meeting notes (optional)
+/create-issue meetings/sprint-planning.md
+
+# Claude will:
+# - Analyze your codebase for context
+# - Extract and structure the issue details
+# - Create GitHub issue with proper labels
+# - Return issue URL: https://github.com/user/repo/issues/142
+
+# 2. Create a PRD for a new feature
 /create-prd Add shopping cart functionality to e-commerce site
 
 # Claude will ask clarifying questions, then create:
 # tasks/prd-shopping-cart.md
 
-# 2. Generate tasks from the PRD
+# 3. Generate tasks from the PRD
 /generate-tasks tasks/prd-shopping-cart.md
 
 # Claude will create:
 # tasks/tasks-prd-shopping-cart.md
 
-# 3. Process the tasks
+# 4. Process the tasks
 /process-tasks tasks/tasks-prd-shopping-cart.md
 
 # Claude will:
 # - Work through each task systematically in sequential order
 # - Update progress and ask for approval between tasks
 
-# 4. Commit and push the completed work
+# 5. Commit and push the completed work
 /commit-and-push
 
 # Claude will:
@@ -225,7 +269,7 @@ Here's how to use all commands together for a complete development cycle:
 # - Create a descriptive commit message
 # - Push to remote repository
 
-# 5. Create a pull request
+# 6. Create a pull request
 /create-pr "Add shopping cart functionality"
 
 # Claude will:
@@ -234,7 +278,7 @@ Here's how to use all commands together for a complete development cycle:
 # - Create PR with generated description
 # - Display the PR URL
 
-# 6. Monitor CI and fix any failures
+# 7. Monitor CI and fix any failures
 /check-ci
 
 # Claude will:
