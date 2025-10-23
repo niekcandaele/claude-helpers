@@ -58,7 +58,7 @@ Then present the plan using ExitPlanMode for approval.
 After plan approval, execute the implementation directly:
 
 1. **Initial Setup**
-   - Locate and read the design document (in `.design/*/design.md`)
+   - Locate and read the design document (in `docs/design/*/design.md`)
    - Locate and read the tasks.md file
    - Check current git status to understand the codebase state
    - Use TodoWrite to track your progress through phases and tasks
@@ -108,7 +108,7 @@ After plan approval, execute the implementation directly:
 **MANDATORY**: After execution completes successfully, automatically run comprehensive verification:
 
 1. **Extract the feature name** from $ARGUMENTS:
-   - If $ARGUMENTS is a path like `.design/2024-01-15-user-auth/tasks.md`, extract `user-auth`
+   - If $ARGUMENTS is a path like `docs/design/2024-01-15-user-auth/tasks.md`, extract `user-auth`
    - If $ARGUMENTS is already a feature name like `user-auth`, use it directly
    - If $ARGUMENTS includes a phase number (e.g., `user-auth 2`), use only the feature name
 
@@ -122,7 +122,7 @@ After plan approval, execute the implementation directly:
    - subagent_type: "cata-reviewer"
    - description: "Review phase implementation"
    - prompt: "Review the implementation for [feature-name].
-     Find and read the design doc in .design/*/design.md.
+     Find and read the design doc in docs/design/*/design.md.
      Use git diff to see changes made in this phase.
      Verify design adherence, check for over-engineering and AI slop.
      Provide detailed code review."
@@ -287,7 +287,7 @@ Follow a strict NO WORKAROUNDS policy:
 
 ### Execute from specific task file:
 ```
-/cata-proj/execute .design/2024-01-15-user-auth/tasks.md
+/cata-proj/execute docs/design/2024-01-15-user-auth/tasks.md
 ```
 
 ## Important Notes

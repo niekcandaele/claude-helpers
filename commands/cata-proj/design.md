@@ -78,7 +78,7 @@ Before writing the design, analyze the existing codebase to understand:
 
 ### Phase 2: Design Document Creation
 
-Get today's date and create `.design/YYYY-MM-DD-$ARGUMENTS/design.md` with this structure:
+Get today's date and create `docs/design/YYYY-MM-DD-$ARGUMENTS/design.md` with this structure:
 
 ## Document Structure
 
@@ -229,9 +229,9 @@ For each component, write tests first or alongside implementation:
 
 ## Deliverables
 
-1. Save the completed design document as `.design/YYYY-MM-DD-$ARGUMENTS/design.md` where YYYY-MM-DD is today's date.
+1. Save the completed design document as `docs/design/YYYY-MM-DD-$ARGUMENTS/design.md` where YYYY-MM-DD is today's date.
 
-2. Generate a feedback file at `.design/YYYY-MM-DD-$ARGUMENTS/feedback.md` containing:
+2. Generate a feedback file at `docs/design/YYYY-MM-DD-$ARGUMENTS/feedback.md` containing:
    - Questions about ambiguous requirements
    - Concerns about potential implementation issues
    - Requests for clarification on design decisions

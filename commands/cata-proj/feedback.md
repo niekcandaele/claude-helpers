@@ -14,7 +14,7 @@ Ingest human feedback and update the design document for: **$ARGUMENTS**
 
 Find the feedback.md file:
 - If given a path, use that directly
-- If given a feature name, search `.design/*/feedback.md`
+- If given a feature name, search `docs/design/*/feedback.md`
 - Use the most recent feedback file for that feature
 
 ### Step 2: Parse Feedback
@@ -84,7 +84,7 @@ When feedback resolves a major decision, add:
 ```
 Input: "user-auth"
 
-1. Found feedback at: .design/2024-01-15-user-auth/feedback.md
+1. Found feedback at: docs/design/2024-01-15-user-auth/feedback.md
 
 2. Processing 3 feedback items:
    ✓ Question 1: Authentication method

@@ -324,7 +324,7 @@ Choose your preferred next step, or I can start implementing the Priority 1 and 
 After presenting the report, offer integration with existing workflows:
 
 #### Option A: Create Task List
-- Generate a `tasks.md` file in `.design/pr-[NUMBER]-feedback/tasks.md`
+- Generate a `tasks.md` file in `docs/design/pr-[NUMBER]-feedback/tasks.md`
 - Structure tasks by priority
 - Can be executed with `/cata-proj:execute`
 
@@ -449,7 +449,7 @@ echo "Total comments: $COMMENT_COUNT"
 ### After analyzing, create tasks
 ```
 User: "Create a task list for these changes"
-Assistant: [Creates .design/pr-123-feedback/tasks.md and suggests /cata-proj:execute]
+Assistant: [Creates docs/design/pr-123-feedback/tasks.md and suggests /cata-proj:execute]
 ```
 
 ## Implementation Notes

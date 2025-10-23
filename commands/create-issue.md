@@ -612,7 +612,7 @@ This command works well with the existing workflow:
 /cata-proj:design [feature-name]
 
 # Generate implementation tasks:
-/cata-proj:tasks .design/*/design.md
+/cata-proj:tasks docs/design/*/design.md
 
 # Execute the implementation:
 /cata-proj:execute [feature-name]

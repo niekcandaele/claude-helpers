@@ -14,13 +14,13 @@ Create an actionable implementation task list based on the design document: **$A
 
 First, find and read the design document:
 - If given a full path, read that file directly
-- If given a feature name, search in `.design/*/design.md` for matching documents
+- If given a feature name, search in `docs/design/*/design.md` for matching documents
 - Look for the most recent design doc with that feature name (by date prefix)
 - Analyze requirements, architecture, and implementation details
 
 ### Step 2: Generate Task List
 
-Create the task list in the same folder as the design document (`.design/YYYY-MM-DD-feature/tasks.md`) with incremental, testable tasks:
+Create the task list in the same folder as the design document (`docs/design/YYYY-MM-DD-feature/tasks.md`) with incremental, testable tasks:
 
 ## Task Structure
 
@@ -118,7 +118,7 @@ Create the task list in the same folder as the design document (`.design/YYYY-MM
 
 ## Output
 
-Save the task list in the same folder as the design document (`.design/YYYY-MM-DD-feature/tasks.md`) with:
+Save the task list in the same folder as the design document (`docs/design/YYYY-MM-DD-feature/tasks.md`) with:
 - Clear, actionable tasks
 - Specific file references
 - Testable outcomes

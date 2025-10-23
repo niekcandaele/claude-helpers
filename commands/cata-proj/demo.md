@@ -16,7 +16,7 @@ This command launches the `cata-tester` agent to execute the demo with strict no
 
 Find the tasks.md file:
 - If given a path, use that directly
-- If given a feature name, search `.design/*/tasks.md`
+- If given a feature name, search `docs/design/*/tasks.md`
 - Use the most recent task file for that feature
 
 ### Step 2: Identify Last Completed Phase
@@ -148,7 +148,7 @@ npm run dev  # Open browser to localhost:3000
 ```
 Input: "user-auth"
 
-1. Found tasks at: .design/2024-01-15-user-auth/tasks.md
+1. Found tasks at: docs/design/2024-01-15-user-auth/tasks.md
 2. Last completed phase: Phase 2 - "Connect to Real Data"
    Demo: "User can register and receive JWT token"
 
@@ -167,7 +167,7 @@ Input: "user-auth"
 ```
 Input: "payment-integration"
 
-1. Found tasks at: .design/2024-01-16-payment-integration/tasks.md
+1. Found tasks at: docs/design/2024-01-16-payment-integration/tasks.md
 2. Last completed phase: Phase 3 - "Process Transactions"
    Demo: "Complete payment flow with Stripe"
 
