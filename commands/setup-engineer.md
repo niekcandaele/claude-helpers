@@ -32,7 +32,7 @@ echo "Repository: $REPO_NAME"
 
 ```bash
 # Check if engineer skill exists
-SKILL_PATH=".claude/commands/${REPO_NAME}-engineer.md"
+SKILL_PATH=".claude/skills/${REPO_NAME}-engineer/SKILL.md"
 if [ -f "$SKILL_PATH" ]; then
   echo "Existing skill found: $SKILL_PATH"
 else
@@ -146,14 +146,15 @@ When updating an existing skill:
 
 Create the directory if needed:
 ```bash
-mkdir -p .claude/commands
+mkdir -p .claude/skills/{REPO_NAME}-engineer
 ```
 
-Write the skill file with this structure:
+Write the skill file to `.claude/skills/{REPO_NAME}-engineer/SKILL.md` with this structure:
 
 ```markdown
 ---
-description: {REPO_NAME} repository knowledge and development guide
+name: {REPO_NAME}-engineer
+description: {REPO_NAME} repository knowledge - architecture, tests, scripts, debugging, database setup. Use when working on this codebase, running tests, debugging issues, or understanding the project structure.
 ---
 
 # {REPO_NAME} Engineer
@@ -260,7 +261,9 @@ If reference is missing, prepend to CLAUDE.md (or create it):
 ```markdown
 # Repository Engineer Skill
 
-**CRITICAL:** At session start, read `.claude/commands/{REPO_NAME}-engineer.md` for repository knowledge.
+This repository has an engineer skill at `.claude/skills/{REPO_NAME}-engineer/SKILL.md`.
+
+Claude will automatically discover and use this skill when relevant. You can also read it directly for repository knowledge.
 
 ## Proactive Maintenance
 
@@ -291,7 +294,7 @@ The goal is keeping the skill accurate and useful, not just accumulating informa
 Output summary:
 
 ```
-✅ Engineer skill updated: .claude/commands/{REPO_NAME}-engineer.md
+✅ Engineer skill updated: .claude/skills/{REPO_NAME}-engineer/SKILL.md
 
 Changes:
 - {what was added/updated}
@@ -301,7 +304,7 @@ Skill now includes:
 - Test commands
 - {other sections present}
 
-💡 The skill will be loaded automatically in future sessions.
+💡 Claude will automatically discover and use this skill.
 💡 Run /setup-engineer anytime to add new knowledge.
 ```
 
@@ -314,9 +317,9 @@ Using directory name: {dirname}
 ```
 Continue without git context.
 
-### Cannot Write to .claude/commands
+### Cannot Write to .claude/skills
 ```
-❌ Cannot write to .claude/commands/
+❌ Cannot write to .claude/skills/
 Check directory permissions.
 ```
 
