@@ -5,13 +5,14 @@ A collection of productivity-enhancing commands for Claude Code that streamline 
 ## Overview
 
 These commands provide a structured approach to feature development:
-1. **Create Issue** - Transform notes into well-structured GitHub issues with codebase context
-2. **Create PRD** - Generate a Product Requirements Document from user input
-3. **Generate Tasks** - Convert a PRD into an actionable task list
-4. **Process Tasks** - Execute tasks systematically with progress tracking
-5. **Commit and Push** - Run quality checks, commit with good message, and push to remote
-6. **Create PR** - Create a pull request with automatic branch management and platform detection
-7. **Check CI** - Monitor CI/CD status and get fixes for any failures
+1. **Setup Engineer** - Create or update a repository engineer skill with session knowledge
+2. **Create Issue** - Transform notes into well-structured GitHub issues with codebase context
+3. **Create PRD** - Generate a Product Requirements Document from user input
+4. **Generate Tasks** - Convert a PRD into an actionable task list
+5. **Process Tasks** - Execute tasks systematically with progress tracking
+6. **Commit and Push** - Run quality checks, commit with good message, and push to remote
+7. **Create PR** - Create a pull request with automatic branch management and platform detection
+8. **Check CI** - Monitor CI/CD status and get fixes for any failures
 
 ## Installation
 
@@ -36,7 +37,54 @@ mkdir -p ~/.claude && mv commands ~/.claude/
 
 ## Commands
 
-### 1. Create Issue (`/create-issue`)
+### 1. Setup Engineer (`/setup-engineer`)
+
+Create or update a repository-specific engineer skill that captures knowledge about how to work with the codebase.
+
+**Usage:**
+```
+/setup-engineer
+```
+
+**What it does:**
+- **First run**: Explores the repository to discover tests, scripts, database setup, debugging approaches
+- **Subsequent runs**: Extracts knowledge from the current session and adds it to the skill
+
+**Key feature - Session awareness:**
+When you run this command after doing work (debugging, implementing features, etc.), Claude analyzes the conversation and captures useful knowledge:
+- Commands that worked
+- Debugging techniques
+- Gotchas and solutions
+- Environment setup requirements
+
+**Files created:**
+- `.claude/commands/{repo-name}-engineer.md` - The engineer skill (loaded automatically in future sessions)
+- Updates `CLAUDE.md` with reference to the skill
+
+**Example workflow:**
+```bash
+# Initial setup in a new repository
+/setup-engineer
+# → Creates engineer skill by exploring the repo
+
+# After debugging an issue
+# ... work session where you figured out how to debug something ...
+/setup-engineer
+# → Adds debugging knowledge to the skill
+
+# After discovering test patterns
+# ... work session with tests ...
+/setup-engineer
+# → Updates test section with new findings
+```
+
+**Why use this:**
+- Knowledge persists across Claude sessions
+- Reduces onboarding time in each new conversation
+- Builds a cumulative knowledge base specific to your repo
+- Future sessions start with context about tests, scripts, debugging, etc.
+
+### 2. Create Issue (`/create-issue`)
 
 Transform notes, meeting minutes, or project documentation into well-structured GitHub issues.
 
@@ -70,7 +118,7 @@ Transform notes, meeting minutes, or project documentation into well-structured 
 /create-issue "Users report login page is slow on mobile devices"
 ```
 
-### 2. Create PRD (`/create-prd`)
+### 3. Create PRD (`/create-prd`)
 
 Creates a detailed Product Requirements Document based on user input.
 
@@ -94,7 +142,7 @@ Creates a detailed Product Requirements Document based on user input.
 /create-prd Add user profile editing functionality
 ```
 
-### 3. Generate Tasks (`/generate-tasks`)
+### 4. Generate Tasks (`/generate-tasks`)
 
 Converts a PRD into a structured task list with dependencies.
 
@@ -116,7 +164,7 @@ Converts a PRD into a structured task list with dependencies.
 /generate-tasks tasks/prd-user-profile-editing.md
 ```
 
-### 4. Process Tasks (`/process-tasks`)
+### 5. Process Tasks (`/process-tasks`)
 
 Executes tasks from a task list with progress tracking.
 
@@ -137,7 +185,7 @@ Executes tasks from a task list with progress tracking.
 /process-tasks tasks/tasks-prd-user-profile-editing.md
 ```
 
-### 5. Commit and Push (`/commit-and-push`)
+### 6. Commit and Push (`/commit-and-push`)
 
 Automatically runs quality checks, creates a clean commit, and pushes to remote.
 
@@ -165,7 +213,7 @@ Automatically runs quality checks, creates a clean commit, and pushes to remote.
 /commit-and-push
 ```
 
-### 6. Create PR (`/create-pr`)
+### 7. Create PR (`/create-pr`)
 
 Creates a pull request with automatic branch management and platform detection.
 
@@ -195,7 +243,7 @@ Creates a pull request with automatic branch management and platform detection.
 /create-pr
 ```
 
-### 7. Check CI (`/check-ci`)
+### 8. Check CI (`/check-ci`)
 
 Monitors CI/CD pipeline status after commits and provides fixes for failures.
 
@@ -233,6 +281,14 @@ Monitors CI/CD pipeline status after commits and provides fixes for failures.
 Here's how to use all commands together for a complete development cycle:
 
 ```bash
+# 0. Set up repository knowledge (first time only, or after learning something)
+/setup-engineer
+
+# Claude will:
+# - Explore the repo to discover tests, scripts, database setup
+# - Create .claude/commands/{repo}-engineer.md
+# - Future sessions will automatically have this context
+
 # 1. Create issues from meeting notes (optional)
 /create-issue meetings/sprint-planning.md
 
