@@ -232,11 +232,15 @@ This skill contains essential knowledge for working with the {REPO_NAME} reposit
 |-------|----------|
 | {error/problem} | {how to fix it} |
 
-## Self-Improvement
+## Maintenance
 
-**Run `/setup-engineer` to update this skill with new knowledge.**
+This skill should stay accurate and useful. During work:
 
-When you learn something useful about this repository, run the command to capture it.
+- **Discover something useful?** → Ask the human if it should be added
+- **Find outdated info here?** → Ask the human if it should be updated/removed
+- **Run `/setup-engineer`** → Bulk update from current session
+
+The human decides what goes in. Claude suggests, human approves.
 ```
 
 ### Step 7: Ensure CLAUDE.md Reference
@@ -256,11 +260,26 @@ If reference is missing, prepend to CLAUDE.md (or create it):
 ```markdown
 # Repository Engineer Skill
 
-**CRITICAL:** Read `.claude/commands/{REPO_NAME}-engineer.md` at session start.
+**CRITICAL:** At session start, read `.claude/commands/{REPO_NAME}-engineer.md` for repository knowledge.
 
-This file contains verified knowledge about working with this repository.
+## Proactive Maintenance
 
-**After learning something new:** Run `/setup-engineer` to capture it.
+During your work, if you discover something that should be in the engineer skill:
+- A debugging technique that worked
+- A command or workflow that's useful
+- A gotcha or non-obvious behavior
+- An error and its solution
+
+**ASK THE HUMAN:** "Should I add this to the engineer skill?"
+
+Also watch for **outdated information** in the skill:
+- Commands that no longer work
+- Patterns that have changed
+- Information that contradicts what you just learned
+
+**ASK THE HUMAN:** "The skill says X but I found Y - should I update it?"
+
+The goal is keeping the skill accurate and useful, not just accumulating information.
 
 ---
 
