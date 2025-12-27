@@ -512,6 +512,98 @@ Compare implementation against requirements systematically:
 - Placeholder code
 - Functions that just pass through data
 
+### 8. Documentation & Instruction Sync
+
+AI agents often change code without updating related documentation. This creates drift between what docs say and what code does.
+
+**Check Documentation Files:**
+- README.md - Does it reflect current features, API, setup instructions?
+- CLAUDE.md - Are project conventions still accurate?
+- API documentation - Do endpoints and parameters match implementation?
+- Architecture docs - Does system design documentation match reality?
+
+**Check AI Agent Instructions:**
+- `.claude/agents/*.md` - Do agent definitions match current behavior?
+- `.claude/commands/*.md` - Do skill/command definitions need updates?
+- `.claude/skills/*/SKILL.md` - Are skill instructions still accurate?
+
+**Check Inline Documentation:**
+- JSDoc/docstrings - Do they match function signatures and behavior?
+- Code comments explaining "why" - Are they still accurate?
+- Example code in comments - Does it still work?
+
+**What Creates Documentation Drift:**
+- Renamed functions/parameters not updated in docs
+- Removed features still documented
+- New features not documented
+- Changed behavior with outdated explanations
+- Example code that no longer compiles/runs
+
+**Verification Commands:**
+```bash
+# Find documentation files in project
+find . -name "README*" -o -name "CLAUDE.md" -o -name "*.md" 2>/dev/null | grep -v node_modules | head -30
+
+# Check if docs were updated alongside code changes
+git diff --name-only [base]...HEAD | grep -E "\.(md|rst|txt)$"
+
+# Find agent and skill definitions
+ls -la .claude/agents/ .claude/skills/ .claude/commands/ 2>/dev/null
+
+# Compare changed function names against documentation mentions
+git diff [base]...HEAD --name-only | xargs -I {} basename {} | sort -u
+```
+
+### 9. Legacy Code & Technical Debt
+
+When code is changed or replaced, old code often gets left behind. Focus ONLY on cleanup opportunities directly related to the current changes - this is not a general technical debt audit.
+
+**Dead Code Detection:**
+- Functions/classes replaced but not deleted
+- Old implementations kept "just in case"
+- Commented-out code blocks
+- Unused variables and imports
+- Feature flags for completed rollouts
+
+**Orphaned Artifacts:**
+- Imports for removed modules
+- Configuration for deleted features
+- Test files for removed functionality
+- Types/interfaces no longer used
+- Constants that lost their references
+
+**Refactoring Opportunities Created by Changes:**
+- Duplicate code that could now use new shared utility
+- Patterns that can be simplified with new approach
+- Error handling that can leverage new infrastructure
+- Tests that could use new test helpers
+
+**Stale Comments and TODOs:**
+- TODO/FIXME/HACK/XXX that current changes resolve
+- Comments describing old behavior
+- "Temporary" code that's now obsolete
+- Workarounds for issues that were fixed
+
+**Verification Commands:**
+```bash
+# See what was deleted vs what was added
+git diff [base]...HEAD --stat
+
+# Find potentially orphaned imports in changed files
+git diff --name-only [base]...HEAD | xargs grep -l "^import\|^from" 2>/dev/null
+
+# Find TODOs/FIXMEs in changed files that might be resolvable
+git diff --name-only [base]...HEAD | xargs grep -n "TODO\|FIXME\|HACK\|XXX" 2>/dev/null
+
+# Check for commented-out code in changed files
+git diff --name-only [base]...HEAD | xargs grep -n "^[[:space:]]*//.*function\|^[[:space:]]*//.*class\|^[[:space:]]*#.*def " 2>/dev/null
+
+# Find unused exports (approximate - check manually)
+git diff [base]...HEAD | grep "^+.*export" | head -20
+```
+
+**Key Question:** Did the changes make any existing code obsolete that wasn't cleaned up?
+
 ## Feedback Format
 
 ### Review Structure
@@ -647,6 +739,36 @@ Compare implementation against requirements systematically:
 ### Missing Tests
 - [What's not tested but should be per design]
 
+## Documentation & Instruction Sync: ❌ STALE / ⚠️ PARTIAL / ✅ CURRENT
+
+### README/Docs Updates Needed
+- **[File:Section]**: [What needs updating]
+  - Code change: [What changed]
+  - Doc impact: [What's now incorrect/missing]
+
+### Agent/Skill Definition Updates
+- **[File]**: [Agent/skill needs update]
+  - Reason: [Why it's stale]
+
+### Inline Documentation Drift
+- **[File:Line]**: [JSDoc/docstring out of sync]
+
+## Legacy Code & Technical Debt: ❌ CLEANUP NEEDED / ✅ CLEAN
+
+### Dead Code to Remove
+- **[File:Line]**: [Function/class replaced but not deleted]
+  - Replaced by: [New implementation location]
+
+### Orphaned Artifacts
+- **[File:Line]**: [Imports, configs, tests for removed code]
+
+### Refactoring Opportunities
+- **[File:Line]**: [Code that can now be simplified]
+  - Because: [What changed that enables this]
+
+### Stale TODOs/FIXMEs
+- **[File:Line]**: [Hack that can now be resolved]
+
 ## Summary
 
 **Verdict:** REJECT / REQUEST CHANGES / APPROVE
@@ -675,6 +797,8 @@ Compare implementation against requirements systematically:
 - Missing features specified in design
 - Debug code logging sensitive data
 - Empty catch blocks swallowing errors
+- Agent/skill definitions contain incorrect instructions
+- README documents removed/changed features incorrectly
 
 **Major (Should Fix):**
 - Over-engineering
@@ -686,6 +810,9 @@ Compare implementation against requirements systematically:
 - Commented assertions
 - Obvious comments and generic naming
 - Requirements partially implemented
+- CLAUDE.md conventions outdated
+- Dead code from replaced functionality
+- Orphaned imports and unused dependencies
 
 **Minor (Consider Fixing):**
 - Style inconsistencies
@@ -694,6 +821,9 @@ Compare implementation against requirements systematically:
 - Minor performance issues
 - Overused AI phrases in documentation
 - Minor template rigidity
+- Stale TODOs that could be resolved
+- Refactoring opportunities enabled by changes
+- Inline documentation slightly out of sync
 
 ## Git Investigation Techniques
 
@@ -794,6 +924,10 @@ grep -r "[Nn]ot needed\|[Ee]xcluded\|[Rr]emoved\|[Nn]ot required" --include="*.j
 ✓ **Scan documentation** for bold bullet epidemic
 ✓ **Run verification commands** for tests and documentation
 ✓ **Look for implementation shortcuts** and placeholder code
+✓ **Check documentation sync** - README, CLAUDE.md, agent/skill definitions
+✓ **Identify dead code** - replaced functionality not cleaned up
+✓ **Flag orphaned artifacts** - imports, configs, tests for removed code
+✓ **Scan for stale TODOs** - hacks that can now be resolved
 
 ## Unacceptable Practices
 
@@ -854,6 +988,15 @@ Before submitting review, verify:
 - [ ] Provided specific file:line references
 - [ ] Cited design doc for discrepancies
 - [ ] Gave honest, uncompromising feedback
+- [ ] Checked if README needs updates for changed features/API
+- [ ] Verified CLAUDE.md reflects current project conventions
+- [ ] Checked if agent definitions need updating
+- [ ] Checked if skill definitions need updating
+- [ ] Verified inline docs (JSDoc/docstrings) match implementation
+- [ ] Looked for dead code from replaced functionality
+- [ ] Checked for orphaned imports and dependencies
+- [ ] Scanned for TODOs/FIXMEs that can now be resolved
+- [ ] Identified refactoring opportunities from the changes
 
 ## After Review - MANDATORY PAUSE
 
