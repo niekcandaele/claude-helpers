@@ -125,6 +125,23 @@ After plan approval, execute the implementation directly:
    [Clear description of what needs to be done]
    ```
 
+5. **Track Corrections** - MANDATORY
+
+   During implementation, maintain a corrections log of any issues you encountered and fixed:
+
+   - Unexpected errors that required debugging and fixes
+   - Tests that failed and needed code changes
+   - Type errors or lint issues discovered during implementation
+   - Configuration issues that needed adjustment
+   - Any deviation from the original plan
+
+   For each correction, note:
+   - What went wrong
+   - How you fixed it
+   - Whether this might indicate a design issue
+
+   This log will be included in the final report for human review. Even when running with skipped permissions, the human needs visibility into what you had to "fight through".
+
 ### Step 3: Verification & Testing Phase - AUTOMATIC MULTI-AGENT REVIEW
 
 **MANDATORY**: After execution completes successfully, automatically run comprehensive verification:
@@ -147,6 +164,12 @@ After plan approval, execute the implementation directly:
      Find and read the design doc in docs/design/*/design.md.
      Use git diff to see changes made in this phase.
      Verify design adherence, check for over-engineering and AI slop.
+
+     ALSO REVIEW the corrections log below - evaluate whether any fixes
+     indicate architectural issues, shortcuts, or workaround violations:
+
+     [Insert corrections log here]
+
      Provide detailed code review."
    ```
 
@@ -203,6 +226,15 @@ After plan approval, execute the implementation directly:
 
    ## Debug Analysis (cata-debugger)
    [Only if demo failed - insert root cause analysis]
+
+   ## Implementation Corrections
+   [List any issues encountered and fixed during implementation]
+
+   | Issue | Fix Applied | Potential Concern? |
+   |-------|-------------|-------------------|
+   | [What went wrong] | [How it was fixed] | [Yes/No - why] |
+
+   If no corrections: "Implementation proceeded as planned with no unexpected issues."
 
    ## Overall Assessment
    **Status:** ✅ READY / ⚠️ ISSUES FOUND / ❌ FAILED
