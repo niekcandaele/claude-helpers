@@ -231,48 +231,17 @@ For each component, write tests first or alongside implementation:
 
 1. Save the completed design document as `docs/design/YYYY-MM-DD-$ARGUMENTS/design.md` where YYYY-MM-DD is today's date.
 
-2. Generate a feedback file at `docs/design/YYYY-MM-DD-$ARGUMENTS/feedback.md` containing:
-   - Questions about ambiguous requirements
-   - Concerns about potential implementation issues
-   - Requests for clarification on design decisions
-   - Areas where multiple approaches exist and guidance is needed
+2. **Interactive Feedback** - Before finalizing, use AskUserQuestion to clarify any ambiguities:
 
-### Feedback File Format
+   Use the `AskUserQuestion` tool to ask 1-4 focused questions about:
+   - Ambiguous requirements that could be interpreted multiple ways
+   - Technical decisions with significant trade-offs
+   - Integration points that need validation
+   - Performance or security considerations
+   - User experience choices
 
-```markdown
-# Design Feedback: [Feature Name]
+   Each question should have clear options that help refine the design.
 
-*Please review the questions below and add your responses inline under "**Human Response:**". Your feedback will be used to refine the design document.*
+3. After receiving answers, update the design document to incorporate the feedback before presenting the final version.
 
-## Questions & Clarifications
-
-### 1. [Topic/Component Name]
-**Question**: [Specific question about the design or requirement]
-**Context**: [Why this clarification is important for implementation]
-**Human Response**: 
-
-### 2. [Another Topic]
-**Concern**: [Potential issue or risk identified]
-**Impact**: [What could go wrong or be affected]
-**Suggested Approach**: [Possible solution if any]
-**Human Response**: 
-
-### 3. [Technical Decision]
-**Clarification Needed**: [Area needing more specification]
-**Options**: 
-- Option A: [description]
-- Option B: [description]
-**Trade-offs**: [Key considerations]
-**Human Response**: 
-```
-
-Include 3-5 meaningful questions focusing on:
-- Ambiguous requirements that could be interpreted multiple ways
-- Technical decisions with significant trade-offs
-- Integration points that need validation
-- Performance or security considerations
-- User experience choices
-
-After creating both files, inform the user to:
-1. Review and respond to questions in `feedback.md`
-2. Run `/cata-proj/feedback [feature-name]` to ingest responses and update the design
+**Note**: Do NOT create a separate feedback.md file. All clarification happens interactively during this session using AskUserQuestion.

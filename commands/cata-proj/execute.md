@@ -34,6 +34,7 @@ This command orchestrates a complete development cycle: planning, execution, and
 3. **Verification & Testing Phase** (automatic multi-agent review)
    - Launch cata-reviewer agent for code review
    - Invoke /cata-proj:demo (runs cata-tester agent)
+   - Launch cata-ux-reviewer agent for UX validation
    - If demo fails: Launch cata-debugger for root cause analysis
    - Combine all outputs into unified report
    - Present comprehensive assessment to human
@@ -42,16 +43,37 @@ This command orchestrates a complete development cycle: planning, execution, and
 
 ### Step 1: Planning Phase
 
-First, research and plan what needs to be done:
+First, research and understand what needs to be done:
 
-1. Locate and read the tasks.md file
-2. Identify the target phase to execute
-3. Read the design document for context
-4. Analyze what each task requires
-5. Check current state (git status, existing code)
-6. Create a detailed execution plan
+1. **Locate project files**
+   - Find and read the tasks.md file
+   - Identify the target phase to execute
+   - Read the design document for context
 
-Then present the plan using ExitPlanMode for approval.
+2. **Deep Codebase Research** - MANDATORY
+
+   Launch research agents IN PARALLEL to understand implementation context:
+
+   a. **Codebase Exploration** - Use Task tool with subagent_type: "Explore"
+      - Understand existing patterns related to this phase
+      - Find similar implementations to follow
+      - Identify integration points and dependencies
+      - Map the code areas that will be modified
+
+   b. **Technical Research** (if phase involves unfamiliar tech) - Use Task tool with subagent_type: "cata-researcher"
+      - Research unfamiliar technologies or patterns
+      - Verify approach against current best practices
+      - Find potential pitfalls or edge cases
+
+   Wait for agent results before proceeding.
+
+3. **Synthesize Research into Plan**
+   - Combine agent findings with design requirements
+   - Identify specific files to modify
+   - Note patterns to follow from existing code
+   - Flag any concerns or unknowns discovered
+
+4. Present the plan using ExitPlanMode for approval.
 
 ### Step 2: Execution Phase
 
@@ -112,9 +134,9 @@ After plan approval, execute the implementation directly:
    - If $ARGUMENTS is already a feature name like `user-auth`, use it directly
    - If $ARGUMENTS includes a phase number (e.g., `user-auth 2`), use only the feature name
 
-2. **Run Code Review and Functional Testing IN PARALLEL**:
+2. **Run All Verification Agents IN PARALLEL**:
 
-   **IMPORTANT**: Launch both agents in parallel using a single message with multiple tool calls.
+   **IMPORTANT**: Launch all agents in parallel using a single message with multiple tool calls.
 
    a. **Code Review - Launch cata-reviewer agent**:
    ```
@@ -135,7 +157,22 @@ After plan approval, execute the implementation directly:
    ```
    - Demo runs via cata-tester agent
 
-   Capture both outputs for the final report
+   c. **UX Review - Launch cata-ux-reviewer agent**:
+   ```
+   Use the Task tool to launch the cata-ux-reviewer agent with:
+   - subagent_type: "cata-ux-reviewer"
+   - description: "Review UX for phase implementation"
+   - prompt: "Review the user experience for [feature-name].
+     Find and read the design doc to understand intended workflows.
+     Test the feature as a naive user would:
+     - Navigate to the feature
+     - Try the happy path workflows
+     - Try error scenarios
+     - Evaluate clarity of messages and feedback
+     Provide detailed UX review with friction points."
+   ```
+
+   Capture all outputs for the final report
 
 3. **Debug Analysis - If demo fails**:
    ```
@@ -160,6 +197,9 @@ After plan approval, execute the implementation directly:
 
    ## Functional Testing (cata-tester)
    [Insert demo test results - pass/fail, specific failures]
+
+   ## UX Review (cata-ux-reviewer)
+   [Insert UX agent output - user experience issues, friction points, message clarity]
 
    ## Debug Analysis (cata-debugger)
    [Only if demo failed - insert root cause analysis]
@@ -248,7 +288,7 @@ Always search for:
 3. Execute each task exactly as specified
 4. Run all quality checks and verifications
 5. Update progress in the tasks.md file
-6. Automatically launch cata-reviewer and /cata-proj:demo IN PARALLEL
+6. Automatically launch cata-reviewer, /cata-proj:demo, and cata-ux-reviewer IN PARALLEL
 7. If demo fails: Automatically launch cata-debugger for analysis
 8. Generate unified report combining all agent outputs
 9. 🛑 STOP and present report to human - DO NOT act on findings
@@ -270,7 +310,7 @@ Follow a strict NO WORKAROUNDS policy:
 2. **Get Approval**: Present plan and wait for user confirmation
 3. **Execute Tasks**: Implement each task exactly as planned
 4. **Handle Blockers**: Stop and report with detailed analysis when blocked
-5. **Multi-Agent Verification**: Automatically run code review and functional testing in parallel, debugging if needed, then generate unified report
+5. **Multi-Agent Verification**: Automatically run code review, functional testing, and UX review in parallel, debugging if needed, then generate unified report
 6. **🛑 STOP**: Present report and wait for human review - DO NOT act on agent findings
 
 ## Examples
@@ -294,7 +334,7 @@ Follow a strict NO WORKAROUNDS policy:
 
 - **Planning is mandatory**: Always create and get approval before execution
 - **No workarounds**: Implementation follows the plan exactly
-- **Multi-agent verification**: Code review, testing, and debugging run automatically after execution
+- **Multi-agent verification**: Code review, testing, UX review, and debugging run automatically after execution
 - **Quality gates**: Each phase must pass all verification before moving on
 - **Unified reporting**: Combined assessment from all agents with clear recommendations
 - **🛑 MANDATORY STOP after reporting**: After presenting the unified agent report, you MUST STOP and wait for human input. DO NOT act on agent findings. DO NOT make any fixes or changes. The reports are for human review only.
@@ -304,9 +344,9 @@ Follow a strict NO WORKAROUNDS policy:
 ```
 1. Human runs: /cata-proj/execute feature-name
 2. Planning phase begins:
-   - Research requirements
-   - Analyze current state
-   - Create detailed plan
+   - Read tasks.md, design doc
+   - Launch Explore/researcher agents to understand codebase context
+   - Synthesize research into detailed plan
    - Exit plan mode for approval
 3. Upon approval:
    - Execute the plan directly
@@ -314,6 +354,7 @@ Follow a strict NO WORKAROUNDS policy:
 4. Automatically run multi-agent verification (IN PARALLEL):
    - Launch cata-reviewer agent to verify design adherence and code quality
    - Use SlashCommand to run /cata-proj:demo feature-name (launches cata-tester agent)
+   - Launch cata-ux-reviewer agent for UX validation
    - If demo fails: Launch cata-debugger agent for root cause analysis
 5. Combine all agent outputs into unified report
 6. Present comprehensive assessment to human
