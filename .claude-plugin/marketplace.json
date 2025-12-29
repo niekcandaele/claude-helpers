@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "cata-helpers",
-      "source": ".",
+      "source": "./",
       "description": "Specialized agents and commands for structured software development workflows",
       "version": "1.0.0",
       "author": {
