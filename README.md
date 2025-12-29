@@ -1,43 +1,109 @@
 # Claude Code Helper Commands
 
-A collection of productivity-enhancing commands for Claude Code that streamline the software development workflow from requirements to implementation.
-
-## Overview
-
-These commands provide a structured approach to feature development:
-1. **Setup Engineer** - Create or update a repository engineer skill with session knowledge
-2. **Create Issue** - Transform notes into well-structured GitHub issues with codebase context
-3. **Create PRD** - Generate a Product Requirements Document from user input
-4. **Generate Tasks** - Convert a PRD into an actionable task list
-5. **Process Tasks** - Execute tasks systematically with progress tracking
-6. **Commit and Push** - Run quality checks, commit with good message, and push to remote
-7. **Create PR** - Create a pull request with automatic branch management and platform detection
-8. **Check CI** - Monitor CI/CD status and get fixes for any failures
+A collection of productivity-enhancing commands and agents for Claude Code that streamline the software development workflow from requirements to implementation.
 
 ## Installation
 
-### Automatic Install (Recommended)
+### Using Claude Code Plugin System (Recommended)
 
-Run this one-liner to download and install all commands:
+1. Add the marketplace:
+   ```
+   /plugin marketplace add niekcandaele/claude-helpers
+   ```
+
+2. Install the plugin:
+   ```
+   /plugin install cata-helpers
+   ```
+
+Commands will be available as `/cata-helpers:command-name` (e.g., `/cata-helpers:commit-and-push`).
+
+### Legacy Installation
+
+If you're using an older version of Claude Code without plugin support:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/niekcandaele/claude-helpers/main/install.sh | bash
 ```
 
-### Manual Install
+## Required Permissions
 
-If you prefer to install manually:
+Some agents and commands require specific permissions. Add these to your `.claude/settings.json` or `.claude/settings.local.json`:
 
-```bash
-# Download and extract commands folder
-curl -L https://github.com/niekcandaele/claude-helpers/archive/main.tar.gz | tar -xz --strip-components=1 claude-helpers-main/commands
-# Move to Claude Code commands directory
-mkdir -p ~/.claude && mv commands ~/.claude/
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git log:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git remote get-url:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh api:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(curl:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
+    ]
+  }
+}
 ```
+
+### Optional MCP Servers
+
+Some agents benefit from MCP server integration:
+
+- **Playwright MCP** - For cata-debugger, cata-tester, and cata-ux-reviewer browser automation
+- **PostgreSQL MCP** - For cata-debugger and cata-researcher database inspection
+- **Redis MCP** - For cata-debugger and cata-researcher cache inspection
+
+## Overview
+
+### Agents
+
+Specialized agents for specific review and analysis tasks (all follow "Report, Never Fix" philosophy):
+
+| Agent | Purpose |
+|-------|---------|
+| `cata-reviewer` | Strict code review, detects over-engineering and AI patterns |
+| `cata-debugger` | Evidence-based troubleshooting with systematic investigation |
+| `cata-researcher` | Critical research with multi-source verification |
+| `cata-tester` | No-nonsense test execution (100% pass rate only) |
+| `cata-ux-reviewer` | User experience evaluation across all interfaces |
+| `technical-writer` | Documentation editing following Google/Grafana style |
+
+### Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/setup-engineer` | Create/update repository-specific engineer skill |
+| `/create-issue` | Transform notes into GitHub issues |
+| `/commit-and-push` | Quality checks, commit, and push |
+| `/create-pr` | Create PR with branch management |
+| `/check-ci` | Monitor CI/CD and fix failures |
+| `/catchup` | Summarize branch changes |
+| `/handoff` | Document progress for session continuity |
+
+### Project Commands (`cata-proj:*`)
+
+Structured feature development workflow:
+
+| Command | Purpose |
+|---------|---------|
+| `/cata-proj:design` | Create technical design documents |
+| `/cata-proj:tasks` | Generate implementation tasks from design |
+| `/cata-proj:execute` | Execute tasks phase-by-phase with verification |
+| `/cata-proj:demo` | Run demo of completed phase |
+| `/cata-proj:pr-review` | Extract and categorize PR feedback |
 
 ## Commands
 
-### 1. Setup Engineer (`/setup-engineer`)
+### Setup Engineer (`/setup-engineer`)
 
 Create or update a repository-specific engineer skill that captures knowledge about how to work with the codebase.
 
@@ -61,30 +127,7 @@ When you run this command after doing work (debugging, implementing features, et
 - `.claude/commands/{repo-name}-engineer.md` - The engineer skill (loaded automatically in future sessions)
 - Updates `CLAUDE.md` with reference to the skill
 
-**Example workflow:**
-```bash
-# Initial setup in a new repository
-/setup-engineer
-# → Creates engineer skill by exploring the repo
-
-# After debugging an issue
-# ... work session where you figured out how to debug something ...
-/setup-engineer
-# → Adds debugging knowledge to the skill
-
-# After discovering test patterns
-# ... work session with tests ...
-/setup-engineer
-# → Updates test section with new findings
-```
-
-**Why use this:**
-- Knowledge persists across Claude sessions
-- Reduces onboarding time in each new conversation
-- Builds a cumulative knowledge base specific to your repo
-- Future sessions start with context about tests, scripts, debugging, etc.
-
-### 2. Create Issue (`/create-issue`)
+### Create Issue (`/create-issue`)
 
 Transform notes, meeting minutes, or project documentation into well-structured GitHub issues.
 
@@ -96,21 +139,11 @@ Transform notes, meeting minutes, or project documentation into well-structured 
 **What it does:**
 - Analyzes codebase to understand project context
 - Extracts issue details from notes or text
-- Generates clear, concise issue title (following best practices)
+- Generates clear, concise issue title
 - Creates comprehensive issue body with markdown formatting
 - Intelligently detects and applies relevant labels
-- Checks for similar existing issues
+- Always adds 'ai' label for transparency
 - Creates issue via GitHub CLI (`gh`)
-- Returns issue URL and details
-
-**Features:**
-- Works with file paths (meeting notes, docs) or direct text input
-- Follows industry best practices for issue writing
-- Smart label detection based on content analysis
-- **Always adds 'ai' label** for transparency and tracking
-- Validates labels exist before applying them
-- References actual codebase components in issue description
-- Detects issue type automatically (bug, feature, docs, etc.)
 
 **Example:**
 ```
@@ -118,74 +151,7 @@ Transform notes, meeting minutes, or project documentation into well-structured 
 /create-issue "Users report login page is slow on mobile devices"
 ```
 
-### 3. Create PRD (`/create-prd`)
-
-Creates a detailed Product Requirements Document based on user input.
-
-**Usage:**
-```
-/create-prd [feature description]
-```
-
-**What it does:**
-- Asks clarifying questions about the feature
-- Generates a comprehensive PRD including:
-  - Goals and objectives
-  - User stories
-  - Functional requirements
-  - Success metrics
-  - Technical considerations
-- Saves the PRD as `tasks/prd-[feature-name].md`
-
-**Example:**
-```
-/create-prd Add user profile editing functionality
-```
-
-### 4. Generate Tasks (`/generate-tasks`)
-
-Converts a PRD into a structured task list with dependencies.
-
-**Usage:**
-```
-/generate-tasks tasks/prd-[feature-name].md
-```
-
-**What it does:**
-- Analyzes the PRD's functional requirements
-- Creates high-level parent tasks
-- Breaks down into detailed sub-tasks
-- Identifies task dependencies
-- Lists relevant files to be created/modified
-- Saves as `tasks/tasks-prd-[feature-name].md`
-
-**Example:**
-```
-/generate-tasks tasks/prd-user-profile-editing.md
-```
-
-### 5. Process Tasks (`/process-tasks`)
-
-Executes tasks from a task list with progress tracking.
-
-**Usage:**
-```
-/process-tasks tasks/tasks-prd-[feature-name].md
-```
-
-**What it does:**
-- Reads the task list and checks dependencies
-- Implements tasks one at a time in sequential order
-- Updates task completion status
-- Asks for user approval between tasks
-- Maintains a list of modified files
-
-**Example:**
-```
-/process-tasks tasks/tasks-prd-user-profile-editing.md
-```
-
-### 6. Commit and Push (`/commit-and-push`)
+### Commit and Push (`/commit-and-push`)
 
 Automatically runs quality checks, creates a clean commit, and pushes to remote.
 
@@ -196,7 +162,7 @@ Automatically runs quality checks, creates a clean commit, and pushes to remote.
 
 **What it does:**
 - Analyzes repository to discover available linting, formatting, and build tools
-- Runs quality checks in optimal order (format → lint → typecheck → build)
+- Runs quality checks in optimal order (format -> lint -> typecheck -> build)
 - Stages all changes for commit
 - Generates descriptive commit message based on changes
 - Creates commit with proper Claude Code attribution
@@ -206,14 +172,8 @@ Automatically runs quality checks, creates a clean commit, and pushes to remote.
 - Dynamic tool discovery (works with any project type)
 - Supports npm scripts, Makefile targets, and direct tool invocation
 - Stops if any quality check fails
-- Handles common git errors gracefully
 
-**Example:**
-```
-/commit-and-push
-```
-
-### 7. Create PR (`/create-pr`)
+### Create PR (`/create-pr`)
 
 Creates a pull request with automatic branch management and platform detection.
 
@@ -228,22 +188,8 @@ Creates a pull request with automatic branch management and platform detection.
 - Detects git platform (GitHub, GitLab, Bitbucket)
 - Creates PR using appropriate CLI tool (gh, glab)
 - Generates PR title and description from commits
-- Displays PR URL for easy access
 
-**Features:**
-- Automatic platform detection from remote URL
-- Smart branch naming (feature/*, fix/*, docs/*)
-- Integrates with commit-and-push for quality checks
-- Handles authentication and CLI tool installation guidance
-
-**Example:**
-```
-/create-pr "Add shopping cart feature"
-# or let it auto-generate title:
-/create-pr
-```
-
-### 8. Check CI (`/check-ci`)
+### Check CI (`/check-ci`)
 
 Monitors CI/CD pipeline status after commits and provides fixes for failures.
 
@@ -258,111 +204,64 @@ Monitors CI/CD pipeline status after commits and provides fixes for failures.
 - Analyzes failure logs when CI fails
 - Identifies error patterns (test failures, build errors, linting)
 - Proposes specific code fixes for identified issues
-- Provides clear next steps to resolve problems
 
-**Features:**
-- Automatic CI platform detection
-- Real-time status monitoring
-- Smart error pattern recognition
-- Actionable fix proposals with code snippets
-- Support for multiple CI platforms
+### Handoff (`/handoff`)
 
-**Example:**
+Document current work state for session continuity.
+
+**Usage:**
 ```
-/check-ci
-# Monitor latest commit's CI status
-
-/check-ci feature-branch
-# Check CI for specific branch
+/handoff
 ```
+
+**What it does:**
+- Captures git history and uncommitted changes
+- Documents TODO progress
+- Generates comprehensive handoff document
+- Saves to `/tmp` for easy copy/paste
 
 ## Complete Workflow Example
 
-Here's how to use all commands together for a complete development cycle:
-
 ```bash
-# 0. Set up repository knowledge (first time only, or after learning something)
+# 0. Set up repository knowledge (first time)
 /setup-engineer
 
-# Claude will:
-# - Explore the repo to discover tests, scripts, database setup
-# - Create .claude/commands/{repo}-engineer.md
-# - Future sessions will automatically have this context
-
-# 1. Create issues from meeting notes (optional)
+# 1. Create issues from meeting notes
 /create-issue meetings/sprint-planning.md
 
-# Claude will:
-# - Analyze your codebase for context
-# - Extract and structure the issue details
-# - Create GitHub issue with proper labels
-# - Return issue URL: https://github.com/user/repo/issues/142
+# 2. Design the feature
+/cata-proj:design "Add shopping cart functionality"
 
-# 2. Create a PRD for a new feature
-/create-prd Add shopping cart functionality to e-commerce site
+# 3. Generate tasks from design
+/cata-proj:tasks docs/design/shopping-cart/design.md
 
-# Claude will ask clarifying questions, then create:
-# tasks/prd-shopping-cart.md
+# 4. Execute tasks with verification
+/cata-proj:execute docs/design/shopping-cart/tasks.md
 
-# 3. Generate tasks from the PRD
-/generate-tasks tasks/prd-shopping-cart.md
-
-# Claude will create:
-# tasks/tasks-prd-shopping-cart.md
-
-# 4. Process the tasks
-/process-tasks tasks/tasks-prd-shopping-cart.md
-
-# Claude will:
-# - Work through each task systematically in sequential order
-# - Update progress and ask for approval between tasks
-
-# 5. Commit and push the completed work
+# 5. Commit and push
 /commit-and-push
-
-# Claude will:
-# - Run available quality checks (linting, formatting, build)
-# - Create a descriptive commit message
-# - Push to remote repository
 
 # 6. Create a pull request
 /create-pr "Add shopping cart functionality"
 
-# Claude will:
-# - Ensure you're on a feature branch
-# - Detect your git platform (GitHub/GitLab)
-# - Create PR with generated description
-# - Display the PR URL
-
-# 7. Monitor CI and fix any failures
+# 7. Monitor CI and fix failures
 /check-ci
-
-# Claude will:
-# - Detect your CI platform automatically
-# - Monitor the pipeline status in real-time
-# - If failures occur, analyze logs and propose fixes
-# - Provide specific code changes to resolve issues
 ```
 
-## Benefits
+## Development
 
-- **Complete Development Cycle**: From requirements to deployed code in structured steps
-- **Clear Requirements**: PRDs ensure all stakeholders understand the feature
-- **Task Management**: Break complex features into manageable chunks
-- **Dependency Tracking**: Ensure tasks are completed in the correct order
-- **Progress Visibility**: See exactly what's been done and what's remaining
-- **Quality Assurance**: Automated linting, formatting, and build checks before commit
-- **Clean Git History**: Descriptive commit messages with proper attribution
-- **CI/CD Integration**: Automatic monitoring and fixing of pipeline failures
-- **Junior Developer Friendly**: Clear, explicit instructions in all outputs
+### Validating the Plugin
 
-## Notes
+```bash
+just validate
+```
 
-- All generated files are saved in a `tasks/` directory in your project
-- Commands are designed to work together but can be used independently
-- Task lists support dependency management with `[depends on: X.Y]` notation
-- PRDs and task lists are written for junior developers to understand
+### Testing Locally
+
+```bash
+just test
+```
 
 ## Contributing
 
-To contribute to these commands, visit the [GitHub repository](https://github.com/niekcandaele/claude-helpers).
+Visit the [GitHub repository](https://github.com/niekcandaele/claude-helpers) to contribute.

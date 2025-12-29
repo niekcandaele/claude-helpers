@@ -1,7 +1,15 @@
 #!/bin/bash
 
-# Claude Code Helper Commands - Installation Script
+# Claude Code Helper Commands - Legacy Installation Script
 # Downloads and installs Claude Code helper commands to ~/.claude/commands
+#
+# NOTE: This script is for legacy installations. For Claude Code with plugin
+# support, use the plugin system instead:
+#
+#   /plugin marketplace add niekcandaele/claude-helpers
+#   /plugin install cata-helpers
+#
+# This legacy script continues to work for older Claude Code versions.
 
 set -e # Exit on any error
 
@@ -47,6 +55,13 @@ trap cleanup EXIT
 main() {
 	echo "🤖 Claude Code Helper Commands Installer"
 	echo "========================================"
+	echo
+	print_warning "This is the legacy installation method."
+	echo "For Claude Code with plugin support, use:"
+	echo "  /plugin marketplace add niekcandaele/claude-helpers"
+	echo "  /plugin install cata-helpers"
+	echo
+	echo "Continuing with legacy installation..."
 	echo
 
 	# Check if commands directory already exists

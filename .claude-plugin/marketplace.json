@@ -1,0 +1,20 @@
+{
+  "name": "cata-helpers-marketplace",
+  "owner": {
+    "name": "Niek Candaele"
+  },
+  "metadata": {
+    "description": "Specialized agents and commands for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "cata-helpers",
+      "source": ".",
+      "description": "Specialized agents and commands for structured software development workflows",
+      "version": "1.0.0",
+      "author": {
+        "name": "Niek Candaele"
+      }
+    }
+  ]
+}

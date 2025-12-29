@@ -1,0 +1,18 @@
+{
+  "name": "cata-helpers",
+  "version": "1.0.0",
+  "description": "Specialized agents and commands for structured software development workflows",
+  "author": {
+    "name": "Niek Candaele"
+  },
+  "repository": "https://github.com/niekcandaele/claude-helpers",
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "debugging",
+    "testing",
+    "documentation",
+    "ci-cd",
+    "workflow"
+  ]
+}
