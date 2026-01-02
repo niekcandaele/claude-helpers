@@ -21,8 +21,9 @@ Optional scope: $ARGUMENTS (e.g., `--skip-ux` to skip UX review for pure backend
    - `cata-tester`: Execute test suite and report failures
    - `cata-ux-reviewer`: Test user-facing changes (unless `--skip-ux` or clearly backend-only)
    - `cata-coherence`: Check if changes fit in the codebase (reinvented wheels, pattern violations, stale docs/AI tooling)
-3. **Generate Unified Report:** Combine all agent findings with clear verdict
-4. **STOP:** Present report and wait for human decision
+3. **Debug Analysis (if failures):** If cata-tester OR cata-ux-reviewer failed, launch cata-debugger for root cause analysis
+4. **Generate Unified Report:** Combine all agent findings with clear verdict
+5. **STOP:** Present report and wait for human decision
 
 ## CRITICAL: No Hiding Issues
 
@@ -105,6 +106,24 @@ Task tool with:
   Check if documentation reflects current code.
   Report any coherence issues found."
 ```
+
+## Conditional Debug Analysis
+
+**After the initial 4 agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
+
+```
+# Agent 5: Debug Analysis (conditional)
+Task tool with:
+- subagent_type: "cata-debugger"
+- description: "Analyze test/UX failures"
+- prompt: "Analyze the root cause of the failures reported by verification agents.
+  Review the test failures and/or UX issues found.
+  Use git, logs, and available tools to investigate.
+  Provide detailed diagnostic report without fixing anything.
+  Focus on identifying WHY the failures occurred."
+```
+
+Only launch this agent if there are actual failures to analyze. Skip if all tests passed and UX review found no critical issues.
 
 ## When to Skip UX Review
 
@@ -213,6 +232,20 @@ After all agents complete, generate this unified report:
 
 ---
 
+## Debug Analysis (cata-debugger)
+
+**Status:** ✅ N/A (no failures) / 🔍 ANALYZED
+
+[Only include this section if cata-debugger was launched]
+
+**Root Cause Analysis:**
+[Diagnostic findings from debugger]
+
+**Investigation Summary:**
+[What was investigated and discovered]
+
+---
+
 ## Blockers
 
 [List ALL blockers prominently - these prevent merging]
@@ -255,12 +288,18 @@ After all agents complete, generate this unified report:
    - Wait for all agents to complete
    - Gather outputs from each
 
-5. **Generate unified report:**
+5. **Launch debugger if failures:**
+   - If cata-tester OR cata-ux-reviewer reported failures
+   - Launch cata-debugger to analyze root cause
+   - Gather diagnostic output
+
+6. **Generate unified report:**
    - Determine overall verdict
    - List ALL issues prominently
+   - Include debug analysis if debugger ran
    - Make blockers impossible to miss
 
-6. **STOP and present:**
+7. **STOP and present:**
    - Display the report
    - Wait for human decision
    - DO NOT proceed to any next steps automatically

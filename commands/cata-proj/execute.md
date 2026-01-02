@@ -31,13 +31,9 @@ This command orchestrates a complete development cycle: planning, execution, and
    - Follow strict no-workarounds protocol
    - Update task progress
 
-3. **Verification & Testing Phase** (automatic multi-agent review)
-   - Launch cata-reviewer agent for code review
-   - Invoke /cata-proj:demo (runs cata-tester agent)
-   - Launch cata-ux-reviewer agent for UX validation
-   - If demo fails: Launch cata-debugger for root cause analysis
-   - Combine all outputs into unified report
-   - Present comprehensive assessment to human
+3. **Verification & Testing Phase** (automatic via /verify)
+   - Invoke /verify command for comprehensive multi-agent review
+   - Present verification report to human
 
 ## Implementation
 
@@ -140,140 +136,22 @@ After plan approval, execute the implementation directly:
    - How you fixed it
    - Whether this might indicate a design issue
 
-   This log will be included in the final report for human review. Even when running with skipped permissions, the human needs visibility into what you had to "fight through".
+   After /verify completes, share this corrections log with the human alongside the verification report. The human needs visibility into what you had to "fight through" during implementation.
 
-### Step 3: Verification & Testing Phase - AUTOMATIC MULTI-AGENT REVIEW
+### Step 3: Verification & Testing Phase
 
-**MANDATORY**: After execution completes successfully, automatically run comprehensive verification:
+**MANDATORY**: After execution completes successfully, run comprehensive verification:
 
-1. **Extract the feature name** from $ARGUMENTS:
-   - If $ARGUMENTS is a path like `docs/design/2024-01-15-user-auth/tasks.md`, extract `user-auth`
-   - If $ARGUMENTS is already a feature name like `user-auth`, use it directly
-   - If $ARGUMENTS includes a phase number (e.g., `user-auth 2`), use only the feature name
+Use the Skill tool to invoke `/verify`
 
-2. **Run All Verification Agents IN PARALLEL**:
+This runs comprehensive verification including:
+- Code review (cata-reviewer)
+- Test execution (cata-tester)
+- UX review (cata-ux-reviewer)
+- Coherence check (cata-coherence)
+- Debug analysis if tests or UX review fail (cata-debugger)
 
-   **IMPORTANT**: Launch all agents in parallel using a single message with multiple tool calls.
-
-   a. **Code Review - Launch cata-reviewer agent**:
-   ```
-   Use the Task tool to launch the cata-reviewer agent with:
-   - subagent_type: "cata-reviewer"
-   - description: "Review phase implementation"
-   - prompt: "Review the implementation for [feature-name].
-     Find and read the design doc in docs/design/*/design.md.
-     Use git diff to see changes made in this phase.
-     Verify design adherence, check for over-engineering and AI slop.
-
-     ALSO REVIEW the corrections log below - evaluate whether any fixes
-     indicate architectural issues, shortcuts, or workaround violations:
-
-     [Insert corrections log here]
-
-     Provide detailed code review."
-   ```
-
-   b. **Functional Testing - Invoke demo command**:
-   ```
-   Use the SlashCommand tool with:
-   command: "/cata-proj:demo [feature-name]"
-   ```
-   - Demo runs via cata-tester agent
-
-   c. **UX Review - Launch cata-ux-reviewer agent**:
-   ```
-   Use the Task tool to launch the cata-ux-reviewer agent with:
-   - subagent_type: "cata-ux-reviewer"
-   - description: "Review UX for phase implementation"
-   - prompt: "Review the user experience for [feature-name].
-     Find and read the design doc to understand intended workflows.
-     Test the feature as a naive user would:
-     - Navigate to the feature
-     - Try the happy path workflows
-     - Try error scenarios
-     - Evaluate clarity of messages and feedback
-     Provide detailed UX review with friction points."
-   ```
-
-   Capture all outputs for the final report
-
-3. **Debug Analysis - If demo fails**:
-   ```
-   Use the Task tool to launch the cata-debugger agent with:
-   - subagent_type: "cata-debugger"
-   - description: "Analyze demo failures"
-   - prompt: "The demo failed for [feature-name].
-     Analyze the root cause of the test failures.
-     Use git, logs, and available tools to investigate.
-     Provide detailed diagnostic report without fixing anything."
-   ```
-   - Capture debugger's diagnostic report for the final report
-
-4. **Generate Unified Report**:
-   Combine all agent outputs into a comprehensive assessment:
-
-   ```markdown
-   # Phase Implementation Review: [Feature - Phase X]
-
-   ## Code Review (cata-reviewer)
-   [Insert reviewer agent output - design adherence, quality issues, AI slop]
-
-   ## Functional Testing (cata-tester)
-   [Insert demo test results - pass/fail, specific failures]
-
-   ## UX Review (cata-ux-reviewer)
-   [Insert UX agent output - user experience issues, friction points, message clarity]
-
-   ## Debug Analysis (cata-debugger)
-   [Only if demo failed - insert root cause analysis]
-
-   ## Implementation Corrections
-   [List any issues encountered and fixed during implementation]
-
-   | Issue | Fix Applied | Potential Concern? |
-   |-------|-------------|-------------------|
-   | [What went wrong] | [How it was fixed] | [Yes/No - why] |
-
-   If no corrections: "Implementation proceeded as planned with no unexpected issues."
-
-   ## Overall Assessment
-   **Status:** ✅ READY / ⚠️ ISSUES FOUND / ❌ FAILED
-
-   **Critical Issues:** [Count from all agents]
-   **Major Issues:** [Count from all agents]
-   **Minor Issues:** [Count from all agents]
-
-   **Recommendation:**
-   - ✅ Phase complete and verified - proceed to next phase
-   - ⚠️ Address issues found before proceeding
-   - ❌ Must fix critical failures before phase is complete
-
-   ## Next Steps for Human
-   [Specific actions based on combined results]
-   ```
-
-5. **STOP HERE - MANDATORY PAUSE**:
-
-   **🛑 CRITICAL: After presenting the unified report, you MUST STOP and wait for human input.**
-
-   **DO NOT:**
-   - ❌ Act on any recommendations from the agents
-   - ❌ Make any fixes based on the reports
-   - ❌ Implement any changes suggested by reviewers
-   - ❌ Address any issues found by testers
-   - ❌ Apply any debugger findings
-   - ❌ Continue to the next phase
-   - ❌ Make any code changes whatsoever
-
-   **WHAT YOU SHOULD DO:**
-   - ✅ Present the unified report clearly
-   - ✅ Wait for the human to review the findings
-   - ✅ Wait for explicit instructions from the human
-   - ✅ Only proceed when the human tells you what to do next
-
-   **The agent reports are FOR HUMAN REVIEW ONLY. Your job is to gather the information and present it, not to act on it.**
-
-**This is NOT optional** - every phase gets full multi-agent verification and a unified assessment report, followed by a mandatory pause for human review.
+**🛑 MANDATORY STOP**: After /verify completes and presents its report, wait for human input before proceeding. DO NOT act on any findings or make any fixes.
 
 ## Unacceptable Practices
 
@@ -320,12 +198,10 @@ Always search for:
 3. Execute each task exactly as specified
 4. Run all quality checks and verifications
 5. Update progress in the tasks.md file
-6. Automatically launch cata-reviewer, /cata-proj:demo, and cata-ux-reviewer IN PARALLEL
-7. If demo fails: Automatically launch cata-debugger for analysis
-8. Generate unified report combining all agent outputs
-9. 🛑 STOP and present report to human - DO NOT act on findings
-10. Wait for human to provide next instructions
-11. Report any blockers with detailed analysis
+6. Invoke /verify for comprehensive multi-agent verification
+7. 🛑 STOP and present report to human - DO NOT act on findings
+8. Wait for human to provide next instructions
+9. Report any blockers with detailed analysis
 
 ## Implementation Philosophy
 
@@ -342,8 +218,8 @@ Follow a strict NO WORKAROUNDS policy:
 2. **Get Approval**: Present plan and wait for user confirmation
 3. **Execute Tasks**: Implement each task exactly as planned
 4. **Handle Blockers**: Stop and report with detailed analysis when blocked
-5. **Multi-Agent Verification**: Automatically run code review, functional testing, and UX review in parallel, debugging if needed, then generate unified report
-6. **🛑 STOP**: Present report and wait for human review - DO NOT act on agent findings
+5. **Verification**: Invoke /verify for comprehensive multi-agent review
+6. **🛑 STOP**: Present report and wait for human review - DO NOT act on findings
 
 ## Examples
 
@@ -366,10 +242,9 @@ Follow a strict NO WORKAROUNDS policy:
 
 - **Planning is mandatory**: Always create and get approval before execution
 - **No workarounds**: Implementation follows the plan exactly
-- **Multi-agent verification**: Code review, testing, UX review, and debugging run automatically after execution
+- **Verification via /verify**: Comprehensive multi-agent verification runs automatically after execution
 - **Quality gates**: Each phase must pass all verification before moving on
-- **Unified reporting**: Combined assessment from all agents with clear recommendations
-- **🛑 MANDATORY STOP after reporting**: After presenting the unified agent report, you MUST STOP and wait for human input. DO NOT act on agent findings. DO NOT make any fixes or changes. The reports are for human review only.
+- **🛑 MANDATORY STOP after verification**: After /verify presents its report, you MUST STOP and wait for human input. DO NOT act on findings. DO NOT make any fixes or changes.
 
 ## Process Flow
 
@@ -383,16 +258,9 @@ Follow a strict NO WORKAROUNDS policy:
 3. Upon approval:
    - Execute the plan directly
    - Update tasks.md on success
-4. Automatically run multi-agent verification (IN PARALLEL):
-   - Launch cata-reviewer agent to verify design adherence and code quality
-   - Use SlashCommand to run /cata-proj:demo feature-name (launches cata-tester agent)
-   - Launch cata-ux-reviewer agent for UX validation
-   - If demo fails: Launch cata-debugger agent for root cause analysis
-5. Combine all agent outputs into unified report
-6. Present comprehensive assessment to human
-7. 🛑 STOP - DO NOT act on agent findings
-8. Wait for human to review and provide next instructions
-9. Human decides next steps based on multi-agent report
+4. Invoke /verify for comprehensive verification
+5. 🛑 STOP - wait for human to review verification report
+6. Human decides next steps
 ```
 
 This ensures thoughtful, tested, and verified implementation at every phase.
