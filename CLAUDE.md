@@ -1,3 +1,5 @@
+ALWAYS use the claude-provided tools/agents/skills/... that instruct you how to create claude code configs/prompts
+
 # Development Instructions
 
 ## Available Commands
