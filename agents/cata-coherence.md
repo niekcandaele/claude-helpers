@@ -56,6 +56,48 @@ Code that doesn't follow codebase conventions:
 - Different import/export patterns
 - Different comment styles
 
+### 6. Placeholder/TODO Artifacts
+Unfinished code that shipped:
+- `// TODO:` comments left behind
+- Empty function bodies or `pass` statements
+- `throw new Error("Not implemented")` in production
+- Stub implementations that were never completed
+
+### 7. Dead/Orphaned Code
+Code that exists but isn't used:
+- New files that aren't imported anywhere
+- Functions/methods never called
+- Exports that nothing imports
+- Unreachable code after return/throw
+
+### 8. Silent Error Swallowing
+Errors caught but not properly handled:
+- Empty catch blocks
+- Catch blocks that only log without re-throwing
+- Generic exception catching without specific handling
+- Errors converted to silent nulls/undefined
+
+### 9. Security Anti-Patterns
+Code patterns that introduce vulnerabilities:
+- Hardcoded credentials or API keys (even fake ones)
+- SQL string concatenation instead of parameterized queries
+- Unsanitized user input in templates or commands
+- Usage of eval() or similar dynamic execution
+
+### 10. Test Quality Issues
+Tests that don't actually verify behavior:
+- Assertions on hardcoded values instead of actual results
+- Mocks that don't match the real implementation signature
+- Tests that only test the mock, not the actual code
+- Commented-out or skipped test cases without explanation
+
+### 11. Backwards Compatibility Cruft
+Unnecessary compatibility code that should be deleted:
+- Unused variables renamed with `_` prefix instead of removed
+- `// removed` or `// deprecated` comments on deleted code
+- Re-exports of removed things "for compatibility"
+- Wrapper functions that just call the new implementation
+
 ## Process
 
 ### Phase 1: Research the Codebase
@@ -145,6 +187,12 @@ Compare each change against your research:
 | Stale AI tooling? | Do agent/skill definitions match this behavior? |
 | Documentation drift? | Does any documentation describe different behavior? |
 | Convention mismatch? | Is this named/structured consistently with similar code? |
+| Placeholder artifact? | Are there TODOs, stubs, or unfinished code? |
+| Dead/orphaned code? | Is this code actually used anywhere? |
+| Silent error swallowing? | Are errors properly handled or silently ignored? |
+| Security anti-pattern? | Does this introduce vulnerabilities? |
+| Test quality issue? | Do tests actually verify behavior with real code? |
+| Backwards compat cruft? | Is there unnecessary compatibility code to delete? |
 
 ### Phase 4: Report Findings
 
@@ -209,6 +257,65 @@ Generate structured report with evidence.
 **This change:** [Pattern used in new code]
 **Correct examples:** [file:line], [file:line]
 **Incorrect (this change):** [file:line]
+
+---
+
+## Placeholder/TODO Artifacts
+
+### [Location]
+**Placeholder found:** [The TODO/stub/empty code]
+**Location:** [file:line]
+**Context:** [What this was supposed to implement]
+
+---
+
+## Dead/Orphaned Code
+
+### [Location]
+**Dead code:** [Description of unused code]
+**Location:** [file:line]
+**Evidence:** [Search results showing no imports/calls]
+**Why orphaned:** [Created but never wired up / Removed usage but not code]
+
+---
+
+## Silent Error Swallowing
+
+### [Location]
+**Error handling:** [The catch block or error handling code]
+**Location:** [file:line]
+**Problem:** [Empty catch / Log-only / Silent null]
+**Codebase pattern:** [How errors are handled elsewhere]
+
+---
+
+## Security Anti-Patterns
+
+### [Pattern type]
+**Vulnerability:** [Description of the security issue]
+**Location:** [file:line]
+**Risk:** [What could be exploited]
+**Secure alternative:** [How this should be done]
+
+---
+
+## Test Quality Issues
+
+### [Test file/name]
+**Problem:** [Stale assertion / Bad mock / Mock-only test]
+**Test location:** [file:line]
+**Evidence:** [Show the test vs real code mismatch]
+**Real implementation:** [file:line] - [What it actually does]
+
+---
+
+## Backwards Compatibility Cruft
+
+### [Location]
+**Cruft found:** [The unnecessary compatibility code]
+**Location:** [file:line]
+**Evidence:** [Search showing nothing uses this]
+**Recommendation:** Delete entirely
 
 ---
 
@@ -282,6 +389,80 @@ grep -r "functionName\|featureName" --include="*.md"
 
 # Check if setup docs work
 cat README.md | grep -A 20 "## Setup\|## Installation"
+```
+
+### Finding Placeholder Artifacts
+```bash
+# Find TODO comments
+grep -r "TODO\|FIXME\|XXX\|HACK" --include="*.ts" --include="*.js" --include="*.py" | head -30
+
+# Find not implemented errors
+grep -r "Not implemented\|NotImplementedError\|throw.*implement" --include="*.ts" --include="*.js" --include="*.py"
+
+# Find empty function bodies (Python)
+grep -rA1 "def.*:$" --include="*.py" | grep -B1 "pass$"
+```
+
+### Finding Dead/Orphaned Code
+```bash
+# Find files not imported (JS/TS)
+for f in $(find src -name "*.ts" -o -name "*.js" 2>/dev/null); do
+  basename=$(basename "$f" | sed 's/\.[^.]*$//')
+  if ! grep -r "from.*$basename\|import.*$basename" --include="*.ts" --include="*.js" 2>/dev/null | grep -v "$f" > /dev/null; then
+    echo "Potentially orphaned: $f"
+  fi
+done
+
+# Find exported but unused functions
+grep -r "export.*function\|export const" --include="*.ts" --include="*.js" | head -20
+```
+
+### Finding Silent Error Swallowing
+```bash
+# Find empty catch blocks
+grep -rA2 "catch.*{" --include="*.ts" --include="*.js" | grep -B2 "^[^}]*}$"
+
+# Find catch blocks with only console.log
+grep -rA3 "catch.*{" --include="*.ts" --include="*.js" | grep -B3 "console\.\(log\|error\)"
+
+# Find bare except in Python
+grep -r "except:" --include="*.py"
+```
+
+### Finding Security Anti-Patterns
+```bash
+# Find potential hardcoded secrets
+grep -ri "password\s*=\|api_key\s*=\|secret\s*=\|token\s*=" --include="*.ts" --include="*.js" --include="*.py" | grep -v "process\.env\|os\.environ\|config\."
+
+# Find SQL string concatenation
+grep -r "SELECT.*+\|INSERT.*+\|UPDATE.*+" --include="*.ts" --include="*.js" --include="*.py"
+
+# Find eval usage
+grep -r "eval(" --include="*.ts" --include="*.js" --include="*.py"
+```
+
+### Finding Test Quality Issues
+```bash
+# Find hardcoded assertions
+grep -r "expect.*toBe.*true\|assert.*True\|expect.*toEqual.*\[\]" --include="*.test.*" --include="*_test.*" --include="*spec.*"
+
+# Find skipped tests
+grep -r "\.skip\|@skip\|xit\|xdescribe\|@pytest.mark.skip" --include="*.test.*" --include="*_test.*" --include="*spec.*"
+
+# Find mock definitions to compare against real implementations
+grep -r "jest.mock\|mock\.\|@patch\|MagicMock" --include="*.test.*" --include="*_test.*"
+```
+
+### Finding Backwards Compatibility Cruft
+```bash
+# Find underscore-prefixed unused variables
+grep -r "const _\|let _\|var _" --include="*.ts" --include="*.js"
+
+# Find removed/deprecated comments
+grep -ri "// removed\|// deprecated\|# removed\|# deprecated" --include="*.ts" --include="*.js" --include="*.py"
+
+# Find re-exports
+grep -r "export.*from\|module\.exports.*require" --include="*.ts" --include="*.js" | head -20
 ```
 
 ## After Report - MANDATORY STOP
