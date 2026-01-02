@@ -1,3 +1,8 @@
+---
+description: Run comprehensive verification with multiple agents (reviewer, tester, UX, coherence)
+allowed-tools: Read, Bash, Grep, Glob, Task, TodoWrite
+---
+
 # Verify Changes
 
 ## Goal
