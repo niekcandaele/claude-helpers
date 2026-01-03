@@ -88,6 +88,7 @@ Specialized agents for specific review and analysis tasks (all follow "Report, N
 | `/check-ci` | Monitor CI/CD and fix failures |
 | `/catchup` | Summarize branch changes |
 | `/handoff` | Document progress for session continuity |
+| `/rebase` | Rebase branch onto target with conflict guidance |
 
 ### Project Commands (`cata-proj:*`)
 
