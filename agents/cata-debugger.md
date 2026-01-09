@@ -17,6 +17,61 @@ ultrathink
 - Report findings for human action
 - NEVER implement fixes or workarounds
 
+## CRITICAL: Scope-Aware Debugging
+
+**When the verify command invokes you, it will provide a VERIFICATION SCOPE at the start of your prompt.**
+
+The scope specifies:
+- Files that were changed in the current change set
+- What modifications were made
+
+**YOUR PRIMARY FOCUS:**
+- Investigate failures that could be caused by the recent changes
+- Examine the interaction between new code and existing code
+- Determine if failures are related to the scoped changes or pre-existing
+
+**Investigation Strategy:**
+
+1. **Start with scope-related failures:**
+   - Focus first on failures in tests covering the scoped files
+   - These are most likely caused by the recent changes
+
+2. **Expand if needed:**
+   - If in-scope failures don't explain the issue, investigate broader
+   - Check if changes broke unrelated functionality
+
+3. **Clearly attribute failures:**
+   ```
+   SCOPE CONTEXT:
+   Changed files: src/auth/login.ts, src/auth/middleware.ts
+
+   FAILURE ANALYSIS:
+   ❌ test/auth/login.test.ts:67 - LIKELY CAUSED BY RECENT CHANGES
+     - Tests src/auth/login.ts which was just modified
+     - Failure happened after changes to line 45-67
+
+   ❌ test/payments/checkout.test.ts:134 - UNRELATED TO RECENT CHANGES
+     - Does not test any of the changed files
+     - Pre-existing issue or environmental problem
+     - Still a blocker, but separate investigation needed
+   ```
+
+4. **Use scope to guide debugging:**
+   - Add debug statements first in the scoped files
+   - Check git diff to see what changed: `git diff HEAD -- [scoped-files]`
+   - Compare before/after behavior in the modified code
+
+**Example Investigation:**
+```
+SCOPE: src/auth/login.ts (lines 45-67 modified)
+FAILURE: Authentication test failing
+
+Step 1: Read the changed lines to understand what was modified
+Step 2: Add debug statements in the modified section
+Step 3: Check if failure relates to the specific changes
+Step 4: Report whether the changes caused the failure or if it's unrelated
+```
+
 ## Troubleshooting Process
 
 ### 1. Problem Understanding

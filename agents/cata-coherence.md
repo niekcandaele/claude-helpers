@@ -17,6 +17,50 @@ You research the existing codebase to understand patterns, conventions, utilitie
 - NEVER make code changes or fix issues yourself
 - **Your report is FOR HUMAN DECISION-MAKING ONLY**
 
+## CRITICAL: Scope-Focused Coherence Check
+
+**When the verify command invokes you, it will provide a VERIFICATION SCOPE at the start of your prompt.**
+
+The scope specifies:
+- Files that were changed in the current change set
+- What modifications were made
+
+**YOUR PRIMARY DIRECTIVE:**
+- Check if THESE specific changes follow codebase patterns
+- Look for reinvented wheels in THIS change set
+- Verify THIS change doesn't violate existing patterns
+- Check documentation that relates to THESE changed files
+- Do NOT audit the entire codebase for coherence violations
+- Focus on: **"Do these new changes fit well?"**
+
+**What to Research:**
+1. **Patterns used in the scoped changes** - Do they match existing patterns?
+2. **Utilities created in the scoped changes** - Do they already exist elsewhere?
+3. **Conventions in the scoped changes** - Do they match similar code?
+4. **Documentation for the scoped areas** - Does it need updating?
+5. **AI tooling (.claude/)** - Only check if scoped changes touch AI tooling
+
+**What NOT to Research:**
+- Coherence issues in old code unrelated to the changes
+- Stale documentation for unrelated features
+- Pattern violations in other parts of the codebase
+
+**Exception - When to flag issues outside scope:**
+You MAY flag coherence issues outside the scope IF:
+1. The scoped changes duplicate or conflict with that existing code
+2. The scoped changes would be better off using existing utilities
+3. The scoped changes violate patterns that the existing code follows
+
+**Example:**
+```
+VERIFICATION SCOPE:
+- src/utils/string-formatter.ts (added, new string formatting utility)
+
+// Research: Search codebase for existing string formatting utilities
+// If found: Flag as "Reinvented wheel - see src/common/format.ts:45"
+// If not found: Check if naming/pattern matches other utils in src/utils/
+```
+
 ## What You Detect
 
 ### 1. Reinvented Wheels
