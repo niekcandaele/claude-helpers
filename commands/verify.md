@@ -1,6 +1,6 @@
 ---
 description: Run comprehensive verification with multiple agents (reviewer, tester, UX, coherence)
-allowed-tools: Read, Bash, Grep, Glob, Task, TodoWrite
+allowed-tools: Read, Bash, Grep, Glob, Task, TodoWrite, AskUserQuestion
 ---
 
 # Verify Changes
@@ -105,9 +105,11 @@ git diff --cached -- <scoped-files>
    - `cata-tester`: Execute test suite and report failures
    - `cata-ux-reviewer`: Test user-facing changes (unless `--skip-ux` or clearly backend-only)
    - `cata-coherence`: Check if changes fit in the codebase (reinvented wheels, pattern violations, stale docs/AI tooling)
-3. **Debug Analysis (if failures):** If cata-tester OR cata-ux-reviewer failed, launch cata-debugger for root cause analysis
-4. **Generate Unified Report:** Combine all agent findings with clear verdict
-5. **STOP:** Present report and wait for human decision
+3. **Manual Exercise (cata-exerciser):** Start the app and exercise the feature end-to-end
+   - If BLOCKED with LOGIN_REQUIRED or UNCLEAR_FEATURE: Ask user for help, retry
+4. **Debug Analysis (if failures):** If cata-tester OR cata-ux-reviewer OR cata-exerciser failed, launch cata-debugger for root cause analysis
+5. **Generate Unified Report:** Combine all agent findings with clear verdict
+6. **STOP:** Present report and wait for human decision
 
 ## CRITICAL: No Hiding Issues
 
@@ -122,6 +124,9 @@ The AI has a tendency to soften or hide issues. This is UNACCEPTABLE. The report
 - **Lint failures** - Not "some style issues", it's a BLOCKER
 - **Build failures** - Not "compilation warnings", it's a BLOCKER
 - **Tests that couldn't execute** - Not "skipped due to setup", it's a BLOCKER
+- **App won't start** - Not "probably works anyway", it's a BLOCKER
+- **Can't exercise the feature** - Not "tests pass so it's fine", it's a BLOCKER
+- **Manual exercise failed** - Not "edge case", it's a BLOCKER
 
 ### Unacceptable Language
 
@@ -294,6 +299,75 @@ Task tool with:
 
 Only launch this agent if there are actual failures to analyze. Skip if all tests passed and UX review found no critical issues.
 
+## Manual Exercise Testing (cata-exerciser)
+
+After the initial 4 agents complete, launch `cata-exerciser` to actually run and test the application.
+
+This step verifies that the feature works when you actually use it, not just when automated tests run.
+
+### Why This Matters
+
+Automated tests pass, but the app can still be broken:
+- Tests mock dependencies that fail in real env
+- Integration points that aren't fully tested
+- Startup issues that tests bypass
+- UI that renders but doesn't function
+
+The exerciser catches these by actually running the app.
+
+### When to Run cata-exerciser
+
+**ALWAYS. No skip flag. Non-negotiable.**
+
+If the exerciser cannot complete (no app, can't start, etc.), that is reported as a **BLOCKER** - not silently skipped.
+
+Even for pure libraries or config-only changes, the exerciser should attempt to run and report what it finds.
+
+### Exercise Agent Invocation
+
+```
+# Agent: Manual Exercise
+Task tool with:
+- subagent_type: "cata-exerciser"
+- description: "Exercise feature end-to-end"
+- prompt: "VERIFICATION SCOPE:
+  Files in scope:
+  [Insert scope list here]
+
+  Exercise the application end-to-end:
+  1. Start the application (docker compose, npm run dev, etc.)
+  2. Navigate to the feature affected by these changes
+  3. Exercise the feature as a user would
+  4. Report whether it works
+
+  If you hit a blocker (can't start, need credentials, unclear what to test):
+  - Return BLOCKED status with specific reason
+  - I will ask the user for help if needed"
+```
+
+### Handling Exercise Blockers
+
+If cata-exerciser returns BLOCKED with reason `LOGIN_REQUIRED` or `UNCLEAR_FEATURE`:
+
+1. **Use AskUserQuestion** to get help from the user:
+   - For LOGIN_REQUIRED: "The exerciser needs to log in to test the feature. Please choose: (1) Provide test credentials (username and password), (2) Point me to a file containing credentials (e.g., .env, seeds), or (3) Log in manually in your browser and tell me when ready to continue."
+   - For UNCLEAR_FEATURE: "I'm not sure what feature to exercise. The changed files are: [insert actual file list]. What user flow or feature should I test?"
+
+2. **Re-launch cata-exerciser** with the user's response added to the prompt
+
+3. **If user can't help** or second attempt also fails: Final status is BLOCKED
+
+### Critical: Exercise Blockers
+
+If cata-exerciser cannot complete for ANY reason, this is a BLOCKER:
+- App won't start → BLOCKER
+- Database not available → BLOCKER
+- Can't log in (after asking user) → BLOCKER
+- Feature doesn't work → BLOCKER
+- Any environmental issue → BLOCKER
+
+There are NO acceptable reasons to skip manual verification.
+
 ## When to Skip UX Review
 
 Only skip `cata-ux-reviewer` when ALL of these are true:
@@ -414,6 +488,27 @@ After all agents complete, generate this unified report:
 
 ---
 
+## Manual Exercise (cata-exerciser)
+
+**Status:** ✅ PASSED / ❌ FAILED / ⚠️ BLOCKED
+
+**Application Startup:**
+- Method: [docker compose / npm run dev / etc.]
+- Startup: ✅ Clean / ❌ Errors
+
+**Feature Exercise:**
+- Feature tested: [Description based on scope]
+- Steps performed: [Summary of what was done]
+- Result: ✅ Worked / ❌ Failed at [step]
+
+**Issues Found:**
+[Details of any problems discovered]
+
+**Blocker Reason (if blocked):**
+[Why exercise could not complete - STARTUP_FAILED / LOGIN_REQUIRED / etc.]
+
+---
+
 ## Debug Analysis (cata-debugger)
 
 **Status:** ✅ N/A (no failures) / 🔍 ANALYZED
@@ -485,33 +580,44 @@ After all agents complete, generate this unified report:
    - Wait for all agents to complete
    - Gather outputs from each
 
-7. **Launch debugger if failures:**
-   - If cata-tester OR cata-ux-reviewer reported failures
+7. **Launch exerciser:**
+   - Launch cata-exerciser to start the app and exercise the feature
+   - **Include scope context in exerciser prompt**
+   - If returns BLOCKED with LOGIN_REQUIRED or UNCLEAR_FEATURE:
+     a. Use AskUserQuestion to get help from user
+     b. Re-launch cata-exerciser with user's response
+     c. If still blocked, record as final BLOCKED status
+
+8. **Launch debugger if failures:**
+   - If cata-tester OR cata-ux-reviewer OR cata-exerciser reported failures
    - Launch cata-debugger to analyze root cause
    - **Include scope context in debugger prompt**
    - Gather diagnostic output
 
-8. **Generate unified report:**
+9. **Generate unified report:**
    - **Add scope section at top** showing what was verified
    - Determine overall verdict
    - List ALL issues prominently
+   - Include exercise results (critical for end-to-end verification)
    - Include debug analysis if debugger ran
    - Make blockers impossible to miss
    - Clearly indicate what was IN scope vs excluded
 
-9. **STOP and present:**
-   - Display the report
-   - Wait for human decision
-   - DO NOT proceed to any next steps automatically
+10. **STOP and present:**
+    - Display the report
+    - Wait for human decision
+    - DO NOT proceed to any next steps automatically
 
 ## Important Notes
 
 - **Scope-aware verification** - Always detect and communicate scope to agents
 - **Include scope in ALL agent prompts** - Critical for focused reviews
-- **Run agents in parallel** - Use single message with multiple Task tool calls
+- **Run initial agents in parallel** - Use single message with multiple Task tool calls
+- **Run exerciser after initial agents** - Sequential to avoid resource conflicts
 - **Never auto-proceed** - Always stop after presenting report
 - **Be honest** - Surface all issues, don't minimize or hide
 - **Assume tests work** - Any test issue is a bug, not an excuse
+- **Exercise failures are blockers** - Can't verify if can't exercise
 - **Default to focused scope** - Auto-detect changed files unless --scope=all specified
 - **Make scope visible** - Always show what was verified in the report
 
