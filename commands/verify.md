@@ -117,35 +117,26 @@ git diff --cached -- <scoped-files>
 
 The AI has a tendency to soften or hide issues. This is UNACCEPTABLE. The report must be brutally honest:
 
-### What Counts as a BLOCKER
-
-- **ANY test failure** - Not a "minor issue", not "mostly passing", it's a BLOCKER
-- **Environmental issues preventing tests from running** - Not "we couldn't verify due to environment", it's a BLOCKER
-- **Lint failures** - Not "some style issues", it's a BLOCKER
-- **Build failures** - Not "compilation warnings", it's a BLOCKER
-- **Tests that couldn't execute** - Not "skipped due to setup", it's a BLOCKER
-- **App won't start** - Not "probably works anyway", it's a BLOCKER
-- **Can't exercise the feature** - Not "tests pass so it's fine", it's a BLOCKER
-- **Manual exercise failed** - Not "edge case", it's a BLOCKER
-
-### Unacceptable Language
-
-NEVER use phrases like:
-- ❌ "Everything works, just a few test failures"
-- ❌ "The important tests passed"
-- ❌ "Minor environmental issues prevented some tests"
-- ❌ "Tests mostly passed with some edge case failures"
-- ❌ "Good enough for now"
-- ❌ "Production ready despite..."
-- ❌ "Non-critical failures"
-
 ### Required Mindset
 
 - Tests should ALWAYS pass - 100% pass rate is the only acceptable outcome
 - Tests should ALWAYS be able to run - any setup/environment issue is a bug
-- If it's not all green, it's NOT MERGEABLE
-- Partial success is failure
 - Be transparent - show ALL issues prominently
+- Report facts - let humans decide what to act on
+
+### Severity Scale (1-10)
+
+All agents use a numeric severity scale instead of categorical labels:
+
+| Range | Impact | Examples |
+|-------|--------|----------|
+| 9-10 | Critical | Data loss, security vulnerability, cannot function |
+| 7-8 | High | Major functionality broken, significant problems |
+| 5-6 | Moderate | Clear issues, workarounds exist |
+| 3-4 | Low | Minor issues, slight inconvenience |
+| 1-2 | Trivial | Polish, cosmetic, optional improvements |
+
+**Important:** Severity reflects "how big is this issue?" - NOT "must you fix it?" The human decides what to act on.
 
 ## Agent Invocation
 
@@ -203,7 +194,13 @@ Task tool with:
   Use git diff to see the actual changes:
   git diff HEAD -- [scoped files]
 
-  Review for: design adherence, over-engineering, AI slop, structural completeness."
+  Review for: design adherence, over-engineering, AI slop, structural completeness.
+
+  OUTPUT FORMAT: For each issue found, provide:
+  - Title (short description)
+  - Severity (1-10, where 1=trivial, 10=critical)
+  - Location (file:line)
+  - Description (what the issue is and why it matters)"
 
 # Agent 2: Test Execution
 Task tool with:
@@ -220,13 +217,14 @@ Task tool with:
 
   Execute the full test suite.
   Report exact pass/fail counts.
-  ANY failure = overall FAIL.
-  If tests cannot run, that is also a FAIL.
+  If tests cannot run, report what prevented execution.
 
-  When reporting failures:
-  - Clearly indicate if failures are in tests related to the scoped changed files
-  - Prioritize failures in test files that cover the changed code
-  - Still report ALL failures, but annotate which are in-scope vs out-of-scope"
+  When reporting failures, for EACH failure provide:
+  - Title (short description of what failed)
+  - Severity (1-10, where 1=trivial, 10=critical)
+  - Location (test file:line)
+  - Description (error message, expected vs actual)
+  - Scope annotation: IN-SCOPE or OUT-OF-SCOPE relative to changed files"
 
 # Agent 3: UX Review (unless skipped)
 Task tool with:
@@ -244,7 +242,13 @@ Task tool with:
 
   Review user experience for the scoped changes.
   Test any UI, CLI output, error messages, or API responses that were modified.
-  Report usability issues and friction points in THE SCOPED CHANGES ONLY."
+  Report usability issues and friction points in THE SCOPED CHANGES ONLY.
+
+  OUTPUT FORMAT: For each issue found, provide:
+  - Title (short description)
+  - Severity (1-10, where 1=trivial, 10=critical)
+  - Location (page/component/command)
+  - Description (user impact and what you observed)"
 
 # Agent 4: Coherence Check
 Task tool with:
@@ -267,7 +271,12 @@ Task tool with:
   Check for pattern violations - different approaches than rest of codebase.
   Verify AI tooling (.claude/) matches actual behavior IF the scoped changes touch AI tooling.
   Check if documentation reflects the scoped code changes.
-  Report any coherence issues found IN THE SCOPED CHANGES."
+
+  OUTPUT FORMAT: For each issue found, provide:
+  - Title (short description)
+  - Severity (1-10, where 1=trivial, 10=critical)
+  - Location (file:line)
+  - Description (what the issue is and existing pattern to follow)"
 ```
 
 **Important:** Replace `[Insert scope list here]` with the actual scope determined in step 1.
@@ -294,10 +303,16 @@ Task tool with:
   Review the test failures and/or UX issues found.
   Use git, logs, and available tools to investigate.
   Provide detailed diagnostic report without fixing anything.
-  Focus on identifying WHY the failures occurred, especially in relation to the scoped changes."
+  Focus on identifying WHY the failures occurred, especially in relation to the scoped changes.
+
+  OUTPUT FORMAT: For each root cause identified, provide:
+  - Title (short description of root cause)
+  - Severity (1-10, where 1=trivial, 10=critical)
+  - Location (file:line or area)
+  - Description (detailed diagnosis and evidence)"
 ```
 
-Only launch this agent if there are actual failures to analyze. Skip if all tests passed and UX review found no critical issues.
+Only launch this agent if there are actual failures to analyze. Skip if all tests passed and UX review found no high-severity issues.
 
 ## Manual Exercise Testing (cata-exerciser)
 
@@ -319,7 +334,7 @@ The exerciser catches these by actually running the app.
 
 **ALWAYS. No skip flag. Non-negotiable.**
 
-If the exerciser cannot complete (no app, can't start, etc.), that is reported as a **BLOCKER** - not silently skipped.
+If the exerciser cannot complete (no app, can't start, etc.), that is reported as a severity 9-10 issue - not silently skipped.
 
 Even for pure libraries or config-only changes, the exerciser should attempt to run and report what it finds.
 
@@ -340,12 +355,18 @@ Task tool with:
   3. Exercise the feature as a user would
   4. Report whether it works
 
-  If you hit a blocker (can't start, need credentials, unclear what to test):
+  If you hit a barrier (can't start, need credentials, unclear what to test):
   - Return BLOCKED status with specific reason
-  - I will ask the user for help if needed"
+  - I will ask the user for help if needed
+
+  OUTPUT FORMAT: For each issue found, provide:
+  - Title (short description)
+  - Severity (1-10, where 1=trivial, 10=critical)
+  - Location (where in the app)
+  - Description (what failed and what you observed)"
 ```
 
-### Handling Exercise Blockers
+### Handling Exercise Barriers
 
 If cata-exerciser returns BLOCKED with reason `LOGIN_REQUIRED` or `UNCLEAR_FEATURE`:
 
@@ -357,16 +378,16 @@ If cata-exerciser returns BLOCKED with reason `LOGIN_REQUIRED` or `UNCLEAR_FEATU
 
 3. **If user can't help** or second attempt also fails: Final status is BLOCKED
 
-### Critical: Exercise Blockers
+### Exercise Barriers
 
-If cata-exerciser cannot complete for ANY reason, this is a BLOCKER:
-- App won't start → BLOCKER
-- Database not available → BLOCKER
-- Can't log in (after asking user) → BLOCKER
-- Feature doesn't work → BLOCKER
-- Any environmental issue → BLOCKER
+If cata-exerciser cannot complete, report it factually with severity:
+- App won't start → Report with severity 10
+- Database not available → Report with severity 9
+- Can't log in (after asking user) → Report with severity 8
+- Feature doesn't work → Report with severity based on impact
+- Environmental issue → Report with appropriate severity
 
-There are NO acceptable reasons to skip manual verification.
+Manual verification barriers are reported as high-severity issues in the Issues Found table.
 
 ## When to Skip UX Review
 
@@ -418,129 +439,88 @@ After all agents complete, generate this unified report:
 ```markdown
 # Verification Report
 
-## Verification Scope
+## Scope
 
-**Scope Mode:** [staged / unstaged / branch / all / files / module]
+**Mode:** [staged / unstaged / branch / all / files / module]
 
 **Files Verified:**
 - src/auth/login.ts (modified, lines 45-67, 89-102)
 - src/auth/middleware.ts (modified, lines 12-34)
 - tests/auth/login.test.ts (added, entire file)
 
-**Files Excluded:** All other files in codebase (not reviewed for this verification)
+**Files Excluded:** All other files in codebase (not in scope for this verification)
 
 ---
 
-## Overall Verdict: ✅ PASS / ❌ FAIL / ⚠️ BLOCKED
+## Agent Results Summary
 
-**Status:** [MERGEABLE / NOT MERGEABLE]
-
----
-
-## Test Results (cata-tester)
-
-**Status:** ✅ ALL PASSED / ❌ FAILURES / ⚠️ COULD NOT RUN
-
-[If failures or issues:]
-⚠️ BLOCKER: [Exact issue - tests failed / tests couldn't run / etc.]
-
-**Summary:**
-- Total: X tests
-- Passed: Y
-- Failed: Z
-- Skipped: W
-
-**Failures:**
-[List each failure with details]
+| Agent | Status | Notes |
+|-------|--------|-------|
+| cata-tester | X passed, Y failed | [brief note if any] |
+| cata-reviewer | Completed | Found N items |
+| cata-ux-reviewer | Completed / Skipped | Found N items / [reason] |
+| cata-coherence | Completed | Found N items |
+| cata-exerciser | PASSED / FAILED / BLOCKED | [reason if blocked] |
+| cata-debugger | Ran / N/A | [if applicable] |
 
 ---
 
-## Code Review (cata-reviewer)
+## Issues Found
 
-**Status:** ✅ APPROVED / ❌ ISSUES FOUND
+[Deduplicated issues from all agents, sorted by severity descending]
 
-**Critical Issues:** [Count]
-**Major Issues:** [Count]
-**Minor Issues:** [Count]
+Issues are assigned **VI-{n}** IDs (Verification Issue) for easy reference during discussion.
 
-[Summary of findings]
+| ID | Sev | Title | Sources | Description |
+|----|-----|-------|---------|-------------|
+| VI-1 | 9 | [Short title] | tester, reviewer | [Combined description from all agents that flagged this] |
+| VI-2 | 7 | [Short title] | reviewer, coherence | [Description with context] |
+| VI-3 | 5 | [Short title] | ux | [Description] |
+| VI-4 | 3 | [Short title] | coherence | [Description] |
 
----
+*Severity: 9-10 Critical | 7-8 High | 5-6 Moderate | 3-4 Low | 1-2 Trivial*
 
-## UX Review (cata-ux-reviewer)
+*Sources column shows which agents flagged the issue. Multiple sources = higher confidence the issue is real.*
 
-**Status:** ✅ GOOD / ⚠️ ISSUES / ❌ CRITICAL / ⏭️ SKIPPED
-
-[Summary of findings or reason for skip]
-
----
-
-## Coherence Check (cata-coherence)
-
-**Status:** ✅ COHERENT / ⚠️ ISSUES / ❌ MAJOR CONCERNS
-
-**Reinvented Wheels:** [Count]
-**Pattern Violations:** [Count]
-**Stale AI Tooling:** [Count]
-**Documentation Drift:** [Count]
-
-[Summary of findings]
+**Total: N issues from M agent findings (deduplicated)**
 
 ---
 
-## Manual Exercise (cata-exerciser)
+STOP - Awaiting human decision.
+```
 
-**Status:** ✅ PASSED / ❌ FAILED / ⚠️ BLOCKED
+## Issue Deduplication
 
-**Application Startup:**
-- Method: [docker compose / npm run dev / etc.]
-- Startup: ✅ Clean / ❌ Errors
+When combining agent findings into the final report:
 
-**Feature Exercise:**
-- Feature tested: [Description based on scope]
-- Steps performed: [Summary of what was done]
-- Result: ✅ Worked / ❌ Failed at [step]
+1. **Collect all findings** from each agent in structured format (title, severity, location, description)
 
-**Issues Found:**
-[Details of any problems discovered]
+2. **Identify duplicates** - same underlying issue flagged by multiple agents:
+   - Same file/location mentioned
+   - Same root cause described differently
+   - Same symptom from different perspectives (code issue → test failure → user impact)
 
-**Blocker Reason (if blocked):**
-[Why exercise could not complete - STARTUP_FAILED / LOGIN_REQUIRED / etc.]
+3. **Merge into single issue:**
+   - Create one VI-{n} entry
+   - List all source agents in Sources column
+   - Combine descriptions to show all perspectives
+   - Use the **highest severity** from the merged findings
 
----
+4. **Assign sequential IDs** (VI-1, VI-2, VI-3...) to deduplicated issues
 
-## Debug Analysis (cata-debugger)
+5. **Sort by severity** descending (most severe first)
 
-**Status:** ✅ N/A (no failures) / 🔍 ANALYZED
+6. **Show deduplication stats** - "N issues from M agent findings"
 
-[Only include this section if cata-debugger was launched]
+**Example Deduplication:**
+```
+Agent findings:
+- cata-reviewer: "Missing error handling in auth.ts" (severity: 6)
+- cata-tester: "Test fails - unhandled exception in auth flow" (severity: 8)
+- cata-ux-reviewer: "User sees cryptic error on login failure" (severity: 7)
 
-**Root Cause Analysis:**
-[Diagnostic findings from debugger]
-
-**Investigation Summary:**
-[What was investigated and discovered]
-
----
-
-## Blockers
-
-[List ALL blockers prominently - these prevent merging]
-
-1. ❌ [Blocker 1]
-2. ❌ [Blocker 2]
-
-## Issues to Address
-
-[List non-blocking issues that should still be fixed]
-
----
-
-## Next Steps
-
-[Clear guidance based on results]
-- If PASS: "Changes verified. Ready for commit/merge."
-- If FAIL: "Must fix blockers before proceeding. See issues above."
+Merged into:
+| VI-1 | 8 | Unhandled auth error | reviewer, tester, ux | Missing error handling causes test failure and cryptic user-facing error |
 ```
 
 ## Execution Steps

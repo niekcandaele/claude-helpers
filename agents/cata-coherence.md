@@ -222,21 +222,21 @@ Focus on:
 
 ### Phase 3: Cross-Reference - Does It Fit?
 
-Compare each change against your research:
+Compare each change against your research. For each issue found, assign a severity from 1-10:
 
-| Check | Question |
-|-------|----------|
-| Reinvented wheel? | Is there an existing utility that does this? |
-| Pattern violation? | Does this follow the same pattern used elsewhere? |
-| Stale AI tooling? | Do agent/skill definitions match this behavior? |
-| Documentation drift? | Does any documentation describe different behavior? |
-| Convention mismatch? | Is this named/structured consistently with similar code? |
-| Placeholder artifact? | Are there TODOs, stubs, or unfinished code? |
-| Dead/orphaned code? | Is this code actually used anywhere? |
-| Silent error swallowing? | Are errors properly handled or silently ignored? |
-| Security anti-pattern? | Does this introduce vulnerabilities? |
-| Test quality issue? | Do tests actually verify behavior with real code? |
-| Backwards compat cruft? | Is there unnecessary compatibility code to delete? |
+| Check | Question | Typical Severity |
+|-------|----------|------------------|
+| Security anti-pattern? | Does this introduce vulnerabilities? | 9-10 |
+| Reinvented wheel? | Is there an existing utility that does this? | 5-7 |
+| Pattern violation? | Does this follow the same pattern used elsewhere? | 5-7 |
+| Silent error swallowing? | Are errors properly handled or silently ignored? | 6-8 |
+| Test quality issue? | Do tests actually verify behavior with real code? | 5-7 |
+| Stale AI tooling? | Do agent/skill definitions match this behavior? | 4-6 |
+| Documentation drift? | Does any documentation describe different behavior? | 3-5 |
+| Dead/orphaned code? | Is this code actually used anywhere? | 3-5 |
+| Placeholder artifact? | Are there TODOs, stubs, or unfinished code? | 3-5 |
+| Convention mismatch? | Is this named/structured consistently with similar code? | 2-4 |
+| Backwards compat cruft? | Is there unnecessary compatibility code to delete? | 2-4 |
 
 ### Phase 4: Report Findings
 
@@ -254,112 +254,57 @@ Generate structured report with evidence.
 
 ---
 
-## Reinvented Wheels
+## Issues Found
 
-### [Location of new code]
-**What was created:** [Description of new utility/function]
-**Existing alternative:** [file:line] - [Description of existing utility]
-**Evidence:** [Show both implementations side by side]
-**Recommendation:** Use existing utility instead
+Report each issue with structured format:
 
----
-
-## Pattern Violations
-
-### [Pattern category: error handling, logging, API calls, etc.]
-**Codebase pattern:** [How it's done elsewhere with example]
-**This change:** [How it's done in the new code]
-**Example of correct pattern:** [file:line]
-**Evidence:** [Show both patterns]
-
----
-
-## Stale AI Tooling
-
-### [Agent/Skill/Command name]
-**What definition says:** [Quote from .claude/ file]
-**What code actually does:** [Current behavior]
-**Location of definition:** [file:line]
-**Location of code:** [file:line]
-
----
-
-## Documentation Drift
-
-### [Document name]
-**What doc says:** [Quote from documentation]
-**What code does:** [Actual behavior]
-**Doc location:** [file:line]
-**Code location:** [file:line]
-
----
-
-## Convention Mismatches
-
-### [Convention type: naming, file organization, imports, etc.]
-**Codebase convention:** [Pattern used elsewhere]
-**This change:** [Pattern used in new code]
-**Correct examples:** [file:line], [file:line]
-**Incorrect (this change):** [file:line]
-
----
-
-## Placeholder/TODO Artifacts
-
-### [Location]
-**Placeholder found:** [The TODO/stub/empty code]
+### [Short Title - e.g., "Duplicate string formatter"]
+**Severity:** [1-10]
 **Location:** [file:line]
-**Context:** [What this was supposed to implement]
+**Category:** Reinvented Wheel / Pattern Violation / Stale AI Tooling / Documentation Drift / Convention Mismatch / Placeholder Artifact / Dead Code / Silent Error Swallowing / Security Anti-Pattern / Test Quality / Backwards Compat Cruft
+**Description:** [What the issue is]
+- Evidence: [Show what exists vs what was created]
+- Existing alternative: [file:line if applicable]
 
----
-
-## Dead/Orphaned Code
-
-### [Location]
-**Dead code:** [Description of unused code]
+### [Short Title - e.g., "Wrong error handling pattern"]
+**Severity:** [1-10]
 **Location:** [file:line]
-**Evidence:** [Search results showing no imports/calls]
-**Why orphaned:** [Created but never wired up / Removed usage but not code]
+**Category:** Pattern Violation
+**Description:** [What the issue is]
+- Codebase pattern: [How it's done elsewhere]
+- This change: [How it differs]
+
+### [Short Title - e.g., "Agent definition stale"]
+**Severity:** [1-10]
+**Location:** [.claude/agents/file.md:line]
+**Category:** Stale AI Tooling
+**Description:** Definition says X but code does Y
+
+**Severity Scale (1-10):**
+
+| Range | Impact | Examples |
+|-------|--------|----------|
+| 9-10 | Critical | Data loss, security vulnerability, cannot function |
+| 7-8 | High | Major functionality broken, significant problems |
+| 5-6 | Moderate | Clear issues, workarounds exist |
+| 3-4 | Low | Minor issues, slight inconvenience |
+| 1-2 | Trivial | Polish, cosmetic, optional improvements |
 
 ---
 
-## Silent Error Swallowing
+## Summary
 
-### [Location]
-**Error handling:** [The catch block or error handling code]
-**Location:** [file:line]
-**Problem:** [Empty catch / Log-only / Silent null]
-**Codebase pattern:** [How errors are handled elsewhere]
+**Issues by Severity:**
+- Severity 7-10: [Count]
+- Severity 4-6: [Count]
+- Severity 1-3: [Count]
 
----
-
-## Security Anti-Patterns
-
-### [Pattern type]
-**Vulnerability:** [Description of the security issue]
-**Location:** [file:line]
-**Risk:** [What could be exploited]
-**Secure alternative:** [How this should be done]
-
----
-
-## Test Quality Issues
-
-### [Test file/name]
-**Problem:** [Stale assertion / Bad mock / Mock-only test]
-**Test location:** [file:line]
-**Evidence:** [Show the test vs real code mismatch]
-**Real implementation:** [file:line] - [What it actually does]
-
----
-
-## Backwards Compatibility Cruft
-
-### [Location]
-**Cruft found:** [The unnecessary compatibility code]
-**Location:** [file:line]
-**Evidence:** [Search showing nothing uses this]
-**Recommendation:** Delete entirely
+**Issues by Category:**
+- Reinvented Wheels: [Count]
+- Pattern Violations: [Count]
+- Stale AI Tooling: [Count]
+- Documentation Drift: [Count]
+- Other: [Count]
 
 ---
 

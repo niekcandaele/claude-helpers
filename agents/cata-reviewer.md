@@ -748,222 +748,182 @@ git diff [base]...HEAD | grep "^+.*export" | head -20
 
 ## Design Adherence: ❌ FAIL / ⚠️ ISSUES / ✅ PASS
 
-### Critical Discrepancies
-- **[File:Line]**: [Specific issue]
-  - Design specifies: [What design says]
-  - Implementation does: [What code does]
-  - Impact: [Why this matters]
+### Design Discrepancies
 
-### Major Deviations
-- **[File:Line]**: [Issue]
-  - Reference: [Section in design doc]
-  - Problem: [Clear explanation]
+### [Short Title]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** [Clear explanation of issue]
+- Design specifies: [What design says]
+- Implementation does: [What code does]
+- Impact: [Why this matters]
 
-### Minor Deviations
-- **[File:Line]**: [Issue]
+### [Another Short Title]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** [...]
 
 ## Over-Engineering: ❌ DETECTED / ✅ CLEAN
 
-### Unnecessary Abstractions
-- **[File:Line]**: [Specific over-engineered code]
-  - Problem: [Why it's over-engineered]
-  - Design says: [What was actually needed]
+### [Short Title - e.g., "Unnecessary abstraction for X"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** [Specific over-engineered code]
+- Problem: [Why it's over-engineered]
+- Design says: [What was actually needed]
 
-### Gold-Plating
-- **[File:Line]**: [Feature not in design]
-  - Not in requirements
-  - Adds complexity without justification
-
-### YAGNI Violations
-- **[File:Line]**: [Future-proofing that wasn't asked for]
+### [Short Title - e.g., "Gold-plating: OAuth config"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** [Feature not in design, adds complexity without justification]
 
 ## Test Suite Integrity: ❌ FAIL / ⚠️ ISSUES / ✅ PASS
 
-### Disabled Tests
-- **[File:Line]**: Tests skipped with .skip, xit, .only
-- **[Impact]**: Test coverage gaps, false confidence
+### [Short Title - e.g., "Disabled rate limiting tests"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** Tests skipped with .skip, xit, .only. Impact: [What's not being tested]
 
-### Commented Assertions
-- **[File:Line]**: Assertions commented out to make tests pass
-- **[Impact]**: Tests provide false confidence
+### [Short Title - e.g., "Commented JWT assertions"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** Assertions commented out to make tests pass. Impact: [What validation is missing]
 
-### Meaningless Tests
-- **[File:Line]**: Tests with no real assertions
-
-### Debug Code
-- **[File:Line]**: console.log, debugger statements left in code
-
-### Empty Catch Blocks
-- **[File:Line]**: Errors being silently swallowed
+### [Short Title - e.g., "Password logged in debug"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** [Debug code or empty catch block issue]
 
 ## AI Slop: ❌ DETECTED / ✅ CLEAN
 
 ### Code AI Slop
 
-#### Generic Naming
-- **[File:Line]**: `result`, `data`, `temp` detected
+### [Short Title - e.g., "Generic naming in helpers.ts"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** `result`, `data`, `temp` - variables need meaningful names
 
-#### Over-Defensive Code
-- **[File:Line]**: Unnecessary null checks
+### [Short Title - e.g., "Over-defensive null checks"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** Unnecessary null checks around [what]
 
-#### Obvious Comments
-- **[File:Line]**: Comment explains what code clearly shows
-- **[File:Line]**: Comment references removed/non-existent code (e.g., "README not needed")
-
-#### Copy-Paste Patterns
-- **[File:Line]**: Tutorial-style code doesn't match codebase
+### [Short Title - e.g., "Obvious comments"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** Comments explaining what code clearly shows or referencing removed code
 
 ### Documentation AI Slop
 
-#### Bold Bullet Epidemic
-- **[File:Line Count]**: [Number] instances of "**Term:** Description" pattern
-- **[Example]**: Show specific pattern found
-- **[Impact]**: Documentation feels robotic and AI-generated
+### [Short Title - e.g., "Bold bullet epidemic in README"]
+**Severity:** [1-10]
+**Location:** [File] - [Number] instances
+**Description:** "**Term:** Description" pattern makes documentation feel robotic
 
-#### Overused AI Phrases
-- **[File]**: "Furthermore" (Nx), "Moreover" (Nx), "Comprehensive" (Nx)
-
-#### Rigid Template Following
-- **[File]**: Every section follows identical structure
-
-#### LLM Signatures
-- **[File:Line]**: Detected [ChatGPT/Claude/Copilot] patterns
+### [Short Title - e.g., "Overused AI phrases"]
+**Severity:** [1-10]
+**Location:** [File]
+**Description:** "Furthermore" (Nx), "Moreover" (Nx), "Comprehensive" (Nx)
 
 ## Requirements Gap Analysis
 
-### Missing Features
-- **[Requirement]**: Not implemented
-- **[Design Reference]**: [Section that specified it]
+### [Short Title - e.g., "Missing rate limiting"]
+**Severity:** [1-10]
+**Location:** [Design section reference]
+**Description:** [What's missing or partially implemented]
 
-### Partial Implementation
-- **[File:Line]**: Only handles happy path
-- **[Missing]**: Error handling, edge cases
-
-### Changed Behavior
-- **[File:Line]**: Implementation differs from spec
-- **[Design Said]**: [What was specified]
-- **[Actual]**: [What was implemented]
+### [Short Title - e.g., "Changed JWT algorithm"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** Implementation differs from spec. Design said X, actual is Y.
 
 ## Code Quality Issues
 
-### Pattern Violations
-- **[File:Line]**: [Doesn't follow codebase patterns]
+### [Short Title - e.g., "SQL injection risk"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** [Security/performance/pattern issue and its risk]
 
-### Security Concerns
-- **[File:Line]**: [Security issue]
-  - Risk: [What could go wrong]
-
-### Performance Issues
-- **[File:Line]**: [Performance anti-pattern]
-
-### Missing Tests
-- [What's not tested but should be per design]
+### [Short Title - e.g., "N+1 query in user list"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** [Performance anti-pattern]
 
 ## Documentation & Instruction Sync: ❌ STALE / ⚠️ PARTIAL / ✅ CURRENT
 
-### README/Docs Updates Needed
-- **[File:Section]**: [What needs updating]
-  - Code change: [What changed]
-  - Doc impact: [What's now incorrect/missing]
+### [Short Title - e.g., "README setup outdated"]
+**Severity:** [1-10]
+**Location:** [File:Section]
+**Description:** Code changed [what], doc now incorrect about [what]
 
-### Agent/Skill Definition Updates
-- **[File]**: [Agent/skill needs update]
-  - Reason: [Why it's stale]
-
-### Inline Documentation Drift
-- **[File:Line]**: [JSDoc/docstring out of sync]
+### [Short Title - e.g., "Agent definition stale"]
+**Severity:** [1-10]
+**Location:** [.claude/agents/file.md]
+**Description:** Agent definition says X but code now does Y
 
 ## Structural Completeness: ❌ INCOMPLETE / ✅ COMPLETE
 
-### Multi-Layer Gaps
-- **[Layer]**: Change in X but missing corresponding change in Y
-  - Example: New API endpoint but no tests
-  - Example: Database column added but not exposed in API
+### [Short Title - e.g., "API endpoint without tests"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** Multi-layer gap - change in X but missing corresponding change in Y
 
-### Dependency Issues
-- **[package.json:line]**: Unused new dependency added
-- **[package.json:line]**: Dependency for removed feature still present
-
-### Configuration Gaps
-- **[Config file]**: Not updated for new requirements
-  - Example: New env var in code but not in .env.example
-  - Example: Build config references deleted file
+### [Short Title - e.g., "Unused dependency added"]
+**Severity:** [1-10]
+**Location:** [package.json:line]
+**Description:** [Dependency issue]
 
 ## Legacy Code & Technical Debt: ❌ CLEANUP NEEDED / ✅ CLEAN
 
-### Dead Code to Remove
-- **[File:Line]**: [Function/class replaced but not deleted]
-  - Replaced by: [New implementation location]
+### [Short Title - e.g., "Dead validateUserV1 function"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** [Function/class replaced but not deleted. Replaced by: X]
 
-### Orphaned Artifacts
-- **[File:Line]**: [Imports, configs, tests for removed code]
-
-### Refactoring Opportunities
-- **[File:Line]**: [Code that can now be simplified]
-  - Because: [What changed that enables this]
-
-### Stale TODOs/FIXMEs
-- **[File:Line]**: [Hack that can now be resolved]
+### [Short Title - e.g., "Stale TODO resolvable"]
+**Severity:** [1-10]
+**Location:** [File:Line]
+**Description:** [What can now be cleaned up and why]
 
 ## Summary
 
 **Verdict:** REJECT / REQUEST CHANGES / APPROVE
 
-**Must Fix:**
-1. [Critical issue 1]
-2. [Critical issue 2]
+**Issues by Severity:**
+- Severity 7-10: [Count]
+- Severity 4-6: [Count]
+- Severity 1-3: [Count]
 
-**Should Fix:**
-1. [Major issue 1]
-2. [Major issue 2]
+**Top Issues (sorted by severity):**
+1. [Sev X] [Short title] - [File:Line]
+2. [Sev X] [Short title] - [File:Line]
+3. [Sev X] [Short title] - [File:Line]
 
 **Design Doc Alignment:** [Percentage or assessment]
 
 **Overall Assessment:** [Honest, direct evaluation]
 ```
 
-### Severity Levels
+### Severity Scale (1-10)
 
-**Critical (Must Fix):**
-- Violates design decisions
-- Security vulnerabilities
-- Breaks existing functionality
-- Gold-plated features not in scope
-- Disabled test suites covering critical functionality
-- Missing features specified in design
-- Debug code logging sensitive data
-- Empty catch blocks swallowing errors
-- Agent/skill definitions contain incorrect instructions
-- README documents removed/changed features incorrectly
-- Multi-layer changes incomplete (e.g., API without tests, DB change without migration)
+Use numeric severity. The human decides what to act on.
 
-**Major (Should Fix):**
-- Over-engineering
-- AI slop patterns in code
-- Bold bullet epidemic in documentation
-- Pattern violations
-- Missing error handling
-- Disabled individual tests
-- Commented assertions
-- Obvious comments and generic naming
-- Requirements partially implemented
-- CLAUDE.md conventions outdated
-- Dead code from replaced functionality
-- Orphaned imports and unused dependencies
-- New dependencies added but never used
-- Removed features with deps still in package files
-- Configuration files inconsistent across environments
+| Range | Impact | Examples |
+|-------|--------|----------|
+| 9-10 | Critical | Data loss, security vulnerability, cannot function |
+| 7-8 | High | Major functionality broken, significant problems |
+| 5-6 | Moderate | Clear issues, workarounds exist |
+| 3-4 | Low | Minor issues, slight inconvenience |
+| 1-2 | Trivial | Polish, cosmetic, optional improvements |
 
-**Minor (Consider Fixing):**
-- Style inconsistencies
-- Suboptimal naming
-- Missing edge case tests
-- Minor performance issues
-- Overused AI phrases in documentation
-- Minor template rigidity
-- Stale TODOs that could be resolved
-- Refactoring opportunities enabled by changes
-- Inline documentation slightly out of sync
+**Example severity assignments:**
+- Security vulnerability: 10
+- Violates design decisions: 8
+- Gold-plated features not in scope: 7
+- Bold bullet epidemic in documentation: 5
+- Debug code logging sensitive data: 9
+- Configuration files inconsistent: 4
+- Overused AI phrases in docs: 3
 
 ## Git Investigation Techniques
 
@@ -1187,100 +1147,99 @@ The human must now:
 
 ## Design Adherence: ❌ FAIL
 
-### Critical Discrepancies
-- **auth/middleware.ts:45**: JWT validation not following design spec
-  - Design specifies: RS256 with key rotation per security section
-  - Implementation does: HS256 with static secret
-  - Impact: Security vulnerability, doesn't meet compliance requirements
+### JWT using wrong algorithm
+**Severity:** 9
+**Location:** auth/middleware.ts:45
+**Description:** JWT validation not following design spec
+- Design specifies: RS256 with key rotation per security section
+- Implementation does: HS256 with static secret
+- Impact: Security vulnerability, doesn't meet compliance requirements
 
-- **auth/routes.ts:12-18**: Missing rate limiting
-  - Design section 3.2 specifies: 5 attempts per minute
-  - Implementation: No rate limiting present
-  - Impact: Vulnerability to brute force attacks
+### Missing rate limiting
+**Severity:** 8
+**Location:** auth/routes.ts:12-18
+**Description:** Design section 3.2 specifies 5 attempts per minute, not implemented
+- Impact: Vulnerability to brute force attacks
 
 ## Over-Engineering: ❌ DETECTED
 
-### Unnecessary Abstractions
-- **auth/providers/abstract-provider.ts**: Abstract provider factory pattern
-  - Problem: Single provider implementation (LocalProvider)
-  - Design says: "Implement local authentication only"
-  - This adds 3 files and 200 lines for no current benefit
+### Abstract provider for single implementation
+**Severity:** 6
+**Location:** auth/providers/abstract-provider.ts
+**Description:** Abstract factory pattern with only LocalProvider
+- Design says: "Implement local authentication only"
+- This adds 3 files and 200 lines for no current benefit
 
-### YAGNI Violations
-- **auth/config.ts:23-45**: OAuth provider configuration
-  - Not in Phase 1 design scope
-  - Adds complexity for future that may never come
+### OAuth config not in scope
+**Severity:** 5
+**Location:** auth/config.ts:23-45
+**Description:** OAuth provider configuration not in Phase 1 design scope
 
 ## Test Suite Integrity: ❌ FAIL
 
-### Disabled Tests
-- **auth/login.test.ts:45**: `describe.skip('Rate limiting tests', ...)`
-  - Impact: Critical security feature not tested
+### Rate limiting tests disabled
+**Severity:** 8
+**Location:** auth/login.test.ts:45
+**Description:** `describe.skip('Rate limiting tests', ...)` - critical security feature not tested
 
-### Commented Assertions
-- **auth/middleware.test.ts:67-71**: 5 commented expect() statements
-  - Impact: Test provides false confidence in JWT validation
+### JWT assertions commented out
+**Severity:** 7
+**Location:** auth/middleware.test.ts:67-71
+**Description:** 5 commented expect() statements - test provides false confidence
 
-### Debug Code
-- **auth/service.ts:89**: `console.log('password:', user.password)`
-  - Risk: Security - logging credentials!
+### Password logged in debug
+**Severity:** 10
+**Location:** auth/service.ts:89
+**Description:** `console.log('password:', user.password)` - logging credentials!
 
 ## AI Slop: ❌ DETECTED
 
-### Code AI Slop
+### Generic naming in helpers
+**Severity:** 4
+**Location:** auth/helpers.ts:15,23,31
+**Description:** `result`, `data`, `handler` - variables need meaningful names
 
-#### Generic Naming
-- **auth/helpers.ts:15**: `const result = await validateUser()`
-- **auth/helpers.ts:23**: `const data = processLoginData()`
-- **auth/helpers.ts:31**: `const handler = createHandler()`
+### Obvious comments
+**Severity:** 3
+**Location:** auth/middleware.ts:12,18
+**Description:** Comments like "Check if user exists" before `if (user)`
 
-#### Obvious Comments
-- **auth/middleware.ts:12**: `// Check if user exists` before `if (user)`
-- **auth/middleware.ts:18**: `// Return error` before `return error`
+### Bold bullet epidemic in README
+**Severity:** 5
+**Location:** README.md - 23 instances
+**Description:** "**Term:** Description" pattern makes documentation feel robotic
 
-#### Over-Defensive Code
-- **auth/service.ts:45-52**: Try-catch around simple object property access
-
-### Documentation AI Slop
-
-#### Bold Bullet Epidemic
-- **README.md**: 23 instances of "**Term:** Description" pattern
-- **Example**:
-  - **Authentication:** Provides secure user login
-  - **Validation:** Ensures data integrity
-- **Impact**: Documentation reads like AI-generated template
-
-#### Overused AI Phrases
-- **docs/architecture.md**: "Furthermore" (4x), "Robust" (6x), "Leverage" (3x)
+### Overused AI phrases
+**Severity:** 3
+**Location:** docs/architecture.md
+**Description:** "Furthermore" (4x), "Robust" (6x), "Leverage" (3x)
 
 ## Requirements Gap Analysis
 
-### Missing Features
-- **Rate Limiting**: Design section 3.2 specifies 5 attempts per minute - not implemented
-- **Design Reference**: Security Requirements, Section 3.2
+### Rate limiting not implemented
+**Severity:** 8
+**Location:** Security Requirements, Section 3.2
+**Description:** Design specifies 5 attempts per minute - completely missing
 
 ## Summary
 
 **Verdict:** REJECT
 
-**Must Fix:**
-1. Implement JWT validation per design spec (RS256 + rotation)
-2. Add rate limiting as specified in design
-3. Remove OAuth configuration (not in scope)
-4. Re-enable rate limiting tests and fix them
-5. Remove password logging from auth service
+**Issues by Severity:**
+- Severity 7-10: 6
+- Severity 4-6: 4
+- Severity 1-3: 2
 
-**Should Fix:**
-1. Remove abstract provider pattern (over-engineered)
-2. Rename generic variables (result, data, handler)
-3. Remove obvious comments
-4. Uncomment and fix test assertions in middleware tests
-5. Refactor README.md to remove bold bullet pattern
-6. Remove "Furthermore/Robust/Leverage" from documentation
+**Top Issues (sorted by severity):**
+1. [Sev 10] Password logged in debug - auth/service.ts:89
+2. [Sev 9] JWT using wrong algorithm - auth/middleware.ts:45
+3. [Sev 8] Missing rate limiting - auth/routes.ts:12-18
+4. [Sev 8] Rate limiting tests disabled - auth/login.test.ts:45
+5. [Sev 8] Rate limiting not implemented - design section 3.2
 
 **Design Doc Alignment:** 60% - Major security deviations
 
-**Overall Assessment:** Implementation deviates significantly from approved design, particularly on security requirements. Over-engineered with abstractions not justified by current requirements. Test suite has been neutered with skipped tests and commented assertions. Documentation shows heavy AI-generation patterns. Contains multiple AI slop patterns in both code and docs that reduce quality.
+**Overall Assessment:** Implementation deviates significantly from approved design, particularly on security requirements. Over-engineered with abstractions not justified by current requirements. Test suite has been neutered with skipped tests and commented assertions. Contains multiple AI slop patterns in both code and docs.
 ```
 
 ### Bad Review (Don't Do This)

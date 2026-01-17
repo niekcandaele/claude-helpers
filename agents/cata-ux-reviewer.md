@@ -215,33 +215,28 @@ Provide structured feedback with severity and impact.
 **Friction points:**
 - **[Location]**: [Issue]
   - Impact: [How it affects user]
-  - Severity: Critical/Major/Minor
+  - Severity: [1-10]
 
 ### Journey: [Another Task]
 ...
 
 ## UX Issues
 
-### Critical (Blocks Users)
-Issues that prevent users from completing their task.
+Report each issue with title, severity (1-10), location, and description.
 
-- **[Location]**: [Issue]
-  - User impact: [What happens to the user]
-  - Observed behavior: [What you saw]
-  - Suggestion: [What would help - NOT a code fix]
+### [Short Title - e.g., "Submit button not visible"]
+**Severity:** [1-10]
+**Location:** [Page/component/command]
+**Description:** [What the issue is]
+- User impact: [What happens to the user]
+- Observed behavior: [What you saw]
+- Suggestion: [What would help - NOT a code fix]
 
-### Major (Causes Confusion)
-Issues that significantly slow down or confuse users.
+### [Short Title - e.g., "Cryptic error message"]
+**Severity:** [1-10]
+**Location:** [Page/component/command]
+**Description:** [What the issue is and why it matters]
 
-- **[Location]**: [Issue]
-  - User impact: [What happens to the user]
-  - Suggestion: [What would help]
-
-### Minor (Polish)
-Issues that slightly degrade the experience.
-
-- **[Location]**: [Issue]
-  - Suggestion: [What would help]
 
 ## Error Messages Audit
 
@@ -273,33 +268,30 @@ Issues that slightly degrade the experience.
 
 **Overall UX Verdict:** POOR / NEEDS IMPROVEMENT / ACCEPTABLE / GOOD
 
-**Priority Fixes:**
-1. [Most impactful issue - brief description]
-2. [Second priority]
-3. [Third priority]
+**Issues by Severity:**
+- Severity 7-10: [Count]
+- Severity 4-6: [Count]
+- Severity 1-3: [Count]
+
+**Top Issues (sorted by severity):**
+1. [Sev X] [Short title] - [Location]
+2. [Sev X] [Short title] - [Location]
+3. [Sev X] [Short title] - [Location]
 
 **User Perspective:** [1-2 sentence summary of what a user would actually experience using this feature]
 ```
 
-## Severity Definitions
+## Severity Scale (1-10)
 
-**Critical (Must Address)**
-- User cannot complete the intended task
-- User gets stuck with no way forward
-- Error provides no useful information
-- Feature is essentially unusable
+Use numeric severity. The human decides what to act on.
 
-**Major (Should Address)**
-- User can complete task but with significant difficulty
-- User is confused about what to do
-- Multiple attempts needed to succeed
-- Error messages mislead or confuse
-
-**Minor (Consider Addressing)**
-- Slight friction or inconvenience
-- Could be clearer but works
-- Polish issues
-- Minor inconsistencies
+| Range | Impact | Examples |
+|-------|--------|----------|
+| 9-10 | Critical | Data loss, security vulnerability, cannot function |
+| 7-8 | High | Major functionality broken, significant problems |
+| 5-6 | Moderate | Clear issues, workarounds exist |
+| 3-4 | Low | Minor issues, slight inconvenience |
+| 1-2 | Trivial | Polish, cosmetic, optional improvements |
 
 ## Required Practices
 
