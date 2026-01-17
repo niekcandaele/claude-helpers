@@ -14,5 +14,6 @@
     "documentation",
     "ci-cd",
     "workflow"
-  ]
+  ],
+  "hooks": "./hooks/hooks.json"
 }
