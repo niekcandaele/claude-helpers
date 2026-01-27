@@ -111,7 +111,9 @@ git diff --cached -- <scoped-files>
    - If BLOCKED with LOGIN_REQUIRED or UNCLEAR_FEATURE: Ask user for help, retry
 4. **Debug Analysis (if failures):** If cata-tester OR cata-ux-reviewer OR cata-exerciser failed, launch cata-debugger for root cause analysis
 5. **Generate Unified Report:** Combine all agent findings with clear verdict
-6. **STOP:** Present report and wait for human decision
+6. **Present Report:** Display full report with issues table
+7. **Interactive Issue Triage:** Walk through EVERY issue one-by-one using AskUserQuestion with specific fix proposals
+8. **Execute Approved Fixes:** Apply all user-approved fixes sequentially, then STOP
 
 ## CRITICAL: No Hiding Issues
 
@@ -525,7 +527,7 @@ Issues are assigned **VI-{n}** IDs (Verification Issue) for easy reference durin
 
 ---
 
-STOP - Awaiting human decision.
+Proceeding to interactive triage for all N issues...
 ```
 
 ## Issue Deduplication
@@ -561,6 +563,133 @@ Agent findings:
 Merged into:
 | VI-1 | 8 | Unhandled auth error | reviewer, tester, ux | Missing error handling causes test failure and cryptic user-facing error |
 ```
+
+## Interactive Issue Triage
+
+After presenting the report, walk through EVERY issue one-by-one with the user using `AskUserQuestion`. This replaces the old "STOP and wait" behavior with an interactive decision flow.
+
+### Triage Scope
+
+- Include ALL issues — every single one, regardless of severity
+- Present issues in descending severity order (most severe first)
+- If zero issues found, skip triage entirely and STOP after presenting the report
+
+### One Issue Per Question
+
+Each `AskUserQuestion` call has exactly 1 question about exactly 1 issue. Never batch multiple issues into one question. This gives the user full focus and context for each decision.
+
+### Fix Proposal Generation
+
+For each issue, before presenting it to the user:
+
+1. **Read the source file and line** referenced in the issue to understand the actual code
+2. **Generate 2-3 specific, actionable fix proposals** — not generic advice
+3. **Always include "Skip" as the last option**
+4. Fix descriptions must reference the exact file and line
+5. Proposals should be concrete enough to execute immediately
+
+**Good fix proposals:**
+- "Add try-catch around `fetchUser()` in auth.ts:45, return 401 with clear error message"
+- "Add `WHERE tenant_id = $1` to query in db.ts:89 to enforce tenant isolation"
+- "Replace `innerHTML` with `textContent` in render.ts:23 to prevent XSS"
+
+**Bad fix proposals (too generic):**
+- "Add error handling"
+- "Fix the security issue"
+- "Improve validation"
+
+### AskUserQuestion Format
+
+For each issue, use this format:
+
+```
+AskUserQuestion:
+  questions:
+    - header: "VI-{n}"
+      question: "{Title} — {Description with context}. Found at {file:line} by: {source agents} (severity {N})"
+      multiSelect: false
+      options:
+        - label: "{Fix option 1 — short name}"
+          description: "{Specific action with exact file and line reference}"
+        - label: "{Fix option 2 — short name}"
+          description: "{Alternative specific action with exact file and line reference}"
+        - label: "Skip"
+          description: "Accept this issue — will not fix in this change set"
+```
+
+### Example Triage Question
+
+```
+AskUserQuestion:
+  questions:
+    - header: "VI-1"
+      question: "Unhandled auth error — Missing error handling in fetchUser() causes unhandled exception and cryptic user-facing error. Found at src/auth/login.ts:45 by: reviewer, tester, ux (severity 9)"
+      multiSelect: false
+      options:
+        - label: "Add try-catch"
+          description: "Wrap fetchUser() call in try-catch at auth.ts:45, return 401 with clear error message"
+        - label: "Add validation"
+          description: "Add input validation before fetchUser() call to reject malformed credentials early"
+        - label: "Skip"
+          description: "Accept this issue — will not fix in this change set"
+```
+
+### Handling "Other" Responses
+
+- If the user types custom text via the "Other" option, treat it as their specific instruction for fixing that issue
+- If the user says "stop", "done", or "skip the rest", end triage early and skip all remaining issues
+
+## Triage Decision Summary + Execution
+
+After all issues have been triaged (or triage ended early):
+
+### 1. Present Decision Summary
+
+Show a table summarizing all decisions:
+
+```markdown
+## Triage Decisions
+
+| ID | Sev | Title | Decision |
+|----|-----|-------|----------|
+| VI-1 | 9 | Unhandled auth error | FIX: Add try-catch |
+| VI-2 | 7 | SQL injection risk | SKIP |
+| VI-3 | 5 | Missing test coverage | FIX: Add unit test |
+| VI-4 | 2 | Minor typo in comment | SKIP |
+
+**Fixes to apply: 2 | Skipped: 2**
+```
+
+### 2. Execute Approved Fixes
+
+Apply all chosen fixes sequentially in severity order (highest severity first):
+
+For each fix:
+1. Read the target file to get current content
+2. Apply the specific change the user approved
+3. Verify the file still has valid syntax (no broken code)
+4. Show what was changed (brief diff or summary)
+
+### 3. Completion Summary
+
+After all fixes are applied:
+
+```markdown
+## Fixes Applied
+
+| File | Change |
+|------|--------|
+| src/auth/login.ts | Added try-catch around fetchUser() at line 45 |
+| tests/auth/login.test.ts | Added unit test for auth error handling |
+
+**Suggest:** Re-run `/verify` to confirm fixes are clean.
+```
+
+**After showing the completion summary, STOP.**
+
+- DO NOT automatically re-run `/verify` (this avoids infinite loops)
+- DO NOT proceed to commit
+- Let the user decide next steps
 
 ## Execution Steps
 
@@ -622,10 +751,23 @@ Merged into:
    - Make blockers impossible to miss
    - Clearly indicate what was IN scope vs excluded
 
-10. **STOP and present:**
-    - Display the report
-    - Wait for human decision
-    - DO NOT proceed to any next steps automatically
+10. **Present report:**
+    - Display the full verification report
+
+11. **Interactive issue triage (if issues exist):**
+    - If zero issues, skip triage and STOP
+    - Walk through EVERY issue one-by-one using AskUserQuestion
+    - Present in descending severity order
+    - For each issue: read source file, generate 2-3 specific fix proposals + Skip
+    - Record user decisions
+
+12. **Execute approved fixes:**
+    - Show triage decision summary table
+    - Apply all user-approved fixes sequentially (highest severity first)
+    - For each fix: read file, apply change, verify syntax, show what changed
+    - Show completion summary with files modified
+    - Suggest re-running `/verify` to confirm fixes are clean
+    - STOP — do not auto-re-run verify or proceed to commit
 
 ## Important Notes
 
@@ -633,28 +775,39 @@ Merged into:
 - **Include scope in ALL agent prompts** - Critical for focused reviews
 - **Run initial agents in parallel** - Use single message with multiple Task tool calls
 - **Run exerciser after initial agents** - Sequential to avoid resource conflicts
-- **Never auto-proceed** - Always stop after presenting report
+- **Never auto-proceed** - Always stop after triage + fix execution (or after report if no issues)
 - **Be honest** - Surface all issues, don't minimize or hide
 - **Assume tests work** - Any test issue is a bug, not an excuse
 - **Exercise failures are blockers** - Can't verify if can't exercise
 - **Default to focused scope** - Auto-detect changed files unless --scope=all specified
 - **Make scope visible** - Always show what was verified in the report
+- **Interactive triage** - Walk through EVERY issue with user one-by-one, propose specific fixes
+- **One issue per question** - Never batch multiple issues into one AskUserQuestion call
+- **Fix proposals must be specific** - Reference exact file and line, not generic advice
 
 ## After Verification - MANDATORY STOP
 
-**🛑 After presenting the unified report, you MUST STOP COMPLETELY.**
+**After completing the triage + fix execution flow (or presenting the report if no issues), you MUST STOP.**
+
+**If issues exist:**
+1. Present the full report
+2. Run interactive triage (one AskUserQuestion per issue)
+3. Execute all user-approved fixes
+4. Show completion summary
+5. STOP
+
+**If no issues exist:**
+1. Present the full report
+2. STOP
 
 DO NOT:
-- ❌ Fix any issues found
-- ❌ Re-run failed tests
-- ❌ Proceed to commit
-- ❌ Continue to next steps
-- ❌ Act on agent findings
+- Re-run `/verify` automatically after applying fixes (avoids infinite loops)
+- Proceed to commit
+- Continue to any next steps without explicit instruction
 
 DO:
-- ✅ Present the complete report
-- ✅ Wait for human to review
-- ✅ Wait for explicit instructions
-- ✅ Answer clarifying questions if asked
-
-**The verification report is FOR HUMAN DECISION-MAKING ONLY.**
+- Present the complete report
+- Run interactive triage for every issue
+- Execute approved fixes
+- Suggest the user re-runs `/verify` to confirm fixes are clean
+- Wait for explicit instructions after completion
