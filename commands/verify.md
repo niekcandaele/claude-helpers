@@ -112,7 +112,7 @@ git diff --cached -- <scoped-files>
 4. **Debug Analysis (if failures):** If cata-tester OR cata-ux-reviewer OR cata-exerciser failed, launch cata-debugger for root cause analysis
 5. **Generate Unified Report:** Combine all agent findings with clear verdict
 6. **Present Report:** Display full report with issues table
-7. **Interactive Issue Triage:** Walk through EVERY issue one-by-one using AskUserQuestion with specific fix proposals
+7. **Interactive Issue Triage:** Present ALL issues in batches of 4 using AskUserQuestion with specific fix proposals
 8. **Execute Approved Fixes:** Apply all user-approved fixes sequentially, then STOP
 
 ## CRITICAL: No Hiding Issues
@@ -566,7 +566,7 @@ Merged into:
 
 ## Interactive Issue Triage
 
-After presenting the report, walk through EVERY issue one-by-one with the user using `AskUserQuestion`. This replaces the old "STOP and wait" behavior with an interactive decision flow.
+After presenting the report, present ALL issues to the user in batches of up to 4 using `AskUserQuestion`. This replaces the old "STOP and wait" behavior with an interactive decision flow.
 
 ### Triage Scope
 
@@ -574,9 +574,33 @@ After presenting the report, walk through EVERY issue one-by-one with the user u
 - Present issues in descending severity order (most severe first)
 - If zero issues found, skip triage entirely and STOP after presenting the report
 
-### One Issue Per Question
+### Batch Issues Together
 
-Each `AskUserQuestion` call has exactly 1 question about exactly 1 issue. Never batch multiple issues into one question. This gives the user full focus and context for each decision.
+Batch up to 4 issues into each `AskUserQuestion` call to minimize waiting between decisions (4 is the maximum supported by the AskUserQuestion tool). If there are more than 4 issues, make multiple calls with 4 issues each. For example, if 10 issues exist, present 3 batches: 4, 4, and 2.
+
+After the user responds to one batch, the next batch is presented automatically until all issues have been triaged.
+
+### NEVER Skip Issues
+
+**This is a critical requirement. DO NOT BE LAZY.**
+
+You MUST present EVERY SINGLE ISSUE to the user for triage, regardless of:
+- How many issues there are (even if 20, 30, or more)
+- How low the severity is (trivial issues still need user decision)
+- How tedious it feels to keep asking
+
+**Violations:**
+- "Let's skip the remaining low-severity issues" — WRONG
+- "The rest are minor, I'll skip them" — WRONG
+- Showing 5 issues when there are 20 — WRONG
+- Any form of deciding FOR the user what to skip — WRONG
+
+**Correct behavior:**
+- Present ALL issues in batches of 4 until every single one has been triaged
+- Continue through ALL batches until the list is exhausted
+- Only stop early if the USER explicitly says "stop", "done", or "skip the rest"
+
+The user decides what to skip, not you.
 
 ### Fix Proposal Generation
 
@@ -600,12 +624,12 @@ For each issue, before presenting it to the user:
 
 ### AskUserQuestion Format
 
-For each issue, use this format:
+Batch up to 4 issues per call. For each batch, use this format:
 
 ```
 AskUserQuestion:
   questions:
-    - header: "VI-{n}"
+    - header: "VI-1"
       question: "{Title} — {Description with context}. Found at {file:line} by: {source agents} (severity {N})"
       multiSelect: false
       options:
@@ -615,9 +639,12 @@ AskUserQuestion:
           description: "{Alternative specific action with exact file and line reference}"
         - label: "Skip"
           description: "Accept this issue — will not fix in this change set"
+    # Repeat same pattern for VI-2, VI-3, VI-4 (up to 4 questions per batch)
 ```
 
-### Example Triage Question
+If there are more than 4 issues, make another `AskUserQuestion` call for the next batch.
+
+### Example Triage Questions (full batch of 4)
 
 ```
 AskUserQuestion:
@@ -630,6 +657,30 @@ AskUserQuestion:
           description: "Wrap fetchUser() call in try-catch at auth.ts:45, return 401 with clear error message"
         - label: "Add validation"
           description: "Add input validation before fetchUser() call to reject malformed credentials early"
+        - label: "Skip"
+          description: "Accept this issue — will not fix in this change set"
+    - header: "VI-2"
+      question: "SQL injection risk — User input passed directly to query without sanitization. Found at src/db/users.ts:89 by: security (severity 8)"
+      multiSelect: false
+      options:
+        - label: "Use parameterized query"
+          description: "Replace string concatenation with parameterized query at db/users.ts:89"
+        - label: "Skip"
+          description: "Accept this issue — will not fix in this change set"
+    - header: "VI-3"
+      question: "Missing test coverage — New auth flow has no unit tests. Found at src/auth/ by: reviewer (severity 5)"
+      multiSelect: false
+      options:
+        - label: "Add unit tests"
+          description: "Create tests/auth/login.test.ts with tests for success and error cases"
+        - label: "Skip"
+          description: "Accept this issue — will not fix in this change set"
+    - header: "VI-4"
+      question: "Inconsistent naming — Variable uses camelCase but codebase convention is snake_case. Found at src/utils/helpers.ts:23 by: coherence (severity 2)"
+      multiSelect: false
+      options:
+        - label: "Rename to snake_case"
+          description: "Rename userName to user_name at helpers.ts:23"
         - label: "Skip"
           description: "Accept this issue — will not fix in this change set"
 ```
@@ -756,10 +807,12 @@ After all fixes are applied:
 
 11. **Interactive issue triage (if issues exist):**
     - If zero issues, skip triage and STOP
-    - Walk through EVERY issue one-by-one using AskUserQuestion
+    - Batch ALL issues into groups of up to 4 per AskUserQuestion call
     - Present in descending severity order
     - For each issue: read source file, generate 2-3 specific fix proposals + Skip
     - Record user decisions
+    - **CRITICAL: Continue through ALL batches until EVERY issue is triaged**
+    - Only stop early if user explicitly says "stop", "done", or "skip the rest"
 
 12. **Execute approved fixes:**
     - Show triage decision summary table
@@ -781,8 +834,9 @@ After all fixes are applied:
 - **Exercise failures are blockers** - Can't verify if can't exercise
 - **Default to focused scope** - Auto-detect changed files unless --scope=all specified
 - **Make scope visible** - Always show what was verified in the report
-- **Interactive triage** - Walk through EVERY issue with user one-by-one, propose specific fixes
-- **One issue per question** - Never batch multiple issues into one AskUserQuestion call
+- **Interactive triage** - Present ALL issues to user in batches, propose specific fixes for each
+- **Batch issues** - Group up to 4 issues per AskUserQuestion call to reduce wait time
+- **Never skip issues** - Present EVERY issue to the user; only stop if user explicitly says "stop" or "skip the rest"
 - **Fix proposals must be specific** - Reference exact file and line, not generic advice
 
 ## After Verification - MANDATORY STOP
@@ -791,7 +845,7 @@ After all fixes are applied:
 
 **If issues exist:**
 1. Present the full report
-2. Run interactive triage (one AskUserQuestion per issue)
+2. Run interactive triage (batches of up to 4 issues per AskUserQuestion)
 3. Execute all user-approved fixes
 4. Show completion summary
 5. STOP
