@@ -1,6 +1,6 @@
 ---
 description: Run comprehensive verification with multiple agents (reviewer, tester, UX, coherence)
-allowed-tools: Read, Bash, Grep, Glob, Task, TodoWrite, AskUserQuestion
+allowed-tools: Read, Bash, Grep, Glob, Task, TodoWrite, AskUserQuestion, EnterPlanMode, ExitPlanMode
 ---
 
 # Verify Changes
@@ -113,7 +113,8 @@ git diff --cached -- <scoped-files>
 5. **Generate Unified Report:** Combine all agent findings with clear verdict
 6. **Present Report:** Display full report with issues table
 7. **Interactive Issue Triage:** Present ALL issues in batches of 4 using AskUserQuestion with specific fix proposals
-8. **Execute Approved Fixes:** Apply all user-approved fixes sequentially, then STOP
+8. **Plan Approved Fixes:** Enter plan mode, analyze all approved fixes holistically, write implementation plan to plan file, present for approval via ExitPlanMode
+9. **Execute Planned Fixes:** Execute fixes according to the approved plan, then STOP
 
 ## CRITICAL: No Hiding Issues
 
@@ -711,17 +712,38 @@ Show a table summarizing all decisions:
 **Fixes to apply: 2 | Skipped: 2**
 ```
 
-### 2. Execute Approved Fixes
+### 2. Planning Phase
 
-Apply all chosen fixes sequentially in severity order (highest severity first):
+After showing the triage summary, if there are fixes to apply:
 
-For each fix:
+- **2a. Enter Plan Mode**: Call `EnterPlanMode` to transition into planning. This restricts you to read-only operations and writing the plan file — which is exactly what you need to research and plan without accidentally modifying code.
+- **2b. Research & Analyze**: Read ALL affected files in full (not just target lines). Identify dependencies between fixes — same file, related logic, prerequisite ordering, potential conflicts. Group related fixes that should be applied together.
+- **2c. Write Plan File**: Write a coherent implementation plan to the plan file. The plan must include:
+  - Overall analysis (what files are affected, what the fixes accomplish together)
+  - Execution order with rationale for ordering
+  - For each fix: exact file, line, what changes, and the user's chosen fix option verbatim
+  - Dependencies between steps (e.g., "step 2 depends on step 1 because both modify auth.ts")
+  - Risks and notes (potential conflicts, line number shifts, etc.)
+- **2d. Present for Approval**: Call `ExitPlanMode` to present the plan for user approval. The user can approve, request changes, or cancel.
+
+**IMPORTANT — Do NOT get confused by plan mode.** Plan mode is intentional here. You are deliberately entering plan mode to write a careful implementation plan. This is NOT an error or unexpected state. The verify command explicitly tells you to do this. Read files, analyze, write the plan, and call ExitPlanMode. That's the workflow.
+
+### 3. Execute Planned Fixes
+
+After plan approval, execute fixes according to the approved plan:
+
+For each fix in the planned order:
 1. Read the target file to get current content
-2. Apply the specific change the user approved
-3. Verify the file still has valid syntax (no broken code)
+2. Apply the specific change from the plan
+3. Verify the file still has valid syntax
 4. Show what was changed (brief diff or summary)
 
-### 3. Completion Summary
+If a fix fails or produces invalid code:
+- Report the failure clearly
+- Continue with remaining independent fixes (those not dependent on the failed one)
+- Include the failure in the completion summary
+
+### 4. Completion Summary
 
 After all fixes are applied:
 
@@ -814,10 +836,18 @@ After all fixes are applied:
     - **CRITICAL: Continue through ALL batches until EVERY issue is triaged**
     - Only stop early if user explicitly says "stop", "done", or "skip the rest"
 
-12. **Execute approved fixes:**
+12. **Plan approved fixes:**
     - Show triage decision summary table
-    - Apply all user-approved fixes sequentially (highest severity first)
+    - Call `EnterPlanMode` to transition into planning
+    - Read ALL affected files in full to understand context
+    - Analyze dependencies between fixes (same file, related logic, ordering)
+    - Write implementation plan to plan file with execution order, rationale, and risks
+    - Call `ExitPlanMode` to present the plan for user approval
+
+13. **Execute planned fixes:**
+    - Follow the approved plan, applying changes in the planned order
     - For each fix: read file, apply change, verify syntax, show what changed
+    - If a fix fails, report it and continue with independent fixes
     - Show completion summary with files modified
     - Suggest re-running `/verify` to confirm fixes are clean
     - STOP — do not auto-re-run verify or proceed to commit
@@ -838,6 +868,9 @@ After all fixes are applied:
 - **Batch issues** - Group up to 4 issues per AskUserQuestion call to reduce wait time
 - **Never skip issues** - Present EVERY issue to the user; only stop if user explicitly says "stop" or "skip the rest"
 - **Fix proposals must be specific** - Reference exact file and line, not generic advice
+- **Plan before executing** - Enter plan mode after triage to analyze all fixes holistically before applying any
+- **Approval gate before execution** - Use ExitPlanMode to present the plan; never start applying fixes without user approval
+- **Plan mode is intentional** - The verify command deliberately uses EnterPlanMode after triage. Do not treat this as an error or get confused by the mode switch
 
 ## After Verification - MANDATORY STOP
 
@@ -846,9 +879,12 @@ After all fixes are applied:
 **If issues exist:**
 1. Present the full report
 2. Run interactive triage (batches of up to 4 issues per AskUserQuestion)
-3. Execute all user-approved fixes
-4. Show completion summary
-5. STOP
+3. Call `EnterPlanMode` to research and plan all approved fixes
+4. Write implementation plan to plan file
+5. Call `ExitPlanMode` to present plan for user approval
+6. Execute fixes according to the approved plan
+7. Show completion summary
+8. STOP
 
 **If no issues exist:**
 1. Present the full report
@@ -858,10 +894,14 @@ DO NOT:
 - Re-run `/verify` automatically after applying fixes (avoids infinite loops)
 - Proceed to commit
 - Continue to any next steps without explicit instruction
+- Start applying fixes without entering plan mode and getting plan approval
 
 DO:
 - Present the complete report
 - Run interactive triage for every issue
-- Execute approved fixes
+- Enter plan mode after triage to analyze all fixes holistically
+- Write implementation plan to plan file
+- Present plan via ExitPlanMode for user approval
+- Execute approved fixes only after plan approval
 - Suggest the user re-runs `/verify` to confirm fixes are clean
 - Wait for explicit instructions after completion
