@@ -608,14 +608,8 @@ This command works well with the existing workflow:
 # After a meeting discussing a new feature:
 /create-issue meetings/feature-planning.md
 
-# Then create a design for the feature:
-/cata-proj:design [feature-name]
-
-# Generate implementation tasks:
-/cata-proj:tasks docs/design/*/design.md
-
-# Execute the implementation:
-/cata-proj:execute [feature-name]
+# Autonomously execute plan, verify, create PR, and pass CI:
+/ralph-execute
 
 # Create a PR when done:
 /create-pr

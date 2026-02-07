@@ -89,19 +89,7 @@ Specialized agents for specific review and analysis tasks (all follow "Report, N
 | `/catchup` | Summarize branch changes |
 | `/handoff` | Document progress for session continuity |
 | `/rebase` | Rebase branch onto target with conflict guidance |
-
-### Project Commands (`cata-proj:*`)
-
-Structured feature development workflow:
-
-| Command | Purpose |
-|---------|---------|
-| `/cata-proj:design` | Create technical design documents |
-| `/cata-proj:tasks` | Generate implementation tasks from design |
-| `/cata-proj:execute` | Execute tasks phase-by-phase with verification |
-| `/cata-proj:ralph-execute` | Autonomous full-cycle: execute plan, verify, PR, CI |
-| `/cata-proj:demo` | Run demo of completed phase |
-| `/cata-proj:pr-review` | Extract and categorize PR feedback |
+| `/ralph-execute` | Autonomous full-cycle: execute plan, verify, PR, CI |
 
 ## Commands
 
@@ -231,22 +219,10 @@ Document current work state for session continuity.
 # 1. Create issues from meeting notes
 /create-issue meetings/sprint-planning.md
 
-# 2. Design the feature
-/cata-proj:design "Add shopping cart functionality"
+# 2. Autonomously execute plan, verify, create PR, and pass CI
+/ralph-execute
 
-# 3. Generate tasks from design
-/cata-proj:tasks docs/design/shopping-cart/design.md
-
-# 4. Execute tasks with verification
-/cata-proj:execute docs/design/shopping-cart/tasks.md
-
-# 5. Commit and push
-/commit-and-push
-
-# 6. Create a pull request
-/create-pr "Add shopping cart functionality"
-
-# 7. Monitor CI and fix failures
+# 3. Monitor CI and fix failures
 /check-ci
 ```
 
