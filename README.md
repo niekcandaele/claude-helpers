@@ -99,6 +99,7 @@ Structured feature development workflow:
 | `/cata-proj:design` | Create technical design documents |
 | `/cata-proj:tasks` | Generate implementation tasks from design |
 | `/cata-proj:execute` | Execute tasks phase-by-phase with verification |
+| `/cata-proj:ralph-execute` | Autonomous full-cycle: execute plan, verify, PR, CI |
 | `/cata-proj:demo` | Run demo of completed phase |
 | `/cata-proj:pr-review` | Extract and categorize PR feedback |
 
