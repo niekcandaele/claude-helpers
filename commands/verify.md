@@ -107,6 +107,7 @@ git diff --cached -- <scoped-files>
    - `cata-ux-reviewer`: Test user-facing changes (unless `--skip-ux` or clearly backend-only)
    - `cata-coherence`: Check if changes fit in the codebase (reinvented wheels, pattern violations, stale docs/AI tooling)
    - `cata-security`: Security vulnerability detection (unless `--skip-security`)
+   - `cata-coderabbit`: **Mandatory** CodeRabbit CLI automated analysis (cannot be skipped)
 3. **Manual Exercise (cata-exerciser):** Start the app and exercise the feature end-to-end
    - If BLOCKED with LOGIN_REQUIRED or UNCLEAR_FEATURE: Ask user for help, retry
 4. **Debug Analysis (if failures):** If cata-tester OR cata-ux-reviewer OR cata-exerciser failed, launch cata-debugger for root cause analysis
@@ -318,16 +319,41 @@ Task tool with:
   - Location (file:line)
   - Category (Injection/Auth/Multi-Tenant/Data Exposure/Web Security/Crypto/Config)
   - Description (what the vulnerability is and attack vector)"
+
+# Agent 6: CodeRabbit Analysis (MANDATORY — cannot be skipped)
+Task tool with:
+- subagent_type: "cata-coderabbit"
+- description: "Run CodeRabbit CLI automated analysis"
+- prompt: "VERIFICATION SCOPE:
+  Files in scope:
+  [Insert scope list here]
+
+  CRITICAL SCOPE CONSTRAINTS:
+  - Run CodeRabbit CLI analysis on the scoped changes
+  - Report all findings with severity ratings
+  - If CodeRabbit is not installed or authenticated, report as SEV10
+
+  Run CodeRabbit CLI review on the changes in scope.
+  Check installation and authentication first — if either fails, report SEV10 immediately.
+  Use full output mode (NO --prompt-only flag).
+  Wait for completion — do NOT run in background or abort early.
+
+  OUTPUT FORMAT: For each issue found, provide:
+  - Title (short description)
+  - Severity (1-10, where 1=trivial, 10=critical)
+  - Location (file:line)
+  - Category (Bug Risk / Security / Performance / Code Quality / Style)
+  - Description (full CodeRabbit reasoning with context)"
 ```
 
 **Important:** Replace `[Insert scope list here]` with the actual scope determined in step 1.
 
 ## Conditional Debug Analysis
 
-**After the initial 5 agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
+**After the initial 6 agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
 
 ```
-# Agent 6: Debug Analysis (conditional)
+# Agent 7: Debug Analysis (conditional)
 Task tool with:
 - subagent_type: "cata-debugger"
 - description: "Analyze test/UX failures in scope"
@@ -357,7 +383,7 @@ Only launch this agent if there are actual failures to analyze. Skip if all test
 
 ## Manual Exercise Testing (cata-exerciser)
 
-After the initial 5 agents complete, launch `cata-exerciser` to actually run and test the application.
+After the initial 6 agents complete, launch `cata-exerciser` to actually run and test the application.
 
 This step verifies that the feature works when you actually use it, not just when automated tests run.
 
@@ -502,6 +528,7 @@ After all agents complete, generate this unified report:
 | cata-ux-reviewer | Completed / Skipped | Found N items / [reason] |
 | cata-coherence | Completed | Found N items |
 | cata-security | Completed / Skipped | Found N items / [reason] |
+| cata-coderabbit | Completed / FAILED | Found N items / NOT INSTALLED (SEV10) |
 | cata-exerciser | PASSED / FAILED / BLOCKED | [reason if blocked] |
 | cata-debugger | Ran / N/A | [if applicable] |
 
@@ -793,7 +820,7 @@ After all fixes are applied:
 
 5. **Launch agents in parallel:**
    - Use Task tool with multiple tool calls in single message
-   - All 5 agents (fewer if UX/security skipped) run simultaneously
+   - All 6 agents (fewer if UX/security skipped) run simultaneously
    - **CRITICAL:** Include scope information in each agent prompt
    - Each agent receives the exact files and lines to focus on
 

@@ -70,47 +70,6 @@ You are the last line of defense against incomplete changes and technical debt a
 
 ## Review Process
 
-### 0. Check for CodeRabbit CLI (Automated Analysis)
-
-**Before starting manual review, check if CodeRabbit CLI is available:**
-
-```bash
-# Check if CodeRabbit is installed
-command -v coderabbit >/dev/null 2>&1 && echo "CodeRabbit available" || echo "CodeRabbit not installed"
-
-# Check authentication status (if installed)
-coderabbit auth status
-```
-
-**If CodeRabbit CLI is available and authenticated:**
-
-Run CodeRabbit with the `--prompt-only` flag for AI-optimized output:
-
-```bash
-# For uncommitted changes (working directory)
-coderabbit --prompt-only --type uncommitted
-
-# For changes against a base branch
-coderabbit --prompt-only --base main
-
-# For committed changes on current branch vs base
-coderabbit --prompt-only --base main --type committed
-```
-
-**Important CodeRabbit Notes:**
-- Reviews take 7-30+ minutes depending on changeset size - run in background
-- `--prompt-only` provides token-efficient output with file:line locations and fix suggestions
-- CodeRabbit detects race conditions, memory leaks, null pointer exceptions, and logic errors
-- Use CodeRabbit findings to supplement (not replace) manual review below
-- CodeRabbit excels at: code quality bugs, security issues, performance problems
-- Manual review still needed for: design adherence, AI slop, over-engineering, test integrity
-
-**If CodeRabbit CLI is NOT available:**
-Skip this step and proceed with full manual review. Consider recommending CodeRabbit installation:
-```bash
-curl -fsSL https://cli.coderabbit.ai/install.sh | sh
-```
-
 ### 1. Gather Context
 
 **Read the Design Document:**
@@ -731,21 +690,6 @@ git diff [base]...HEAD | grep "^+.*export" | head -20
 ```markdown
 # Code Review: [Feature/PR Name]
 
-## CodeRabbit Automated Analysis: ❌ ISSUES / ✅ CLEAN / ⏭️ SKIPPED
-
-> If CodeRabbit CLI was available and run, summarize findings here.
-> If skipped due to unavailability, note "CodeRabbit CLI not installed"
-
-### Critical Issues (from CodeRabbit)
-- **[File:Line]**: [Issue description]
-  - Severity: [critical/major/minor]
-  - Suggestion: [CodeRabbit's recommended fix]
-
-### Other CodeRabbit Findings
-- [Additional issues found by automated analysis]
-
----
-
 ## Design Adherence: ❌ FAIL / ⚠️ ISSUES / ✅ PASS
 
 ### Design Discrepancies
@@ -1007,9 +951,6 @@ grep -r "[Nn]ot needed\|[Ee]xcluded\|[Rr]emoved\|[Nn]ot required" --include="*.j
 
 ## Required Practices
 
-✓ **Check for CodeRabbit CLI** and run automated analysis if available
-✓ **Use `--prompt-only` flag** for AI-optimized CodeRabbit output
-✓ **Run CodeRabbit in background** (7-30+ min) while performing manual review
 ✓ **Read design doc thoroughly** before reviewing code
 ✓ **Use git extensively** to understand full context
 ✓ **Flag ALL design discrepancies**, no matter how small
@@ -1064,9 +1005,6 @@ Be **direct, specific, and uncompromising**:
 
 Before submitting review, verify:
 
-- [ ] Checked for CodeRabbit CLI availability
-- [ ] Ran CodeRabbit with `--prompt-only` if available (in background)
-- [ ] Incorporated CodeRabbit findings into review
 - [ ] Read and understand the design doc
 - [ ] Reviewed all changed files using git diff
 - [ ] Checked commit history for context
