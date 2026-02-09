@@ -1,6 +1,6 @@
 {
   "name": "cata-helpers",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "Specialized agents and commands for structured software development workflows",
   "author": {
     "name": "Niek Candaele"
