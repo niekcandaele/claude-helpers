@@ -106,6 +106,7 @@ git diff --cached -- <scoped-files>
    - `cata-tester`: Execute test suite and report failures
    - `cata-ux-reviewer`: Test user-facing changes (unless `--skip-ux` or clearly backend-only)
    - `cata-coherence`: Check if changes fit in the codebase (reinvented wheels, pattern violations, stale docs/AI tooling)
+   - `cata-architect`: Architectural health analysis (module boundaries, dependency direction, abstraction gaps, god objects)
    - `cata-security`: Security vulnerability detection (unless `--skip-security`)
    - `cata-coderabbit`: **Mandatory** CodeRabbit CLI automated analysis (cannot be skipped)
 3. **Manual Exercise (cata-exerciser):** Start the app and exercise the feature end-to-end
@@ -284,7 +285,46 @@ Task tool with:
   - Location (file:line)
   - Description (what the issue is and existing pattern to follow)"
 
-# Agent 5: Security Review (unless --skip-security)
+# Agent 5: Architecture Review
+Task tool with:
+- subagent_type: "cata-architect"
+- description: "Analyze architectural health of scoped changes"
+- prompt: "VERIFICATION SCOPE:
+  Files in scope:
+  [Insert scope list here]
+
+  ARCHITECTURE REVIEW CONSTRAINTS:
+  - Analyze the ARCHITECTURAL IMPACT of these specific changes
+  - Check if changes degrade structural health (module boundaries, dependency direction, layering)
+  - Look for abstraction opportunities these changes reveal (3+ duplications)
+  - Check for god object growth in changed files
+  - Do NOT audit the entire codebase for pre-existing architectural debt
+  - Focus on: 'Do these changes maintain healthy architecture?'
+
+  First research the project's architecture:
+  - Discover the module/directory structure and layering
+  - Understand dependency direction patterns
+  - Check file sizes of changed files
+  - Look for existing abstractions the changes might duplicate
+
+  Then analyze the scoped changes for:
+  - Module boundary violations
+  - Dependency direction violations
+  - God object growth
+  - Missing abstractions (logic in 3+ places)
+  - Separation of concerns issues
+  - Circular dependencies
+  - API surface bloat
+  - Tight coupling
+
+  OUTPUT FORMAT: For each issue found, provide:
+  - Title (short description)
+  - Severity (1-10, where 1=trivial, 10=critical)
+  - Location (file:line)
+  - Category (Abstraction Opportunity / Module Boundary / Dependency Direction / God Object / Separation of Concerns / Circular Dependency / API Surface / Coupling)
+  - Description (what the structural issue is, evidence, and trajectory impact)"
+
+# Agent 6: Security Review (unless --skip-security)
 Task tool with:
 - subagent_type: "cata-security"
 - description: "Security vulnerability detection in scope"
@@ -320,7 +360,7 @@ Task tool with:
   - Category (Injection/Auth/Multi-Tenant/Data Exposure/Web Security/Crypto/Config)
   - Description (what the vulnerability is and attack vector)"
 
-# Agent 6: CodeRabbit Analysis (MANDATORY — cannot be skipped)
+# Agent 7: CodeRabbit Analysis (MANDATORY — cannot be skipped)
 Task tool with:
 - subagent_type: "cata-coderabbit"
 - description: "Run CodeRabbit CLI automated analysis"
@@ -350,10 +390,10 @@ Task tool with:
 
 ## Conditional Debug Analysis
 
-**After the initial 6 agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
+**After the initial 7 agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
 
 ```
-# Agent 7: Debug Analysis (conditional)
+# Agent 8: Debug Analysis (conditional)
 Task tool with:
 - subagent_type: "cata-debugger"
 - description: "Analyze test/UX failures in scope"
@@ -383,7 +423,7 @@ Only launch this agent if there are actual failures to analyze. Skip if all test
 
 ## Manual Exercise Testing (cata-exerciser)
 
-After the initial 6 agents complete, launch `cata-exerciser` to actually run and test the application.
+After the initial 7 agents complete, launch `cata-exerciser` to actually run and test the application.
 
 This step verifies that the feature works when you actually use it, not just when automated tests run.
 
@@ -527,6 +567,7 @@ After all agents complete, generate this unified report:
 | cata-reviewer | Completed | Found N items |
 | cata-ux-reviewer | Completed / Skipped | Found N items / [reason] |
 | cata-coherence | Completed | Found N items |
+| cata-architect | Completed | Found N items |
 | cata-security | Completed / Skipped | Found N items / [reason] |
 | cata-coderabbit | Completed / FAILED | Found N items / NOT INSTALLED (SEV10) |
 | cata-exerciser | PASSED / FAILED / BLOCKED | [reason if blocked] |
@@ -820,7 +861,7 @@ After all fixes are applied:
 
 5. **Launch agents in parallel:**
    - Use Task tool with multiple tool calls in single message
-   - All 6 agents (fewer if UX/security skipped) run simultaneously
+   - All 7 agents (fewer if UX/security skipped) run simultaneously
    - **CRITICAL:** Include scope information in each agent prompt
    - Each agent receives the exact files and lines to focus on
 
