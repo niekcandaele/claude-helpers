@@ -677,9 +677,10 @@ For each issue, before presenting it to the user:
 
 1. **Read the source file and line** referenced in the issue to understand the actual code
 2. **Generate 2-3 specific, actionable fix proposals** — not generic advice
-3. **Always include "Skip" as the last option**
-4. Fix descriptions must reference the exact file and line
-5. Proposals should be concrete enough to execute immediately
+3. **Always include "Explain" as the second-to-last option** — this lets the user request full context before deciding
+4. **Always include "Skip" as the last option**
+5. Fix descriptions must reference the exact file and line
+6. Proposals should be concrete enough to execute immediately
 
 **Good fix proposals:**
 - "Add try-catch around `fetchUser()` in auth.ts:45, return 401 with clear error message"
@@ -706,6 +707,8 @@ AskUserQuestion:
           description: "{Specific action with exact file and line reference}"
         - label: "{Fix option 2 — short name}"
           description: "{Alternative specific action with exact file and line reference}"
+        - label: "Explain"
+          description: "Get the full picture before deciding"
         - label: "Skip"
           description: "Accept this issue — will not fix in this change set"
     # Repeat same pattern for VI-2, VI-3, VI-4 (up to 4 questions per batch)
@@ -726,6 +729,8 @@ AskUserQuestion:
           description: "Wrap fetchUser() call in try-catch at auth.ts:45, return 401 with clear error message"
         - label: "Add validation"
           description: "Add input validation before fetchUser() call to reject malformed credentials early"
+        - label: "Explain"
+          description: "Get the full picture before deciding"
         - label: "Skip"
           description: "Accept this issue — will not fix in this change set"
     - header: "VI-2"
@@ -734,6 +739,8 @@ AskUserQuestion:
       options:
         - label: "Use parameterized query"
           description: "Replace string concatenation with parameterized query at db/users.ts:89"
+        - label: "Explain"
+          description: "Get the full picture before deciding"
         - label: "Skip"
           description: "Accept this issue — will not fix in this change set"
     - header: "VI-3"
@@ -742,6 +749,8 @@ AskUserQuestion:
       options:
         - label: "Add unit tests"
           description: "Create tests/auth/login.test.ts with tests for success and error cases"
+        - label: "Explain"
+          description: "Get the full picture before deciding"
         - label: "Skip"
           description: "Accept this issue — will not fix in this change set"
     - header: "VI-4"
@@ -750,9 +759,29 @@ AskUserQuestion:
       options:
         - label: "Rename to snake_case"
           description: "Rename userName to user_name at helpers.ts:23"
+        - label: "Explain"
+          description: "Get the full picture before deciding"
         - label: "Skip"
           description: "Accept this issue — will not fix in this change set"
 ```
+
+### Handling "Explain" Responses
+
+When the user selects "Explain" for an issue, they're saying: "I don't have enough context to make this call — give me the full picture."
+
+**What to do:**
+
+1. **Read the surrounding code** — not just the flagged line. Read enough of the file to understand the function, the module, what calls it, and what it's responsible for.
+2. **Re-present the same issue** via `AskUserQuestion` (on its own, not batched with other issues) with a much richer `question` field that covers:
+   - **Surrounding context**: What does the code around this issue do? What's the function/module responsible for? What calls into it or depends on it?
+   - **What was flagged and why**: The specific code pattern or behavior the verification agent caught, and what rule or heuristic triggered it
+   - **Real-world impact**: What could actually go wrong in practice — concrete scenarios, not abstract worst-cases. Is this "requests silently return wrong data" or "a log line is slightly misleading"?
+   - **What each fix option would change**: Walk through each proposed fix and explain concretely what it does to the code
+3. The re-presented issue keeps **all the same options** (fix options, Explain, Skip)
+4. If they pick Explain again, dig deeper — read more call sites, trace the data flow further, or rephrase from a different angle
+5. The issue is **not counted as triaged** until the user picks a fix option or Skip
+
+**Tone**: Like a thorough code review comment that gives you everything you need to evaluate the issue. Technical depth and jargon are fine — just don't be terse or assume the reader has the relevant code open in front of them.
 
 ### Handling "Other" Responses
 
