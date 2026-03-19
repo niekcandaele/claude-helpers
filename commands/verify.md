@@ -108,6 +108,7 @@ git diff --cached -- <scoped-files>
    - `cata-coherence`: Check if changes fit in the codebase (reinvented wheels, pattern violations, stale docs/AI tooling)
    - `cata-architect`: Architectural health analysis (module boundaries, dependency direction, abstraction gaps, god objects)
    - `cata-security`: Security vulnerability detection (unless `--skip-security`)
+   - `cata-hardener`: Feature hardening analysis (invalid inputs, missing error paths, entry point consistency, orphaned references, unhandled states)
    - `cata-coderabbit`: **Mandatory** CodeRabbit CLI automated analysis (cannot be skipped)
 3. **Manual Exercise (cata-exerciser):** Start the app and exercise the feature end-to-end
    - If BLOCKED with LOGIN_REQUIRED or UNCLEAR_FEATURE: Ask user for help, retry
@@ -360,7 +361,42 @@ Task tool with:
   - Category (Injection/Auth/Multi-Tenant/Data Exposure/Web Security/Crypto/Config)
   - Description (what the vulnerability is and attack vector)"
 
-# Agent 7: CodeRabbit Analysis (MANDATORY — cannot be skipped)
+# Agent 7: Feature Hardening
+Task tool with:
+- subagent_type: "cata-hardener"
+- description: "Feature hardening analysis for scoped changes"
+- prompt: "VERIFICATION SCOPE:
+  Files in scope:
+  [Insert scope list here]
+
+  HARDENING REVIEW CONSTRAINTS:
+  - Systematically check what happens with invalid/missing/extreme input
+  - Check if every failure mode gives the user/caller feedback
+  - Compare validation across entry points (create vs update, API vs background job)
+  - Check what happens when dependencies are removed or degraded
+  - Check for orphaned references and missing cascade behavior
+  - Do NOT audit the entire codebase for gaps unrelated to the changes
+  - Focus on: 'What failure scenarios do these changes not handle?'
+
+  First discover the feature:
+  - What entities/operations are involved?
+  - What inputs does each operation accept?
+  - What does it depend on?
+  - What entry points exist?
+
+  Then systematically check across three dimensions:
+  A. Input & Boundary: For each input field — what if missing, empty, wrong type, too large, invalid reference, duplicate?
+  B. State & Lifecycle: For each dependency — what if deleted, disabled, degraded? For each entity — what states can it reach?
+  C. Entry Point Consistency: Do all paths to the same operation validate the same things and give the same feedback?
+
+  OUTPUT FORMAT: For each issue found, provide:
+  - Title (short description)
+  - Severity (1-10, where 1=trivial, 10=critical)
+  - Location (file:line)
+  - Category (Unvalidated Input / Silent Failure / Inconsistent Entry Points / Orphaned References / Stale Data / Unhandled State / Missing Boundary Handling / Missing Cascade)
+  - Description (concrete scenario, current behavior, expected behavior)"
+
+# Agent 8: CodeRabbit Analysis (MANDATORY — cannot be skipped)
 Task tool with:
 - subagent_type: "cata-coderabbit"
 - description: "Run CodeRabbit CLI automated analysis"
@@ -390,7 +426,7 @@ Task tool with:
 
 ## Conditional Debug Analysis
 
-**After the initial 7 agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
+**After the initial 8 agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
 
 ```
 # Agent 8: Debug Analysis (conditional)
@@ -423,7 +459,7 @@ Only launch this agent if there are actual failures to analyze. Skip if all test
 
 ## Manual Exercise Testing (cata-exerciser)
 
-After the initial 7 agents complete, launch `cata-exerciser` to actually run and test the application.
+After the initial 8 agents complete, launch `cata-exerciser` to actually run and test the application.
 
 This step verifies that the feature works when you actually use it, not just when automated tests run.
 
@@ -569,6 +605,7 @@ After all agents complete, generate this unified report:
 | cata-coherence | Completed | Found N items |
 | cata-architect | Completed | Found N items |
 | cata-security | Completed / Skipped | Found N items / [reason] |
+| cata-hardener | Completed | Found N items |
 | cata-coderabbit | Completed / FAILED | Found N items / NOT INSTALLED (SEV10) |
 | cata-exerciser | PASSED / FAILED / BLOCKED | [reason if blocked] |
 | cata-debugger | Ran / N/A | [if applicable] |
@@ -890,7 +927,7 @@ After all fixes are applied:
 
 5. **Launch agents in parallel:**
    - Use Task tool with multiple tool calls in single message
-   - All 7 agents (fewer if UX/security skipped) run simultaneously
+   - All 8 agents (fewer if UX/security skipped) run simultaneously
    - **CRITICAL:** Include scope information in each agent prompt
    - Each agent receives the exact files and lines to focus on
 
