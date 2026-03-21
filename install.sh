@@ -97,20 +97,20 @@ main() {
 	fi
 
 	# Check if commands directory was extracted
-	if [ ! -d "commands" ]; then
+	if [ ! -d "plugins/cata-helpers/commands" ]; then
 		print_error "Commands directory not found in downloaded archive."
 		exit 1
 	fi
 
 	# Move commands to installation directory
 	print_status "Installing commands to $INSTALL_DIR..."
-	mv commands "$INSTALL_DIR"
+	mv plugins/cata-helpers/commands "$INSTALL_DIR"
 
 	# Check if agents directory exists and install it
-	if [ -d "agents" ]; then
+	if [ -d "plugins/cata-helpers/agents" ]; then
 		print_status "Found agents directory in archive"
 		print_status "Installing agents to $AGENTS_DIR..."
-		mv agents "$AGENTS_DIR"
+		mv plugins/cata-helpers/agents "$AGENTS_DIR"
 	else
 		print_warning "No agents directory found in archive"
 	fi

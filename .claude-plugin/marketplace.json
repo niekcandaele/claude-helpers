@@ -9,9 +9,18 @@
   "plugins": [
     {
       "name": "cata-helpers",
-      "source": "./",
+      "source": "./plugins/cata-helpers",
       "description": "Specialized agents and commands for structured software development workflows",
       "version": "1.0.28",
+      "author": {
+        "name": "Niek Candaele"
+      }
+    },
+    {
+      "name": "kubecon",
+      "source": "./plugins/kubecon",
+      "description": "KubeCon schedule curator skill — filter and curate conference sessions",
+      "version": "1.0.0",
       "author": {
         "name": "Niek Candaele"
       }

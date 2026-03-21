@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - '.claude-plugin/plugin.json'
+      - 'plugins/*/.claude-plugin/plugin.json'
       - '.claude-plugin/marketplace.json'
 
 jobs:
@@ -16,26 +16,55 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 2
 
-      - name: Bump patch version
+      - name: Bump changed plugin versions
         run: |
-          # Read current version
-          VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          MARKETPLACE=".claude-plugin/marketplace.json"
+          BUMPED=""
 
-          # Bump patch
-          IFS='.' read -r major minor patch <<< "$VERSION"
-          NEW_VERSION="$major.$minor.$((patch + 1))"
+          for plugin_dir in plugins/*/; do
+            plugin_name=$(basename "$plugin_dir")
 
-          # Update both files
-          jq --arg v "$NEW_VERSION" '.version = $v' .claude-plugin/plugin.json > tmp.json && mv tmp.json .claude-plugin/plugin.json
-          jq --arg v "$NEW_VERSION" '.plugins[0].version = $v' .claude-plugin/marketplace.json > tmp.json && mv tmp.json .claude-plugin/marketplace.json
+            # Skip if no files changed in this plugin dir
+            if ! echo "$CHANGED" | grep -q "^plugins/$plugin_name/"; then
+              continue
+            fi
 
-          echo "Bumped version: $VERSION -> $NEW_VERSION"
+            PLUGIN_JSON="${plugin_dir}.claude-plugin/plugin.json"
+            if [ ! -f "$PLUGIN_JSON" ]; then
+              echo "No plugin.json found for $plugin_name, skipping"
+              continue
+            fi
+
+            # Read and bump version
+            VERSION=$(jq -r '.version' "$PLUGIN_JSON")
+            IFS='.' read -r major minor patch <<< "$VERSION"
+            NEW_VERSION="$major.$minor.$((patch + 1))"
+
+            # Update plugin.json
+            jq --arg v "$NEW_VERSION" '.version = $v' "$PLUGIN_JSON" > tmp.json \
+              && mv tmp.json "$PLUGIN_JSON"
+
+            # Update marketplace.json entry by name
+            jq --arg name "$plugin_name" --arg v "$NEW_VERSION" \
+              '(.plugins[] | select(.name == $name)).version = $v' \
+              "$MARKETPLACE" > tmp.json && mv tmp.json "$MARKETPLACE"
+
+            echo "Bumped $plugin_name: $VERSION -> $NEW_VERSION"
+            BUMPED="$BUMPED $plugin_name"
+          done
+
+          if [ -z "$BUMPED" ]; then
+            echo "No plugins changed, skipping bump"
+          fi
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .claude-plugin/
-          git commit -m "chore: bump version to $(jq -r '.version' .claude-plugin/plugin.json)" || exit 0
+          git add plugins/*/.claude-plugin/ .claude-plugin/
+          git diff --staged --quiet && exit 0
+          git commit -m "chore: bump plugin versions"
           git push
