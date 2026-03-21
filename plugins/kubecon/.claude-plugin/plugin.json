@@ -1,6 +1,6 @@
 {
   "name": "kubecon",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "KubeCon schedule curator skill — filter and curate conference sessions",
   "author": {
     "name": "Niek Candaele"

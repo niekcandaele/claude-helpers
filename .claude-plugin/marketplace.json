@@ -11,7 +11,7 @@
       "name": "cata-helpers",
       "source": "./plugins/cata-helpers",
       "description": "Specialized agents and commands for structured software development workflows",
-      "version": "1.0.28",
+      "version": "1.0.29",
       "author": {
         "name": "Niek Candaele"
       }
@@ -20,7 +20,7 @@
       "name": "kubecon",
       "source": "./plugins/kubecon",
       "description": "KubeCon schedule curator skill — filter and curate conference sessions",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": {
         "name": "Niek Candaele"
       }
