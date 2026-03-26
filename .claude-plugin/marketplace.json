@@ -29,7 +29,7 @@
       "name": "player-coach",
       "source": "./plugins/player-coach",
       "description": "Adversarial cooperation loop — player implements, coach reviews with /verify, iterates until approved",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": {
         "name": "Niek Candaele"
       }
