@@ -18,6 +18,12 @@ validate:
     @echo "✓ Found plugin.json"
     @jq empty plugins/kubecon/.claude-plugin/plugin.json && echo "✓ plugin.json is valid JSON"
     @echo "✓ Found $(find plugins/kubecon/skills -name 'SKILL.md' | wc -l | tr -d ' ') skills"
+    @echo "\n--- player-coach plugin ---"
+    @test -f plugins/player-coach/.claude-plugin/plugin.json || (echo "Missing player-coach plugin.json" && exit 1)
+    @echo "✓ Found plugin.json"
+    @jq empty plugins/player-coach/.claude-plugin/plugin.json && echo "✓ plugin.json is valid JSON"
+    @echo "✓ Found $(find plugins/player-coach/commands -name '*.md' | wc -l | tr -d ' ') commands"
+    @echo "✓ Found $(find plugins/player-coach/agents -name '*.md' | wc -l | tr -d ' ') agents"
     @echo "\n--- marketplace ---"
     @test -f .claude-plugin/marketplace.json || (echo "Missing marketplace.json" && exit 1)
     @echo "✓ Found marketplace.json"
