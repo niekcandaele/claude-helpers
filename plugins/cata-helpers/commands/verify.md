@@ -1,5 +1,5 @@
 ---
-description: Run comprehensive verification with multiple agents (reviewer, tester, UX, coherence)
+description: Run comprehensive verification with multiple specialized agents
 allowed-tools: Read, Bash, Grep, Glob, Task, TodoWrite, AskUserQuestion, EnterPlanMode, ExitPlanMode
 ---
 
@@ -109,6 +109,7 @@ git diff --cached -- <scoped-files>
    - `cata-architect`: Architectural health analysis (module boundaries, dependency direction, abstraction gaps, god objects)
    - `cata-security`: Security vulnerability detection (unless `--skip-security`)
    - `cata-hardener`: Feature hardening analysis (invalid inputs, missing error paths, entry point consistency, orphaned references, unhandled states)
+   - `cata-qa`: Test coverage quality, test strategy, and mock appropriateness evaluation
    - `cata-coderabbit`: **Mandatory** CodeRabbit CLI automated analysis (cannot be skipped)
 3. **Manual Exercise (cata-exerciser):** Start the app and exercise the feature end-to-end
    - If BLOCKED with LOGIN_REQUIRED or UNCLEAR_FEATURE: Ask user for help, retry
@@ -396,7 +397,29 @@ Task tool with:
   - Category (Unvalidated Input / Silent Failure / Inconsistent Entry Points / Orphaned References / Stale Data / Unhandled State / Missing Boundary Handling / Missing Cascade)
   - Description (concrete scenario, current behavior, expected behavior)"
 
-# Agent 8: CodeRabbit Analysis (MANDATORY — cannot be skipped)
+# Agent 8: QA Coverage & Quality
+Task tool with:
+- subagent_type: "cata-qa"
+- description: "Evaluate test coverage quality for scoped changes"
+- prompt: "VERIFICATION SCOPE:
+  Files in scope:
+  [Insert scope list here]
+
+  QA REVIEW CONSTRAINTS:
+  - Evaluate whether the scoped changes are adequately tested
+  - Assess test quality, mock usage, and test type appropriateness
+  - Adapt expectations to codebase testing maturity
+  - Do NOT audit the entire test suite for quality
+  - Focus on: 'Are these changes well-tested with good tests?'
+
+  OUTPUT FORMAT: For each issue found, provide:
+  - Title (short description)
+  - Severity (1-10, where 1=trivial, 10=critical)
+  - Location (file:line)
+  - Category (Coverage Gap / Weak Assertion / Mock Abuse / Wrong Test Type / Flaky Pattern / Missing Regression Test)
+  - Description (what's missing or wrong, and what kind of test is appropriate)"
+
+# Agent 9: CodeRabbit Analysis (MANDATORY — cannot be skipped)
 Task tool with:
 - subagent_type: "cata-coderabbit"
 - description: "Run CodeRabbit CLI automated analysis"
@@ -426,10 +449,10 @@ Task tool with:
 
 ## Conditional Debug Analysis
 
-**After the initial 8 agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
+**After the initial 9 agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
 
 ```
-# Agent 8: Debug Analysis (conditional)
+# Agent 10: Debug Analysis (conditional)
 Task tool with:
 - subagent_type: "cata-debugger"
 - description: "Analyze test/UX failures in scope"
@@ -459,7 +482,7 @@ Only launch this agent if there are actual failures to analyze. Skip if all test
 
 ## Manual Exercise Testing (cata-exerciser)
 
-After the initial 8 agents complete, launch `cata-exerciser` to actually run and test the application.
+After the initial 9 agents complete, launch `cata-exerciser` to actually run and test the application.
 
 This step verifies that the feature works when you actually use it, not just when automated tests run.
 
@@ -606,6 +629,7 @@ After all agents complete, generate this unified report:
 | cata-architect | Completed | Found N items |
 | cata-security | Completed / Skipped | Found N items / [reason] |
 | cata-hardener | Completed | Found N items |
+| cata-qa | Completed | Found N items |
 | cata-coderabbit | Completed / FAILED | Found N items / NOT INSTALLED (SEV10) |
 | cata-exerciser | PASSED / FAILED / BLOCKED | [reason if blocked] |
 | cata-debugger | Ran / N/A | [if applicable] |
@@ -927,7 +951,7 @@ After all fixes are applied:
 
 5. **Launch agents in parallel:**
    - Use Task tool with multiple tool calls in single message
-   - All 8 agents (fewer if UX/security skipped) run simultaneously
+   - All 9 agents (fewer if UX/security skipped) run simultaneously
    - **CRITICAL:** Include scope information in each agent prompt
    - Each agent receives the exact files and lines to focus on
 
