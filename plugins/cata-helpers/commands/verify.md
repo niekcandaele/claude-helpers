@@ -110,7 +110,6 @@ git diff --cached -- <scoped-files>
    - `cata-security`: Security vulnerability detection (unless `--skip-security`)
    - `cata-hardener`: Feature hardening analysis (invalid inputs, missing error paths, entry point consistency, orphaned references, unhandled states)
    - `cata-qa`: Test coverage quality, test strategy, and mock appropriateness evaluation
-   - `cata-coderabbit`: **Mandatory** CodeRabbit CLI automated analysis (cannot be skipped)
 3. **Manual Exercise (cata-exerciser):** Start the app and exercise the feature end-to-end
    - If BLOCKED with LOGIN_REQUIRED or UNCLEAR_FEATURE: Ask user for help, retry
 4. **Debug Analysis (if failures):** If cata-tester OR cata-ux-reviewer OR cata-exerciser failed, launch cata-debugger for root cause analysis
@@ -419,37 +418,13 @@ Task tool with:
   - Category (Coverage Gap / Weak Assertion / Mock Abuse / Wrong Test Type / Flaky Pattern / Missing Regression Test)
   - Description (what's missing or wrong, and what kind of test is appropriate)"
 
-# Agent 9: CodeRabbit Analysis (MANDATORY — cannot be skipped)
-Task tool with:
-- subagent_type: "cata-coderabbit"
-- description: "Run CodeRabbit CLI automated analysis"
-- prompt: "VERIFICATION SCOPE:
-  Files in scope:
-  [Insert scope list here]
-
-  CRITICAL SCOPE CONSTRAINTS:
-  - Run CodeRabbit CLI analysis on the scoped changes
-  - Report all findings with severity ratings
-  - If CodeRabbit is not installed or authenticated, report as SEV10
-
-  Run CodeRabbit CLI review on the changes in scope.
-  Check installation and authentication first — if either fails, report SEV10 immediately.
-  Use full output mode (NO --prompt-only flag).
-  Wait for completion — do NOT run in background or abort early.
-
-  OUTPUT FORMAT: For each issue found, provide:
-  - Title (short description)
-  - Severity (1-10, where 1=trivial, 10=critical)
-  - Location (file:line)
-  - Category (Bug Risk / Security / Performance / Code Quality / Style)
-  - Description (full CodeRabbit reasoning with context)"
 ```
 
 **Important:** Replace `[Insert scope list here]` with the actual scope determined in step 1.
 
 ## Conditional Debug Analysis
 
-**After the initial 9 agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
+**After the initial agents complete**, check if cata-tester OR cata-ux-reviewer reported failures. If either failed:
 
 ```
 # Agent 10: Debug Analysis (conditional)
@@ -630,7 +605,6 @@ After all agents complete, generate this unified report:
 | cata-security | Completed / Skipped | Found N items / [reason] |
 | cata-hardener | Completed | Found N items |
 | cata-qa | Completed | Found N items |
-| cata-coderabbit | Completed / FAILED | Found N items / NOT INSTALLED (SEV10) |
 | cata-exerciser | PASSED / FAILED / BLOCKED | [reason if blocked] |
 | cata-debugger | Ran / N/A | [if applicable] |
 

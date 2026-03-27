@@ -42,9 +42,14 @@ When there is no previous coach feedback, implement the solution from scratch:
 1. Read and internalize every requirement in the plan
 2. Design your approach (think before coding)
 3. Implement the solution
-4. Write tests that cover the key functionality
-5. Run the tests to make sure they pass
-6. Run any linters/formatters the project uses
+4. Install dependencies (npm install, pip install, etc.)
+5. Build/compile the project — fix any errors before proceeding
+6. Write tests that cover the key functionality
+7. Run the tests — fix any failures before proceeding
+8. Start the application (if it's a server/API) and verify it responds
+9. Run any linters/formatters the project uses
+
+**The coach will reject any implementation that doesn't build, doesn't have passing tests, or doesn't start.** Don't skip steps 4-8.
 
 ## Turn 2+: Address Coach Feedback
 
@@ -72,14 +77,24 @@ Changes made:
 - path/to/other.ts — what was changed and why
 - tests/file.test.ts — what tests were added/modified
 
+Build:
+- [pass/fail — command used, error output if failed]
+
 Tests:
 - X passed, Y failed
 - [if failures: which tests failed and why]
+- [if no tests written: explain why — the coach WILL reject this]
+
+Application:
+- [started successfully / failed to start — details]
+- [if server/API: tested with curl/request — response]
 
 Remaining concerns:
 - [anything you couldn't address and why]
 - [anything you're uncertain about]
 ```
+
+The coach verifies every claim in this report independently. Do not lie or exaggerate — if tests failed, say so. If the app doesn't start, say so. The coach will find out anyway.
 
 ## Critical Constraints
 

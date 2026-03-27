@@ -151,7 +151,6 @@ Launch agents **in parallel** using the Task tool. Each agent prompt MUST includ
 - `cata-coherence` — Pattern/consistency check on changed files
 - `cata-architect` — Architectural health analysis
 - `cata-security` — Security vulnerability detection
-- `cata-coderabbit` — CodeRabbit CLI analysis
 
 **If `--with-ux` flag is present**, also launch:
 - `cata-ux-reviewer` — UX review of changed surfaces
@@ -223,7 +222,6 @@ Combine all information into a single report:
 | cata-coherence | Completed | Found N items |
 | cata-architect | Completed | Found N items |
 | cata-security | Completed | Found N items |
-| cata-coderabbit | Completed / FAILED | Found N items / NOT INSTALLED |
 | cata-ux-reviewer | Completed / Skipped | [if --with-ux] |
 | cata-exerciser | PASSED / FAILED / Skipped | [if --with-ux] |
 
