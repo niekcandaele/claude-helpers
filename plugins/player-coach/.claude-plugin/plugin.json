@@ -1,6 +1,6 @@
 {
   "name": "player-coach",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Adversarial cooperation loop — player implements, coach reviews with /verify, iterates until approved",
   "author": {
     "name": "Niek Candaele"
