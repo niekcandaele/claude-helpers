@@ -1,6 +1,7 @@
 ---
 name: pc-player
 description: Implementation agent for player-coach loop. Reads plan requirements, writes code and tests, addresses verification feedback. Fresh context each turn.
+model: sonnet
 tools: Read, Write, Edit, MultiEdit, Bash, Grep, Glob, WebSearch, WebFetch
 ---
 
