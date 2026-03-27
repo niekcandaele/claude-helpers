@@ -11,7 +11,7 @@
       "name": "cata-helpers",
       "source": "./plugins/cata-helpers",
       "description": "Specialized agents and commands for structured software development workflows",
-      "version": "1.0.29",
+      "version": "1.0.30",
       "author": {
         "name": "Niek Candaele"
       }
@@ -29,7 +29,7 @@
       "name": "player-coach",
       "source": "./plugins/player-coach",
       "description": "Adversarial cooperation loop — player implements, coach reviews with /verify, iterates until approved",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "author": {
         "name": "Niek Candaele"
       }
