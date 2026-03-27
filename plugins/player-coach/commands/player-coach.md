@@ -93,7 +93,23 @@ Coach feedback from turn {turn - 1} that you must address:
 
 Wait for the player to complete. Extract the PLAYER REPORT from the result.
 
-### Step 2: Spawn ALL 8 Verification Agents
+**Output to the user immediately after the player completes:**
+```markdown
+## Turn N/M — Player Report
+
+**Changes:**
+- path/to/file.ts — what was changed
+- path/to/other.ts — what was changed
+
+**Build:** pass/fail
+**Tests:** X passed, Y failed
+**App starts:** yes/no/N/A
+**Concerns:** [any remaining concerns from player report, or "none"]
+```
+
+The user needs to see what the player did before verification starts. Don't skip this.
+
+### Step 2: Spawn ALL 7 Verification Agents
 
 After the player completes, spawn ALL of the following agents in parallel using the Agent tool. Use a single message with multiple Agent tool calls to maximize parallelism. Every agent must run — no exceptions, no skipping.
 
@@ -118,6 +134,39 @@ For each agent, include in the prompt:
 7. **cata-security** — "Check for injection flaws, auth issues, data exposure, and other security vulnerabilities. Files changed: {changed_files}"
 
 Wait for ALL 7 agents to complete. Collect all their results.
+
+**Output to the user immediately after verification completes.**
+
+Use the same report format as the `/verify` command. Deduplicate findings across agents and present a unified report:
+
+```markdown
+## Turn N/M — Verification Report
+
+### Agent Results
+
+| Agent | Status | Notes |
+|-------|--------|-------|
+| cata-tester | X passed, Y failed | [brief note] |
+| cata-exerciser | PASSED / FAILED | [brief note] |
+| cata-reviewer | Completed | Found N items |
+| cata-hardener | Completed | Found N items |
+| cata-coherence | Completed | Found N items |
+| cata-architect | Completed | Found N items |
+| cata-security | Completed | Found N items |
+
+### Issues Found
+
+[Deduplicate findings from all agents — same location, same root cause, or same symptom get merged into one entry. Use highest severity. List all source agents.]
+
+| ID | Sev | Title | Sources | Description |
+|----|-----|-------|---------|-------------|
+| VI-1 | 8 | [title] | tester, reviewer | [merged description] |
+| VI-2 | 5 | [title] | hardener | [description] |
+
+*Total: N issues from M agent findings (deduplicated)*
+```
+
+This gives the user the full picture before the coach makes its decision. Don't skip this.
 
 ### Step 3: Spawn the Coach
 
@@ -165,28 +214,36 @@ History of previous coach feedback (so you don't repeat yourself):
 
 Wait for the coach to complete. Extract the COACH DECISION from the result.
 
-### Step 4: Parse the decision
+### Step 4: Parse the decision and output to user
 
-**If `COACH DECISION: APPROVED`:**
-→ Output the completion summary (see below)
-→ STOP the loop
+**Output to the user immediately after the coach completes:**
 
-**If `COACH DECISION: FEEDBACK`:**
-→ Extract the feedback items
-→ Append to feedback_history (prefixed with "Turn N:")
-→ Set coach_feedback = the extracted feedback
-→ Continue to next turn
+If APPROVED:
+```markdown
+## Turn N/M — Coach Decision: APPROVED
 
-### Step 5: Output turn status
-
-After each turn, output a brief status update:
-
+**Summary:** [coach's approval summary]
+**Requirements met:** N/N
+**Runtime verification:** build pass, tests X/Y, app starts yes/no
 ```
-=== Turn N/M ===
-Player: [1-line summary from player report]
-Verify: [1-line summary — e.g. "tester: 5 pass, exerciser: app starts, security: 1 issue sev 6"]
-Coach: [APPROVED or FEEDBACK — list top 3 items if feedback]
+Then output the completion summary (Phase 2 below) and STOP the loop.
+
+If FEEDBACK:
+```markdown
+## Turn N/M — Coach Decision: FEEDBACK
+
+**Summary:** [coach's progress assessment]
+**Requirements met:** N/M
+
+**Feedback items for next turn:**
+1. [BLOCKING] file.ts:45 — description
+2. [IMPORTANT] test.ts — description
+3. [MINOR] utils.ts — description
+
+**Verification issues at/above threshold:**
+- VI-1 (sev 8): description
 ```
+Then extract the feedback items, append to feedback_history (prefixed with "Turn N:"), set coach_feedback = the extracted feedback, and continue to next turn.
 
 ## Phase 2: Completion
 
