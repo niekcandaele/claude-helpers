@@ -1,14 +1,14 @@
 ---
-description: Adversarial cooperation loop — player implements, coach reviews with verification agents, iterates until approved
+description: Adversarial cooperation loop — player implements, verification agents review, iterates until clean
 argument-hint: [--max-turns=N] [--severity=N]
 allowed-tools: Read, Bash, Grep, Glob, Task, TodoWrite, AskUserQuestion
 ---
 
 # Player-Coach: Adversarial Cooperation Loop
 
-You are the orchestrator of a player-coach loop. Three phases per turn: the **player** implements code, you spawn **all 8 verification agents** in parallel, then the **coach** evaluates the results and decides to approve or give feedback.
+You are the orchestrator of a player-coach loop. Two phases per turn: the **player** implements code, then you spawn **all 7 verification agents** in parallel to review it. Issues at or above the severity threshold become feedback for the next player turn. The loop ends when verification is clean or the turn limit is reached.
 
-You must spawn the verification agents yourself because subagents cannot spawn further subagents — that's a platform limitation. The coach receives the verification results from you.
+There is no separate coach agent. The verification agents ARE the review, and you apply the severity threshold mechanically.
 
 ## Phase 0: Pre-Loop Setup
 
@@ -27,12 +27,12 @@ Then STOP.
 
 ### 2. Read the plan
 
-Read the plan file. You need a basic understanding of what's being built to ask good clarifying questions. Note the plan file path — you'll pass it to agents.
+Read the plan file. You need a basic understanding of what's being built to ask good clarifying questions. Note the plan file path — you'll pass it to the player agent.
 
 ### 3. Parse arguments
 
 Check `$ARGUMENTS` for:
-- `--max-turns=N` — maximum player-coach iterations
+- `--max-turns=N` — maximum iterations
 - `--severity=N` — minimum severity threshold for issues that must be fixed
 
 ### 4. Clarify with the user
@@ -47,12 +47,12 @@ Use `AskUserQuestion` to fill in anything not specified. Only ask what's genuine
   - 7 = lenient (only fix critical/high issues)
   - Default: 5
 
-- **Max turns**: How many player-coach iterations? (Default: 5)
+- **Max turns**: How many iterations? (Default: 5)
 
 **Ask only if the plan is unclear about:**
 
 - Scope or ambiguity in requirements
-- Missing critical information the agents will need
+- Missing critical information the player will need
 - Anything that would cause the player to get stuck
 
 ### 5. Confirm and start
@@ -65,7 +65,7 @@ Briefly summarize the configuration to the user:
 ```
 Initialize:
   turn = 0
-  coach_feedback = ""
+  feedback = ""
   feedback_history = []
 ```
 
@@ -83,11 +83,11 @@ Plan file: {plan_file_path}
 Severity threshold: {severity}
 
 {if turn == 1}
-This is turn 1. There is no previous coach feedback. Implement the plan from scratch.
+This is turn 1. There is no previous feedback. Implement the plan from scratch.
 {else}
-Coach feedback from turn {turn - 1} that you must address:
+Verification feedback from turn {turn - 1} that you must address:
 
-{coach_feedback}
+{feedback}
 {endif}
 ```
 
@@ -107,8 +107,6 @@ Wait for the player to complete. Extract the PLAYER REPORT from the result.
 **Concerns:** [any remaining concerns from player report, or "none"]
 ```
 
-The user needs to see what the player did before verification starts. Don't skip this.
-
 ### Step 2: Spawn ALL 7 Verification Agents
 
 After the player completes, spawn ALL of the following agents in parallel using the Agent tool. Use a single message with multiple Agent tool calls to maximize parallelism. Every agent must run — no exceptions, no skipping.
@@ -117,7 +115,7 @@ For each agent, include in the prompt:
 - What files the player changed (from the PLAYER REPORT)
 - The plan file path for context
 
-**Agents to spawn (all 8, every turn):**
+**Agents to spawn (all 7, every turn):**
 
 1. **cata-tester** — "Run the test suite for this project. Report all test failures with severity ratings. Files changed: {changed_files}"
 
@@ -135,9 +133,9 @@ For each agent, include in the prompt:
 
 Wait for ALL 7 agents to complete. Collect all their results.
 
-**Output to the user immediately after verification completes.**
+### Step 3: Generate Verification Report and output to user
 
-Use the same report format as the `/verify` command. Deduplicate findings across agents and present a unified report:
+Deduplicate findings across agents and present a unified report using the same format as the `/verify` command:
 
 ```markdown
 ## Turn N/M — Verification Report
@@ -163,91 +161,47 @@ Use the same report format as the `/verify` command. Deduplicate findings across
 | VI-1 | 8 | [title] | tester, reviewer | [merged description] |
 | VI-2 | 5 | [title] | hardener | [description] |
 
+*Severity: 9-10 Critical | 7-8 High | 5-6 Moderate | 3-4 Low | 1-2 Trivial*
 *Total: N issues from M agent findings (deduplicated)*
 ```
 
-This gives the user the full picture before the coach makes its decision. Don't skip this.
+### Step 4: Apply severity threshold and decide
 
-### Step 3: Spawn the Coach
+This is mechanical — no judgment call needed:
 
-Use the Agent tool to spawn a `pc-coach` agent with a fresh context. Pass it EVERYTHING it needs to make a decision:
+**Count issues at or above the severity threshold.**
 
-**Prompt template:**
-```
-You are the coach agent on turn {turn} of {max_turns} in a player-coach loop.
+**If zero issues at/above threshold → APPROVED:**
 
-Plan file: {plan_file_path}
-Severity threshold: {severity}
-
-Player report from this turn:
-{player_report}
-
-Verification agent results:
-
-=== cata-tester ===
-{tester_results}
-
-=== cata-exerciser ===
-{exerciser_results}
-
-=== cata-reviewer ===
-{reviewer_results}
-
-=== cata-hardener ===
-{hardener_results}
-
-=== cata-coherence ===
-{coherence_results}
-
-=== cata-architect ===
-{architect_results}
-
-=== cata-security ===
-{security_results}
-
-{if turn > 1}
-History of previous coach feedback (so you don't repeat yourself):
-
-{feedback_history joined with newlines}
-{endif}
-```
-
-Wait for the coach to complete. Extract the COACH DECISION from the result.
-
-### Step 4: Parse the decision and output to user
-
-**Output to the user immediately after the coach completes:**
-
-If APPROVED:
+Output to the user:
 ```markdown
-## Turn N/M — Coach Decision: APPROVED
+## Turn N/M — APPROVED
 
-**Summary:** [coach's approval summary]
-**Requirements met:** N/N
-**Runtime verification:** build pass, tests X/Y, app starts yes/no
+No issues at or above severity threshold {severity}.
+[If there are issues below threshold: "N issues below threshold noted but not blocking."]
 ```
 Then output the completion summary (Phase 2 below) and STOP the loop.
 
-If FEEDBACK:
+**If any issues at/above threshold → FEEDBACK:**
+
+Collect all issues at/above threshold. These become feedback for the next player turn.
+
+Output to the user:
 ```markdown
-## Turn N/M — Coach Decision: FEEDBACK
+## Turn N/M — FEEDBACK (N issues at/above severity {severity})
 
-**Summary:** [coach's progress assessment]
-**Requirements met:** N/M
+**Issues for next turn:**
+1. VI-1 (sev 8) [tester, reviewer]: [title] — [description]
+2. VI-3 (sev 5) [hardener]: [title] — [description]
 
-**Feedback items for next turn:**
-1. [BLOCKING] file.ts:45 — description
-2. [IMPORTANT] test.ts — description
-3. [MINOR] utils.ts — description
-
-**Verification issues at/above threshold:**
-- VI-1 (sev 8): description
+[If below-threshold issues exist: "N additional issues below threshold (not blocking)."]
 ```
-Then extract the feedback items, append to feedback_history (prefixed with "Turn N:"), set coach_feedback = the extracted feedback, and continue to next turn.
+
+Set feedback = the issues list above, append to feedback_history (prefixed with "Turn N:"), and continue to next turn.
 
 ## Phase 2: Completion
 
-### If coach approved:
+### If approved:
 
 ```markdown
 # Player-Coach Complete
@@ -256,13 +210,10 @@ Then extract the feedback items, append to feedback_history (prefixed with "Turn
 ## Severity threshold: {severity}
 
 ## Turn History
-| Turn | Player Summary | Verification | Coach Decision |
-|------|---------------|--------------|----------------|
-| 1    | [summary]     | [summary]    | FEEDBACK (N items) |
-| 2    | [summary]     | [summary]    | APPROVED |
-
-## Final Coach Assessment
-[Copy the coach's approval summary]
+| Turn | Player Summary | Issues at/above threshold |
+|------|---------------|--------------------------|
+| 1    | [summary]     | N issues → FEEDBACK |
+| 2    | [summary]     | 0 issues → APPROVED |
 
 ## Files Changed
 [List from the final player report]
@@ -277,14 +228,14 @@ Then extract the feedback items, append to feedback_history (prefixed with "Turn
 ## Severity threshold: {severity}
 
 ## Turn History
-| Turn | Player Summary | Verification | Coach Decision |
-|------|---------------|--------------|----------------|
-| 1    | [summary]     | [summary]    | FEEDBACK (N items) |
-| ...  | ...           | ...          | ...            |
-| M    | [summary]     | [summary]    | FEEDBACK (N items) |
+| Turn | Player Summary | Issues at/above threshold |
+|------|---------------|--------------------------|
+| 1    | [summary]     | N issues |
+| ...  | ...           | ...      |
+| M    | [summary]     | N issues |
 
-## Last Coach Feedback
-[Full feedback from the final turn]
+## Remaining Issues
+[Full issues list from the final verification report]
 
 ## Recommendation
 The task may need manual intervention, plan refinement, or more turns.
@@ -293,9 +244,9 @@ You can re-run with `--max-turns=N` to continue iterating.
 
 ## Important Notes
 
-- **Spawn ALL 7 verification agents every turn.** This is the whole point. No skipping, no "as warranted."
-- **Spawn verification agents in parallel.** Use a single message with 7 Agent tool calls for maximum speed.
+- **Spawn ALL 7 verification agents every turn.** No skipping, no "as warranted."
+- **Spawn verification agents in parallel.** Use a single message with 7 Agent tool calls.
 - **Don't write code.** The player does that.
 - **Don't run verification yourself.** The agents do that.
-- **Pass the plan file path, not the plan content.** Agents read the plan themselves.
-- **The verification results WILL make your context grow.** That's the tradeoff for agents not being able to spawn sub-agents. Keep turn status summaries short to compensate.
+- **Pass the plan file path, not the plan content.** The player reads the plan itself.
+- **The decision is mechanical.** Issues at/above threshold = FEEDBACK. No issues at/above threshold = APPROVED. No subjective judgment.
