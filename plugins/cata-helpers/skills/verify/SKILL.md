@@ -391,14 +391,21 @@ Launch `cata-exerciser` (sonnet) with:
 ```
 {CONTEXT_BUNDLE}
 
-Exercise the application end-to-end:
-1. Start the application (docker compose, npm run dev, etc.)
-2. Navigate to the feature affected by these changes
-3. Exercise the feature as a user would
-4. Report whether it works
+Exercise the changes end-to-end:
+1. Read the engineer skill (.claude/skills/*-engineer/) if it exists — follow its instructions for starting the environment, authenticating, and interacting with services
+2. Start the full local environment (app + all backing services)
+3. Determine exercise strategy based on change type:
+   - Frontend/UI changes → use Playwright to navigate and interact
+   - API/backend changes → make actual API calls via curl, verify responses and data state
+   - Data/search/indexing changes → trigger operations, query services via CLI tools to verify data was written/indexed
+   - Job/worker changes → trigger jobs, verify side effects via database/service queries
+   - Mixed → exercise through all affected interfaces
+4. Verify data flows end-to-end — don't stop at "endpoint returns 200", follow data through the system
+5. Report whether the specific changes actually work with real data
 
-If you hit a barrier (can't start, need credentials, unclear what to test):
+If you hit a barrier (can't start, need credentials, unclear what to test, no engineer skill for complex backend):
 - Return BLOCKED status with specific reason
+- If you cannot determine HOW to exercise the change, that is severity 9-10
 
 ISSUES FOUND BY REVIEW AGENTS:
 {List of all issues found in Phase 6 with VI-IDs, severity, title, location}
@@ -408,7 +415,7 @@ While exercising, attempt to trigger each reported issue and report verification
 ```
 
 **Handle exerciser barriers:**
-- If BLOCKED with `LOGIN_REQUIRED` or `UNCLEAR_FEATURE` (interactive/auto-fix modes only):
+- If BLOCKED with `LOGIN_REQUIRED`, `UNCLEAR_FEATURE`, `NO_EXERCISE_STRATEGY`, `NO_ENGINEER_SKILL`, or `SERVICE_UNAVAILABLE` (interactive/auto-fix modes only):
   1. Use `AskUserQuestion` to get help from the user
   2. Re-launch cata-exerciser with the user's response
   3. If still blocked, record as final BLOCKED status
