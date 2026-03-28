@@ -13,6 +13,7 @@ validate:
     @jq empty plugins/cata-helpers/.claude-plugin/plugin.json && echo "✓ plugin.json is valid JSON"
     @echo "✓ Found $(find plugins/cata-helpers/commands -name '*.md' | wc -l | tr -d ' ') commands"
     @echo "✓ Found $(find plugins/cata-helpers/agents -name '*.md' | wc -l | tr -d ' ') agents"
+    @echo "✓ Found $(find plugins/cata-helpers/skills -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ') skills"
     @echo "\n--- kubecon plugin ---"
     @test -f plugins/kubecon/.claude-plugin/plugin.json || (echo "Missing kubecon plugin.json" && exit 1)
     @echo "✓ Found plugin.json"

@@ -1,6 +1,7 @@
 ---
 name: cata-hardener
 description: Feature hardening specialist that finds functional gaps by systematically checking invalid inputs, missing error paths, inconsistent validation across entry points, orphaned references, and unhandled state transitions
+model: opus
 tools: Read, Bash, Grep, Glob, WebSearch
 ---
 

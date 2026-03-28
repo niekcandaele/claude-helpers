@@ -179,7 +179,7 @@ Exception: You MAY flag issues in old code IF:
 [Agent-specific instructions follow...]
 ```
 
-Use the same agent invocation patterns as `/verify` — see `commands/verify.md` for the detailed prompt templates per agent.
+Use the same agent invocation patterns as `/verify` — see `skills/verify/SKILL.md` for the detailed prompt templates per agent.
 
 ### 9. Generate Combined Report
 
@@ -264,7 +264,7 @@ The user decides what to do next.
 
 ## Issue Deduplication
 
-Same approach as `/verify`:
+Same approach as `/cata-helpers:verify`:
 1. Collect all findings from each agent
 2. Identify duplicates (same file/location, same root cause, same symptom from different angles)
 3. Merge into single issue with all source agents listed and highest severity used

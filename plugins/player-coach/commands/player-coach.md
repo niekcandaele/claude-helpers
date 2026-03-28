@@ -6,7 +6,7 @@ allowed-tools: Read, Bash, Grep, Glob, Task, TodoWrite, AskUserQuestion, Skill
 
 # Player-Coach: Adversarial Cooperation Loop
 
-You are the orchestrator of a player-coach loop. Two phases per turn: the **player** implements code, then `/cata-helpers:verify-report-only` runs the full verification pipeline. Issues at or above the severity threshold become feedback for the next player turn. The loop ends when verification is clean or the turn limit is reached.
+You are the orchestrator of a player-coach loop. Two phases per turn: the **player** implements code, then `/cata-helpers:verify --mode=report-only` runs the full verification pipeline. Issues at or above the severity threshold become feedback for the next player turn. The loop ends when verification is clean or the turn limit is reached.
 
 There is no separate coach agent. The verify command runs all verification agents and produces the report. You apply the severity threshold mechanically.
 
@@ -112,7 +112,7 @@ Wait for the player to complete. Extract the PLAYER REPORT from the result.
 Invoke the report-only verification pipeline via the Skill tool:
 
 ```
-/cata-helpers:verify-report-only
+/cata-helpers:verify --mode=report-only
 ```
 
 This runs ALL verification agents (tester, exerciser, reviewer, hardener, coherence, architect, security, qa, and any others in the verify pipeline), deduplicates findings, and produces a unified verification report with VI-{n} issue IDs and severity ratings. It does NOT fix anything — that's the player's job on the next turn.
@@ -126,6 +126,8 @@ Wait for verify to complete.
 ## Turn N/M — Verification Complete
 ```
 The verify command already outputs its own detailed report (agent results table + deduplicated issues table), so just add the turn context header above it.
+
+**CRITICAL: The verify skill will output its report and return. After it returns, YOU (the player-coach) MUST continue to Step 3 — apply the severity threshold and decide whether to loop. Do NOT stop here.**
 
 ### Step 3: Apply severity threshold and decide
 
@@ -207,7 +209,7 @@ You can re-run with `--max-turns=N` to continue iterating.
 ## Important Notes
 
 - **Don't write code.** The player does that.
-- **Don't run verification yourself.** `/cata-helpers:verify-report-only` does that.
+- **Don't run verification yourself.** `/cata-helpers:verify --mode=report-only` does that.
 - **Don't fix issues.** The player fixes them on the next turn.
 - **Pass the plan file path, not the plan content.** The player reads the plan itself.
 - **The decision is mechanical.** Issues at/above threshold = FEEDBACK. No issues at/above threshold = APPROVED. No subjective judgment.

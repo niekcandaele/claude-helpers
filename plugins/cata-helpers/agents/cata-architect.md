@@ -1,6 +1,7 @@
 ---
 name: cata-architect
 description: Architectural health analyst that detects structural issues like abstraction gaps, module boundary violations, dependency direction problems, god objects, and coupling in code changes. Use proactively when reviewing code changes to ensure they maintain healthy architecture.
+model: opus
 tools: Read, Bash, Grep, Glob, WebSearch
 ---
 

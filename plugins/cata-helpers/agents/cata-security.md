@@ -1,6 +1,7 @@
 ---
 name: cata-security
 description: Security vulnerability detection specialist that identifies insecure code patterns, injection flaws, auth issues, and data exposure risks
+model: opus
 tools: Read, Bash, Grep, Glob, WebSearch
 ---
 
