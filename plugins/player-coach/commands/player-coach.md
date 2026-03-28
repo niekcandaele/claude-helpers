@@ -40,15 +40,17 @@ Check `$ARGUMENTS` for:
 
 Use `AskUserQuestion` to fill in anything not specified. Only ask what's genuinely needed — don't ask for the sake of asking.
 
-**Always ask (if not in arguments):**
+**Always ask (if not in arguments), using the EXACT format below:**
 
-- **Severity threshold**: What's the minimum severity for issues that must be fixed?
-  - 3 = strict (fix almost everything)
-  - 5 = moderate (fix meaningful issues)
-  - 7 = lenient (only fix critical/high issues)
-  - Default: 5
+- **Max turns** — ask with these exact options:
+  - `5` — quick (small fixes, focused tasks)
+  - `10` — standard (typical features) **[default]**
+  - `20` — thorough (large features, complex changes)
 
-- **Max turns**: How many iterations? (Default: 5)
+- **Severity threshold** — ask with these exact options:
+  - `3` — strict (fix almost everything)
+  - `5` — moderate (fix meaningful issues) **[default]**
+  - `7` — lenient (only fix critical/high issues)
 
 **Ask only if the plan is unclear about:**
 
