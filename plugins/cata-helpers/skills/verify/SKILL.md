@@ -159,7 +159,7 @@ Output concrete commands that can be executed.
 
 ```
 Read each changed file (not just the extension — look at actual content).
-For each file, classify what review types it needs:
+For each file, assign it to the agents whose review is most relevant:
 
 Categories:
 - CODE_REVIEW: Business logic, application code → cata-reviewer
@@ -173,6 +173,10 @@ Categories:
 
 A file can have multiple categories.
 
+IMPORTANT: ALL agents always run — triage assigns files to focus each agent,
+but never skips agents. Agents with no specifically assigned files review
+the full scope (they may catch cross-cutting concerns).
+
 Output a JSON-like mapping:
 {
   "agent_assignments": {
@@ -181,7 +185,6 @@ Output a JSON-like mapping:
     "cata-tester": ["all"],
     ...
   },
-  "skip_agents": ["cata-ux-reviewer"],  // if no UX-relevant files
   "toolchain": {
     "test": "npm test",
     "build": "npm run build",
@@ -190,9 +193,7 @@ Output a JSON-like mapping:
 }
 ```
 
-**If `--scope=all`:** Skip triage — run all agents on everything.
-
-**If `--skip-ux` or `--skip-security`:** Add those to `skip_agents` regardless of triage results.
+**If `--skip-ux` or `--skip-security`:** Those specific agents are skipped (explicit user override only).
 
 **Output:** Store the agent assignments as `TRIAGE_RESULT` and toolchain commands as `TOOLCHAIN`.
 
@@ -245,7 +246,7 @@ DIFF STAT:
 
 ## Phase 6: Launch Review Agents (Parallel)
 
-For each agent NOT in `TRIAGE_RESULT.skip_agents`, launch in parallel using the Agent tool.
+Launch ALL review agents in parallel using the Agent tool. Every agent runs every time — no agents are skipped based on triage (only explicit `--skip-ux` or `--skip-security` flags can exclude an agent).
 
 **Model routing is handled by agent frontmatter:**
 - opus: cata-reviewer, cata-security, cata-hardener, cata-coherence, cata-architect, cata-qa
@@ -443,8 +444,8 @@ While exercising, attempt to trigger each reported issue and report verification
 
 ## Triage Summary
 
-**Agents run:** cata-reviewer, cata-tester, cata-security, cata-hardener, cata-architect, cata-coherence, cata-qa, cata-exerciser
-**Agents skipped:** cata-ux-reviewer (no UX-relevant files in scope)
+**Agents run:** cata-reviewer, cata-tester, cata-security, cata-hardener, cata-architect, cata-coherence, cata-qa, cata-ux-reviewer, cata-exerciser
+**Agents skipped:** [none, or list if --skip-ux/--skip-security was used]
 **Static analysis:** ESLint (3 findings), tsc (1 finding)
 
 ---
@@ -585,14 +586,14 @@ Severity reflects "how big is this issue?" — NOT "must you fix it?" The human 
 
 ## When to Skip UX Review
 
-Only skip `cata-ux-reviewer` when ALL are true:
+`cata-ux-reviewer` runs by default like all other agents. It can only be skipped via the explicit `--skip-ux` flag. Use `--skip-ux` when ALL are true:
 - No changes to UI components, templates, or frontend code
 - No changes to CLI output formatting or help text
 - No changes to error messages or user-facing strings
 - No changes to API response messages
 - Pure backend, infrastructure, or internal refactoring only
 
-The triage phase (Phase 3) handles this automatically. When in doubt, RUN IT.
+When in doubt, don't use `--skip-ux` — let it run.
 
 ## Context Window Discipline
 
@@ -619,7 +620,7 @@ This is critical since verify runs in the main context window.
 
 ## Important Notes
 
-- **Triage-first**: Not all agents need to run on all files — triage reduces noise and cost
+- **All agents, every time**: Triage assigns files to focus each agent, but never skips agents — missed regressions cost more than the extra agent runs
 - **Static analysis pre-step**: Linter findings feed into review agents for context
 - **Engineer skill integration**: Pre-verified knowledge speeds up discovery
 - **Exerciser verifies issues**: Reported issues get E2E verification status
