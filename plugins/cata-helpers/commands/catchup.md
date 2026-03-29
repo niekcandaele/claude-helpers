@@ -237,7 +237,7 @@ Cannot compare branches without commit history.
 This command works well with:
 - `/clear` - Clear state, then `/catchup` to understand what's there
 - `/handoff` - After `/catchup`, use `/handoff` to document work
-- `/create-pr` - After `/catchup`, review changes before creating PR
+- `/cata-helpers:create-pr` - After `/catchup`, review changes before creating PR
 - `/check-ci` - After `/catchup`, ensure tests pass
 
 ## Final Instructions

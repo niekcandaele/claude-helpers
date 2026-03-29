@@ -182,68 +182,17 @@ Set feedback = the issues list above, append to feedback_history (prefixed with 
 
 This phase runs after verification passes (APPROVED) when `pr_enabled` is true (the default). Set `phase = "ci"`.
 
-### Step 1: Create the PR
+### Step 1: Write context file and create the PR
 
-First, check if a PR already exists for the current branch:
+Before invoking the create-pr skill, write the accumulated loop state to a temp file so the skill can produce a rich, context-aware PR description with inline review comments. The human wasn't present during implementation — this is their primary way to understand what happened.
 
-```bash
-gh pr view --json url 2>/dev/null
-```
-
-**If a PR already exists:** Extract the URL, store it as `pr_url`, and skip to Step 2.
-
-**If no PR exists:** Invoke the create-pr skill:
-
-```
-/cata-helpers:create-pr
-```
-
-This creates a feature branch, commits changes, pushes, and opens a PR. Extract the PR URL from the output and store it as `pr_url`.
-
-**If create-pr fails** (no remote, auth error, branch conflict, etc.): Report the failure to the user and fall back to the `--no-pr` completion summary (Phase 2). Do not retry — the user needs to fix the underlying issue.
-
-### Step 1b: Update PR with rich description
-
-After `pr_url` is obtained (whether from an existing PR or newly created), compose a comprehensive PR description and apply it. The human wasn't present during implementation — this description is their primary way to understand what happened.
-
-**Compose the PR body using this template, then apply it with `gh pr edit`:**
+**Write the context file:**
 
 ```bash
-gh pr edit {pr_url} --body "$(cat <<'PRBODY'
-{composed body — see template below}
-PRBODY
-)"
-```
-
-If `gh pr edit` fails, warn the user but do not fail the loop — the generic description from create-pr is an acceptable fallback.
-
-#### PR Description Template
-
-Populate this from the accumulated loop state (plan, feedback_history, sticky_issues, player_concerns, ci_failures_log, and the final verification report):
-
-```markdown
-## Summary
-
-{2-4 sentences explaining what was built and why, derived from the plan.
-Write for someone who was NOT involved in planning or implementation.
-Include the motivation/problem being solved, not just what files changed.}
-
-## Architecture
-
-{ASCII diagram showing the high-level structure of what was built or changed.
-Show data flow, component relationships, request paths, module boundaries —
-whatever helps the reader build a mental model quickly.
-
-Skip this section for small or non-architectural changes (bug fixes, config tweaks).}
-
-## What Changed
-
-{Key changes grouped logically. Describe at component/feature level, not per-file.
-Include what tests were added.}
-
-- **Area/Component**: What was done and why
-- **Another area**: What was done and why
-- **Tests**: Summary of test coverage added
+cat > /tmp/pc-pr-context.md << 'CONTEXT'
+## Plan Summary
+{Synthesize the plan's goals in 2-4 sentences. Write for someone who was NOT
+involved in planning. Include the problem being solved.}
 
 ## Implementation Journey
 
@@ -251,59 +200,44 @@ Completed in {N} turns (of {M} budget), severity threshold {S}.
 
 | Turn | Phase | Summary | Outcome |
 |------|-------|---------|---------|
-| 1 | Verify | {player summary} | {N issues → FEEDBACK} |
-| 2 | Verify | {player summary} | {0 issues → APPROVED} |
-| 3 | CI | PR created | {outcome} |
-| ... | ... | ... | ... |
+{turn history table from feedback_history}
 
-{If the run was smooth (≤3 turns, no sticky issues, no CI failures):
-"Clean implementation — no sticky issues or repeated feedback."}
-
-{If the run was rough (many turns, sticky issues, CI failures):
-Write a brief narrative explaining what happened. Example:
-"The auth middleware took 3 turns to stabilize. Turn 1's approach used
-session storage but verification flagged JWT as the project convention.
-After switching in turn 2, token refresh edge cases required turn 3."}
+{If smooth: "Clean implementation — no sticky issues or repeated feedback."}
+{If rough: brief narrative of what happened and why.}
 
 ## Friction Log
+{From sticky_issues and player_concerns. Only include if friction occurred.
+For each item, include the file/line reference so the skill can post inline comments.}
 
-{ONLY include this section if friction actually occurred. Omit entirely for clean runs.
-
-Include items where:
-- An issue persisted across 2+ turns (from sticky_issues) — the player couldn't fix it on the first try
-- The player flagged unresolved concerns
-- A workaround or hack was applied instead of a clean fix
-- CI failures required non-trivial fixes
-
-These are signals the human should look closely at the code in that area.
-
-Format per item:}
-
-- **{area/file}**: {What was hard and why}. Appeared in turns {N, M}.
-  **Review**: {Specific thing the human should check — e.g., "the retry logic
-  in auth.ts:45 is a workaround for a race condition, consider a proper fix"}
+- **{area}** ({file}:{line}): {What was hard and why}. Turns {N, M}.
 
 ## Below-Threshold Issues
-
-{Issues from the final verification that fell below the severity threshold.
-These passed the bar but the human may want to address them later.
-Omit this section if there are none.}
+{From final verification report. Omit if none.}
 
 - (sev {N}) [{agent}] VI-{X}: {description}
+
+## CI Failures
+{From ci_failures_log. Omit if none.}
+CONTEXT
 ```
 
-#### Key guidance
+**Invoke the create-pr skill with the context:**
 
-- **Summary**: Synthesize the plan's goals in plain language — don't paste the plan verbatim.
-- **Architecture**: Even a 3-line box-and-arrow diagram helps. Skip for trivial changes.
-- **Friction Log**: This is the most important section. A clean run with no friction log signals "smooth, standard review." A friction log signals "pay attention here." Be honest about hacks and workarounds — the human would rather know now than discover issues in production.
+```
+/cata-helpers:create-pr --context=/tmp/pc-pr-context.md
+```
+
+The skill creates the feature branch, commits, pushes, opens the PR with a rich description, and posts inline review comments on friction areas. Extract the PR URL from the output and store it as `pr_url`.
+
+**If a PR already exists:** The skill detects this and updates the description instead.
+
+**If create-pr fails** (no remote, auth error, branch conflict, etc.): Report the failure to the user and fall back to the `--no-pr` completion summary (Phase 2). Do not retry — the user needs to fix the underlying issue.
 
 **Output to user:**
 ```markdown
 ## PR Created
 
 PR: [pr_url]
-PR description updated with implementation context.
 Checking CI status...
 ```
 

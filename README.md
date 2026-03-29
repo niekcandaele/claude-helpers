@@ -84,7 +84,7 @@ Specialized agents for specific review and analysis tasks (all follow "Report, N
 | `/setup-engineer` | Create/update repository-specific engineer skill |
 | `/create-issue` | Transform notes into GitHub issues |
 | `/commit-and-push` | Quality checks, commit, and push |
-| `/create-pr` | Create PR with branch management |
+| `/create-pr` | Create PR/MR with rich descriptions and inline review comments |
 | `/check-ci` | Monitor CI/CD and fix failures |
 | `/catchup` | Summarize branch changes |
 | `/handoff` | Document progress for session continuity |
@@ -165,19 +165,21 @@ Automatically runs quality checks, creates a clean commit, and pushes to remote.
 
 ### Create PR (`/create-pr`)
 
-Creates a pull request with automatic branch management and platform detection.
+Creates a pull request or merge request with a rich, context-aware description and inline review comments. Analyzes changes to explain what changed, why, and where reviewers should focus.
 
 **Usage:**
 ```
-/create-pr [optional PR title]
+/create-pr [optional PR title] [--context=path] [--no-comments]
 ```
 
 **What it does:**
-- Checks if you're on a feature branch (creates one if on main/master)
-- Runs commit-and-push workflow for uncommitted changes
-- Detects git platform (GitHub, GitLab, Bitbucket)
-- Creates PR using appropriate CLI tool (gh, glab)
-- Generates PR title and description from commits
+- Creates feature branch, commits, pushes to remote
+- Detects git platform (GitHub, GitLab) and uses appropriate CLI
+- Gathers context (diff, commits, plan files, issue references)
+- Composes rich PR description: summary, architecture diagram, what changed, reviewer guide
+- Posts inline review comments on lines needing attention (max 8)
+- Accepts optional context file from callers like player-coach (friction log, turn history)
+- Fetches and applies matching labels
 
 ### Check CI (`/check-ci`)
 
