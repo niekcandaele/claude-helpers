@@ -413,7 +413,7 @@ Try specifying a different location:
 This command works well with:
 - `/clear` - After `/handoff`, clear the session knowing state is documented
 - `/catchup` - When resuming, use `/catchup` to verify handoff is accurate
-- `/create-pr` - Before creating PR, `/handoff` documents what's being submitted
+- `/cata-helpers:create-pr` - Before creating PR, `/handoff` documents what's being submitted
 - `/check-ci` - After `/handoff`, ensure tests pass before stepping away
 
 ## Advanced Features

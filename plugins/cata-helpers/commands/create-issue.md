@@ -612,5 +612,5 @@ This command works well with the existing workflow:
 /ralph-execute
 
 # Create a PR when done:
-/create-pr
+/cata-helpers:create-pr
 ```
