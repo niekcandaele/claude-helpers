@@ -25,6 +25,13 @@ validate:
     @jq empty plugins/player-coach/.claude-plugin/plugin.json && echo "✓ plugin.json is valid JSON"
     @echo "✓ Found $(find plugins/player-coach/commands -name '*.md' | wc -l | tr -d ' ') commands"
     @echo "✓ Found $(find plugins/player-coach/agents -name '*.md' | wc -l | tr -d ' ') agents"
+    @echo "\n--- root-cause-analysis plugin ---"
+    @test -f plugins/root-cause-analysis/.claude-plugin/plugin.json || (echo "Missing root-cause-analysis plugin.json" && exit 1)
+    @echo "✓ Found plugin.json"
+    @jq empty plugins/root-cause-analysis/.claude-plugin/plugin.json && echo "✓ plugin.json is valid JSON"
+    @echo "✓ Found $(find plugins/root-cause-analysis/commands -name '*.md' | wc -l | tr -d ' ') commands"
+    @echo "✓ Found $(find plugins/root-cause-analysis/agents -name '*.md' | wc -l | tr -d ' ') agents"
+    @echo "✓ Found $(find plugins/root-cause-analysis/skills -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ') skills"
     @echo "\n--- marketplace ---"
     @test -f .claude-plugin/marketplace.json || (echo "Missing marketplace.json" && exit 1)
     @echo "✓ Found marketplace.json"

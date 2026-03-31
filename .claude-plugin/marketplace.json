@@ -33,6 +33,15 @@
       "author": {
         "name": "Niek Candaele"
       }
+    },
+    {
+      "name": "root-cause-analysis",
+      "source": "./plugins/root-cause-analysis",
+      "description": "Adversarial investigation loop — investigator gathers evidence, critic reviews for depth and rigor",
+      "version": "1.0.0",
+      "author": {
+        "name": "Niek Candaele"
+      }
     }
   ]
 }
