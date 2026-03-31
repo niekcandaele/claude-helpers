@@ -1,6 +1,6 @@
 {
   "name": "root-cause-analysis",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Adversarial investigation loop — investigator gathers evidence and writes report, critic pushes for depth and rigor",
   "author": {
     "name": "Niek Candaele"
