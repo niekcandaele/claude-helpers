@@ -89,6 +89,18 @@ Every time series comparison, before/after measurement, or distribution analysis
 
 Chart titles describe findings, not metrics: "P95 dropped from 120s to 270ms after index migration" not "Response Time."
 
+### 7. Scrub sensitive data from all report content
+
+Investigation evidence often contains secrets and personally identifiable information. RCA reports get shared with teams, stakeholders, and sometimes end up in post-mortem archives — any sensitive data in the report becomes a leak.
+
+Before writing evidence into the report or worklog, redact:
+- **Credentials**: passwords, API keys, tokens, secrets, private keys
+- **Connection strings**: mask embedded usernames and passwords (e.g., `postgres://[REDACTED]@db-host:5432/mydb`)
+- **PII**: email addresses, phone numbers, and personal names that aren't essential to understanding the issue
+- **Internal identifiers**: customer IDs, account numbers, or tenant-specific data when not directly relevant to the root cause
+
+Use descriptive placeholders so the evidence remains useful: `[REDACTED-API-KEY]`, `[REDACTED-PASSWORD]`, `[REDACTED-EMAIL]`. Keep the structure around the redacted value — a reader should still understand the query pattern, the config shape, or the log format. For example, show `Authorization: Bearer [REDACTED-TOKEN]` not just `[REDACTED]`.
+
 ## Turn 1: Initial Investigation
 
 When there is no previous feedback:

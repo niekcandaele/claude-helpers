@@ -72,6 +72,9 @@ Every claim cites its source — the exact query, command, or code reference. A 
 ### Honest about what it doesn't know
 If evidence was inaccessible, the report says so. If a hypothesis couldn't be fully verified, it's marked as plausible, not confirmed. Wrong theories are documented in the Investigation Trail so others don't repeat them.
 
+### Scrubbed of sensitive data
+Passwords, API keys, tokens, PII, and connection strings are redacted before they enter the report. Evidence keeps its structure (query patterns, config shapes, log formats) but credentials and personal data are replaced with descriptive `[REDACTED-*]` placeholders. The critic flags any sensitive data that slips through as severity 9-10.
+
 ### Actionable
 Fix recommendations include code-level changes, not just "increase resources." The report explains the mechanism so developers know exactly what to change and why.
 

@@ -73,6 +73,18 @@ The report is hard to follow for someone who wasn't part of the investigation.
 - **Chart title describes metric, not finding**: "Response Time" vs "P95 dropped from 120s to 270ms after index migration." Severity 3.
 - **Disjointed narrative**: The report jumps between issues without clear transitions or a logical flow from symptom to root cause. Severity 4.
 
+## Sensitive Data Exposure (severity 9-10)
+
+RCA reports get shared broadly — with teams, stakeholders, and into post-mortem archives. Any sensitive data in the report is effectively a leak.
+
+Scan the report and worklog for:
+- **Credentials in evidence** (severity 10): passwords, API keys, bearer tokens, private keys, or secrets visible in log excerpts, query examples, config snippets, or curl commands. Even a single leaked credential means the report can't be shared safely.
+- **Connection strings with embedded credentials** (severity 10): database URIs, API endpoints, or service URLs that contain plaintext usernames/passwords.
+- **PII that isn't essential to the investigation** (severity 9): email addresses, phone numbers, personal names, customer IDs, or account numbers included in evidence but not directly relevant to the root cause. If the PII is central to the issue (e.g., investigating why a specific user's requests fail), note that it should be anonymized with a placeholder like `[USER-A]`.
+- **Internal secrets in environment tables** (severity 9): environment variable values, internal hostnames with credentials, or cloud resource ARNs that expose account structure.
+
+The investigator should be using `[REDACTED-*]` placeholders. If they haven't, flag every instance. One missed credential is enough to make the entire report unsafe to distribute.
+
 ## Contradiction Detection
 
 Actively look for internal contradictions in the report:
