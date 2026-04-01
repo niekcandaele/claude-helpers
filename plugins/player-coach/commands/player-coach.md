@@ -128,6 +128,8 @@ This runs ALL verification agents (tester, exerciser, reviewer, hardener, cohere
 
 The verify command handles agent spawning, parallelism, deduplication, and reporting. No need to manage agent lists here — if verify adds new agents in the future, they're automatically included.
 
+**The exerciser (cata-exerciser) must run every single turn.** The exerciser does a real E2E smoke test — it starts the application, uses the feature, and checks data flows. Tests passing is not sufficient; the feature must actually work end-to-end with real interactions. Do not rationalize skipping it ("the changes were small", "just a fix", "saving time") — the exerciser runs every turn because any code change can break E2E behavior in ways that unit tests miss. If the verification report comes back without a cata-exerciser row in the Agent Results Summary, treat verification as incomplete and re-invoke verify.
+
 Wait for verify to complete.
 
 **Output to the user:**
@@ -148,6 +150,25 @@ This is mechanical — no judgment call needed.
 
 1. **Sticky issues**: Compare this turn's issues against the previous turn's feedback by title, location, and description — NOT by VI-ID (VI-IDs are sequential counters regenerated each run, so VI-1 in turn 1 and VI-1 in turn 2 are unrelated). If an issue from this turn matches a previous turn's issue by content (same file/location, same root cause), add it to `sticky_issues` with both turn numbers. These are issues the player failed to fix on the first attempt — a friction signal.
 2. **Player concerns**: If the player report's "Remaining concerns" section lists any items (is not empty, "none", "N/A", or similar), append it to `player_concerns` with the turn number.
+
+**EXERCISER GATE (check this before the APPROVED/FEEDBACK decision):**
+
+Look at the verification report's Agent Results Summary table for the `cata-exerciser` row. This gate is mechanical — a table lookup with no room for judgment calls.
+
+1. **cata-exerciser row is MISSING from the report:** The exerciser did not run. Output:
+   ```markdown
+   ## Turn N/M — EXERCISER MISSING
+   The exerciser did not run this turn. Re-running verification.
+   ```
+   Re-invoke `/cata-helpers:verify --mode=report-only`. This does not increment the turn counter.
+
+2. **cata-exerciser status is FAILED:** The feature does not work end-to-end. This blocks approval regardless of severity threshold — treat it as a severity 10 issue. Add the exerciser's failure description to feedback and continue to next turn.
+
+3. **cata-exerciser status is BLOCKED:** The feature could not be verified. This blocks approval — treat as severity 9. The player must resolve the blocker (startup failure, missing credentials, unclear exercise strategy) so the exerciser can run. Add to feedback and continue to next turn.
+
+4. **cata-exerciser status is PASSED:** Proceed to the APPROVED/FEEDBACK decision below.
+
+A feature cannot be approved without a passing exerciser. The exerciser is what proves the feature actually works — not just that tests pass or code reviews look clean.
 
 **If zero issues at/above threshold → APPROVED:**
 
