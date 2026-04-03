@@ -45,6 +45,7 @@ Some agents and commands require specific permissions. Add these to your `.claud
       "Bash(find:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
+      "Bash(codex:*)",
       "Bash(curl:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
@@ -62,6 +63,10 @@ Some agents benefit from MCP server integration:
 - **PostgreSQL MCP** - For cata-debugger and cata-researcher database inspection
 - **Redis MCP** - For cata-debugger and cata-researcher cache inspection
 
+Some integrations also require local tooling:
+
+- **Codex CLI** - Required for `cata-codex-reviewer`; must be installed locally, authenticated, and allowed outbound network access
+
 ## Overview
 
 ### Agents
@@ -71,6 +76,7 @@ Specialized agents for specific review and analysis tasks (all follow "Report, N
 | Agent | Purpose |
 |-------|---------|
 | `cata-reviewer` | Strict code review, detects over-engineering and AI patterns |
+| `cata-codex-reviewer` | Independent general review pass via local Codex CLI for second-model feedback |
 | `cata-debugger` | Evidence-based troubleshooting with systematic investigation |
 | `cata-researcher` | Critical research with multi-source verification |
 | `cata-tester` | No-nonsense test execution (100% pass rate only) |

@@ -82,6 +82,16 @@ Create a list of files in scope with status:
 
 Store as `SCOPE_CONTEXT` for passing to agents.
 
+Also build a machine-usable `SCOPE_METADATA` block for agents that need exact diff reconstruction:
+- `scope_mode`: `staged`, `unstaged`, `branch`, `files`, `module`, `all`, or the resolved auto-detected mode
+- `base_ref`: exact baseline ref/commit used for the scoped diff
+- `compare_ref`: exact comparison target (`HEAD`, `INDEX`, `WORKTREE`, or explicit ref)
+- `path_filter`: exact scoped paths, or `ALL_SCOPED_FILES`
+- `diff_command`: exact git diff command used to define the scope
+- `merge_base`: exact merge-base hash for branch scope, otherwise empty
+
+`SCOPE_METADATA` is the source of truth for any agent that needs to reconstruct the selected diff.
+
 **4. Format Scope for Agents:**
 
 ```
@@ -105,6 +115,17 @@ Exception: You MAY flag issues in old code IF:
 Git commands to see your scoped changes:
 git diff HEAD -- <scoped-files>
 git diff --cached -- <scoped-files>
+```
+
+Example machine-readable metadata:
+```text
+SCOPE_METADATA:
+- scope_mode: unstaged
+- base_ref: INDEX
+- compare_ref: WORKTREE
+- path_filter: src/auth/login.ts,src/auth/middleware.ts
+- diff_command: git diff -- src/auth/login.ts src/auth/middleware.ts
+- merge_base:
 ```
 
 ## Phase 2: Load Engineer Skill
@@ -163,6 +184,7 @@ For each file, assign it to the agents whose review is most relevant:
 
 Categories:
 - CODE_REVIEW: Business logic, application code → cata-reviewer
+- GENERAL_SECOND_OPINION: Entire scoped diff → cata-codex-reviewer
 - SECURITY: Auth, crypto, input handling, data access → cata-security
 - HARDENING: Input validation, error paths, state management → cata-hardener
 - ARCHITECTURE: Module structure, dependencies, abstractions → cata-architect
@@ -177,10 +199,13 @@ IMPORTANT: ALL agents always run — triage assigns files to focus each agent,
 but never skips agents. Agents with no specifically assigned files review
 the full scope (they may catch cross-cutting concerns).
 
+Always assign the full scoped file list to `cata-codex-reviewer`. It is a general second-opinion pass, not a specialist router target.
+
 Output a JSON-like mapping:
 {
   "agent_assignments": {
     "cata-reviewer": ["src/auth.ts", "src/api/users.ts"],
+    "cata-codex-reviewer": ["all scoped files"],
     "cata-security": ["src/auth.ts"],
     "cata-tester": ["all"],
     ...
@@ -226,6 +251,9 @@ CONTEXT_BUNDLE:
 VERIFICATION SCOPE:
 {SCOPE_CONTEXT from Phase 1}
 
+SCOPE METADATA:
+{SCOPE_METADATA from Phase 1}
+
 ENGINEER SKILL SUMMARY:
 {Brief summary from ENGINEER_CONTEXT, or "No engineer skill found — toolchain discovered via exploration"}
 {If engineer skill exists: "Reference files available at .claude/skills/{name}/ — read TESTING.md, ARCHITECTURE.md etc. for your domain"}
@@ -250,7 +278,7 @@ Launch ALL review agents in parallel using the Agent tool. Every agent runs ever
 
 **Model routing is handled by agent frontmatter:**
 - opus: cata-reviewer, cata-security, cata-hardener, cata-coherence, cata-architect, cata-qa
-- sonnet: cata-ux-reviewer
+- sonnet: cata-ux-reviewer, cata-codex-reviewer
 - haiku: cata-tester
 
 **Each agent prompt includes:**
@@ -259,6 +287,8 @@ Launch ALL review agents in parallel using the Agent tool. Every agent runs ever
 3. Static findings relevant to their domain (e.g., security lint rules → cata-security)
 4. Instruction to read engineer skill reference files for their domain if available
 5. Agent-specific instructions (see templates below)
+
+For `cata-codex-reviewer`, `SCOPE_METADATA` is authoritative. It must not infer scope mode from filenames or prose when exact metadata is available.
 
 ### Agent Prompt Templates
 
@@ -294,6 +324,19 @@ OUTPUT FORMAT: For each issue found, provide:
 Review for: design adherence, over-engineering, AI slop, structural completeness.
 When checking completeness, verify changes in scope are complete (e.g., if route added, check if tests exist).
 But do NOT audit the entire codebase for unrelated issues.
+```
+
+**cata-codex-reviewer:**
+```
+Run the local Codex CLI as an independent second-opinion reviewer.
+Use `codex review` via Bash, not Claude's native analysis alone.
+Use `SCOPE_METADATA` as the source of truth for scope reconstruction.
+Adapt the verify scope into a temporary diff-only workspace under /tmp so Codex reviews only the intended changes.
+Do NOT infer staged vs unstaged vs branch vs path-filtered scope from assigned files or prose if `SCOPE_METADATA` says otherwise.
+If exact reconstruction from `SCOPE_METADATA` is not possible, report PATCH_CONSTRUCTION_FAILED instead of reviewing an approximate diff.
+If Codex is unavailable (missing CLI, auth missing, network blocked, sandbox blocked), report BLOCKED status with a short factual reason.
+If scope is `--scope=all`, report SKIPPED_UNSUPPORTED_SCOPE rather than attempting a whole-codebase audit.
+Normalize Codex output into: title, severity, location, description.
 ```
 
 **cata-tester:**
@@ -367,6 +410,13 @@ Collect structured findings from each agent. Extract ONLY:
 - Description
 
 **Discard investigation narratives.** Keep the orchestrator context lean.
+
+For `cata-codex-reviewer`, also collect agent status if no findings were produced:
+- `COMPLETED`
+- `BLOCKED`
+- `SKIPPED_UNSUPPORTED_SCOPE`
+
+Blocked or skipped Codex runs are reported in the Agent Results Summary but do not abort verification.
 
 ### 7b. Conditional: cata-debugger
 
@@ -451,7 +501,7 @@ While exercising, attempt to trigger each reported issue and report verification
 
 ## Triage Summary
 
-**Agents run:** cata-reviewer, cata-tester, cata-security, cata-hardener, cata-architect, cata-coherence, cata-qa, cata-ux-reviewer, cata-exerciser
+**Agents run:** cata-reviewer, cata-codex-reviewer, cata-tester, cata-security, cata-hardener, cata-architect, cata-coherence, cata-qa, cata-ux-reviewer, cata-exerciser
 **Agents skipped:** [none, or list if --skip-ux/--skip-security was used]
 **Static analysis:** ESLint (3 findings), tsc (1 finding)
 
@@ -464,6 +514,7 @@ While exercising, attempt to trigger each reported issue and report verification
 | cata-static | Completed | 4 findings (3 warnings, 1 error) |
 | cata-tester | X passed, Y failed | [brief note] |
 | cata-reviewer | Completed | Found N items |
+| cata-codex-reviewer | Completed / Blocked / Skipped | Found N items / [reason] |
 | cata-ux-reviewer | Completed / Skipped | Found N items / [reason] |
 | cata-coherence | Completed | Found N items |
 | cata-architect | Completed | Found N items |
@@ -628,6 +679,7 @@ This is critical since verify runs in the main context window.
 ## Important Notes
 
 - **All agents, every time**: Triage assigns files to focus each agent, but never skips agents — missed regressions cost more than the extra agent runs
+- **Codex reviewer is best-effort**: It should surface an independent second-model review when local Codex is available, and show BLOCKED/SKIPPED status when it is not
 - **Static analysis pre-step**: Linter findings feed into review agents for context
 - **Engineer skill integration**: Pre-verified knowledge speeds up discovery
 - **Exerciser verifies issues**: Reported issues get E2E verification status
