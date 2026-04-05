@@ -146,11 +146,8 @@ Record the status of each check/job (pass/fail/pending/running). Do NOT wait for
 Launch agents **in parallel** using the Task tool. Each agent prompt MUST include the PR scope context.
 
 **Agents to launch:**
-- `cata-reviewer` — Code review scoped to PR diff
+- `cata-reviewer` — Comprehensive review scoped to PR diff (design, architecture, coherence, hardening, security)
 - `cata-tester` — Run test suite with scope awareness
-- `cata-coherence` — Pattern/consistency check on changed files
-- `cata-architect` — Architectural health analysis
-- `cata-security` — Security vulnerability detection
 
 **If `--with-ux` flag is present**, also launch:
 - `cata-ux-reviewer` — UX review of changed surfaces
@@ -218,10 +215,7 @@ Combine all information into a single report:
 | Agent | Status | Notes |
 |-------|--------|-------|
 | cata-tester | X passed, Y failed | [brief note] |
-| cata-reviewer | Completed | Found N items |
-| cata-coherence | Completed | Found N items |
-| cata-architect | Completed | Found N items |
-| cata-security | Completed | Found N items |
+| cata-reviewer | Completed | Found N items (design, arch, coherence, hardening, security) |
 | cata-ux-reviewer | Completed / Skipped | [if --with-ux] |
 | cata-exerciser | PASSED / FAILED / Skipped | [if --with-ux] |
 

@@ -180,9 +180,24 @@ Look at the verification report for a "Custom Verification Gates" section. This 
 
 3. **Any custom gate has status BLOCKED:** This blocks approval — treat as severity 9. The player must resolve whatever prevented the gate from being checked. Add to feedback and continue to next turn.
 
-4. **All custom gates PASS:** Proceed to the APPROVED/FEEDBACK decision below.
+4. **All custom gates PASS:** Proceed to the CODEX GATE below.
 
 Custom gates are repo-maintainer-defined invariants. A feature cannot be approved with failing custom gates.
+
+**CODEX GATE (after custom gates, before APPROVED/FEEDBACK):**
+
+Look at the verification report's Agent Results Summary for `cata-codex-reviewer`. This gate requires human input when Codex is blocked.
+
+1. **cata-codex-reviewer status is COMPLETED:** Proceed to the APPROVED/FEEDBACK decision below.
+
+2. **cata-codex-reviewer status is BLOCKED:** The independent second-model review did not run. Use `AskUserQuestion` to ask:
+   > "Codex review was BLOCKED ({reason from report}). The independent second-model review did not run. Continue without Codex review, or stop to resolve?"
+   - If user says continue → proceed to APPROVED/FEEDBACK decision
+   - If user says stop → halt the loop and output current state
+
+3. **cata-codex-reviewer status is SKIPPED_UNSUPPORTED_SCOPE:** Expected for `--scope=all`. Proceed to APPROVED/FEEDBACK decision.
+
+4. **No cata-codex-reviewer row in report:** Treat as BLOCKED and ask the user.
 
 **If zero issues at/above threshold → APPROVED:**
 

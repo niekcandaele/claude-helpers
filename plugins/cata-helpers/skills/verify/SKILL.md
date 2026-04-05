@@ -5,7 +5,7 @@ description: >
   Detects scope, discovers toolchain, triages files to relevant agents, runs static
   analysis, launches review agents in parallel, exercises the app, and produces a
   unified report. Supports interactive, report-only, and auto-fix modes.
-argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--files=file1,file2] [--module=path] [--skip-ux] [--skip-security] [--auto-fix-threshold=N]"
+argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--files=file1,file2] [--module=path] [--skip-ux] [--auto-fix-threshold=N]"
 ---
 
 # Verify Changes — Triage-First Pipeline
@@ -34,7 +34,6 @@ Parse `$ARGUMENTS` for:
 
 **Other Options:**
 - `--skip-ux`: Skip UX review for pure backend changes
-- `--skip-security`: Skip security review (not recommended)
 - `--auto-fix-threshold=N`: Minimum severity for auto-fix mode (default: 3)
 
 ## Phase 1: Scope Detection
@@ -187,12 +186,8 @@ Read each changed file (not just the extension — look at actual content).
 For each file, assign it to the agents whose review is most relevant:
 
 Categories:
-- CODE_REVIEW: Business logic, application code → cata-reviewer
+- REVIEWER: Business logic, application code, architecture, patterns, security, robustness → cata-reviewer
 - GENERAL_SECOND_OPINION: Entire scoped diff → cata-codex-reviewer
-- SECURITY: Auth, crypto, input handling, data access → cata-security
-- HARDENING: Input validation, error paths, state management → cata-hardener
-- ARCHITECTURE: Module structure, dependencies, abstractions → cata-architect
-- COHERENCE: Pattern adherence, existing utilities → cata-coherence
 - QA: Test files or files that need test coverage assessment → cata-qa
 - UX: UI components, CLI output, user-facing strings → cata-ux-reviewer
 - TEST_EXECUTION: Any code change that could affect tests → cata-tester
@@ -208,11 +203,11 @@ Always assign the full scoped file list to `cata-codex-reviewer`. It is a genera
 Output a JSON-like mapping:
 {
   "agent_assignments": {
-    "cata-reviewer": ["src/auth.ts", "src/api/users.ts"],
+    "cata-reviewer": ["all scoped files"],
     "cata-codex-reviewer": ["all scoped files"],
-    "cata-security": ["src/auth.ts"],
+    "cata-qa": ["test files and files needing test coverage"],
+    "cata-ux-reviewer": ["UI/CLI/user-facing files"],
     "cata-tester": ["all"],
-    ...
   },
   "toolchain": {
     "test": "npm test",
@@ -222,7 +217,7 @@ Output a JSON-like mapping:
 }
 ```
 
-**If `--skip-ux` or `--skip-security`:** Those specific agents are skipped (explicit user override only).
+**If `--skip-ux`:** The UX reviewer agent is skipped (explicit user override only).
 
 **Output:** Store the agent assignments as `TRIAGE_RESULT` and toolchain commands as `TOOLCHAIN`.
 
@@ -283,16 +278,17 @@ DIFF STAT:
 
 ## Phase 6: Launch Review Agents (Parallel)
 
-Launch ALL review agents in parallel using the Agent tool. Every agent runs every time — no agents are skipped based on triage (only explicit `--skip-ux` or `--skip-security` flags can exclude an agent).
+Launch ALL review agents in parallel using the Agent tool. Every agent runs every time — no agents are skipped based on triage (only explicit `--skip-ux` flag can exclude an agent).
 
 **Model routing is handled by agent frontmatter:**
-- sonnet: cata-reviewer, cata-security, cata-hardener, cata-coherence, cata-architect, cata-qa, cata-ux-reviewer, cata-codex-reviewer, cata-exerciser
+- opus: cata-reviewer (comprehensive review: design, architecture, coherence, hardening, security)
+- sonnet: cata-codex-reviewer, cata-qa, cata-ux-reviewer, cata-exerciser
 - haiku: cata-tester, cata-static
 
 **Each agent prompt includes:**
 1. The `CONTEXT_BUNDLE` from Phase 5
 2. Per-agent file list from `TRIAGE_RESULT.agent_assignments`
-3. Static findings relevant to their domain (e.g., security lint rules → cata-security)
+3. Static findings relevant to their domain
 4. Instruction to read engineer skill reference files for their domain if available
 5. Agent-specific instructions (see templates below)
 
@@ -314,7 +310,7 @@ RELEVANT STATIC FINDINGS:
 {If engineer skill exists:}
 ENGINEER SKILL REFERENCE:
 Reference files are available at .claude/skills/{engineer-skill-name}/
-Read files relevant to your domain (e.g., TESTING.md for cata-tester, architecture docs for cata-architect).
+Read files relevant to your domain (e.g., TESTING.md for cata-tester, architecture docs for cata-reviewer).
 
 {Agent-specific instructions...}
 
@@ -329,9 +325,15 @@ OUTPUT FORMAT: For each issue found, provide:
 
 **cata-reviewer:**
 ```
-Review for: design adherence, over-engineering, AI slop, structural completeness.
-When checking completeness, verify changes in scope are complete (e.g., if route added, check if tests exist).
-But do NOT audit the entire codebase for unrelated issues.
+Comprehensive review across all five dimensions:
+1. Design & Code Quality: design adherence, over-engineering, AI slop, test integrity, structural completeness
+2. Architecture: module boundaries, dependency direction, god objects, abstraction opportunities, coupling
+3. Coherence: reinvented wheels, pattern violations, convention mismatches, documentation drift, dead code
+4. Hardening: invalid inputs, error paths, inconsistent validation, orphaned references, state transitions
+5. Security: injection, auth/authz, multi-tenant isolation, data exposure, crypto
+
+Research the project's structure, patterns, and security approach BEFORE evaluating changes.
+Focus on: 'Is this change well-designed, structurally sound, pattern-consistent, robust, and secure?'
 ```
 
 **cata-codex-reviewer:**
@@ -363,41 +365,6 @@ Focus on the UX of what changed in this scope.
 Test any UI, CLI output, error messages, or API responses that were modified.
 ```
 
-**cata-coherence:**
-```
-Check if THESE specific changes follow codebase patterns.
-Look for reinvented wheels in THIS change set.
-Verify THIS change doesn't violate existing patterns.
-Check documentation that relates to THESE changed files.
-Focus on: 'Do these new changes fit well?'
-```
-
-**cata-architect:**
-```
-Analyze the ARCHITECTURAL IMPACT of these specific changes.
-Check if changes degrade structural health (module boundaries, dependency direction, layering).
-Look for abstraction opportunities (3+ duplications).
-Check for god object growth in changed files.
-Focus on: 'Do these changes maintain healthy architecture?'
-```
-
-**cata-security:**
-```
-ONLY flag security issues in code that was ADDED or MODIFIED.
-First research how security is done in THIS codebase (auth, tenant isolation, validation).
-Flag deviations from established security patterns.
-Focus on: 'Does this new code introduce security vulnerabilities?'
-```
-
-**cata-hardener:**
-```
-Systematically check what happens with invalid/missing/extreme input.
-Check if every failure mode gives feedback.
-Compare validation across entry points.
-Check for orphaned references and missing cascade behavior.
-Focus on: 'What failure scenarios do these changes not handle?'
-```
-
 **cata-qa:**
 ```
 Evaluate whether the scoped changes are adequately tested.
@@ -424,7 +391,10 @@ For `cata-codex-reviewer`, also collect agent status if no findings were produce
 - `BLOCKED`
 - `SKIPPED_UNSUPPORTED_SCOPE`
 
-Blocked or skipped Codex runs are reported in the Agent Results Summary but do not abort verification.
+**Codex BLOCKED handling:** If cata-codex-reviewer reports BLOCKED, this is a significant event — the independent second-model review did not run. Flag it prominently in the report:
+- In `report-only` mode: Include BLOCKED status with high visibility in the Agent Results Summary and add a prominent warning after the summary table.
+- In `interactive` mode: Use `AskUserQuestion` to ask: "Codex review was BLOCKED ({reason}). Continue without Codex review, or stop to resolve?"
+- `SKIPPED_UNSUPPORTED_SCOPE` is expected for `--scope=all` and is not flagged as a warning.
 
 ### 7b. Conditional: cata-debugger
 
@@ -517,8 +487,8 @@ status cannot be PASSED — use FAILED instead.
 
 ## Triage Summary
 
-**Agents run:** cata-reviewer, cata-codex-reviewer, cata-tester, cata-security, cata-hardener, cata-architect, cata-coherence, cata-qa, cata-ux-reviewer, cata-exerciser
-**Agents skipped:** [none, or list if --skip-ux/--skip-security was used]
+**Agents run:** cata-reviewer, cata-codex-reviewer, cata-tester, cata-qa, cata-ux-reviewer, cata-exerciser
+**Agents skipped:** [none, or list if --skip-ux was used]
 **Static analysis:** ESLint (3 findings), tsc (1 finding)
 
 ---
@@ -529,14 +499,10 @@ status cannot be PASSED — use FAILED instead.
 |-------|--------|-------|
 | cata-static | Completed | 4 findings (3 warnings, 1 error) |
 | cata-tester | X passed, Y failed | [brief note] |
-| cata-reviewer | Completed | Found N items |
-| cata-codex-reviewer | Completed / Blocked / Skipped | Found N items / [reason] |
-| cata-ux-reviewer | Completed / Skipped | Found N items / [reason] |
-| cata-coherence | Completed | Found N items |
-| cata-architect | Completed | Found N items |
-| cata-security | Completed / Skipped | Found N items / [reason] |
-| cata-hardener | Completed | Found N items |
+| cata-reviewer | Completed | Found N items (design, arch, coherence, hardening, security) |
+| cata-codex-reviewer | Completed / **BLOCKED** / Skipped | Found N items / [reason] |
 | cata-qa | Completed | Found N items |
+| cata-ux-reviewer | Completed / Skipped | Found N items / [reason] |
 | cata-exerciser | PASSED / FAILED / BLOCKED | [reason if blocked] |
 | cata-debugger | Ran / N/A | [if applicable] |
 
@@ -713,7 +679,7 @@ This is critical since verify runs in the main context window.
 ## Important Notes
 
 - **All agents, every time**: Triage assigns files to focus each agent, but never skips agents — missed regressions cost more than the extra agent runs
-- **Codex reviewer is best-effort**: It should surface an independent second-model review when local Codex is available, and show BLOCKED/SKIPPED status when it is not
+- **Codex reviewer is a hard gate**: The independent second-model review is critical for catching blind spots. If Codex is BLOCKED, flag it prominently — the human must decide whether to proceed without it
 - **Static analysis pre-step**: Linter findings feed into review agents for context
 - **Engineer skill integration**: Pre-verified knowledge speeds up discovery
 - **Exerciser verifies issues**: Reported issues get E2E verification status
