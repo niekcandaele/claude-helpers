@@ -117,6 +117,20 @@ Each agent will actually execute commands and report real findings.
 Proceed with investigation?
 ```
 
+Additionally, offer to create a `VERIFICATION.md` with custom verification gates:
+
+```
+I can also create a VERIFICATION.md file with custom verification gates.
+These are hard requirements that the verify pipeline enforces every time it runs.
+
+Examples:
+- "POST /api/search must return results after seeding"
+- "All files in src/api/routes/ must have corresponding tests"
+- "The health endpoint must return 200 with database connectivity"
+
+Would you like to add custom verification gates?
+```
+
 Options:
 - "Yes, investigate all areas"
 - "Let me select which areas"
@@ -324,6 +338,29 @@ mkdir -p .claude/skills/${REPO_NAME}-engineer
 
 Generate files based on investigation results:
 
+#### VERIFICATION.md (optional — if user opted in for custom gates)
+
+```markdown
+# Verification Rules
+
+Custom gates checked by the verification pipeline every /verify run.
+Each gate is a hard requirement — all must pass for verification to approve.
+
+## Exerciser Gates
+
+Checked by cata-exerciser while the app is running.
+
+- [ ] {describe what must work when the app is running}
+
+## Review Gates
+
+Checked by review agents during code analysis (no running app needed).
+
+- [ ] {describe what must be true about the code}
+```
+
+If the user provides specific gates during the conversation, populate the file with those instead of the skeleton placeholders.
+
 #### SKILL.md (entry point)
 
 ```markdown
@@ -343,6 +380,7 @@ description: {REPO_NAME} repository knowledge - architecture, testing, database,
 | Testing | [TESTING.md](TESTING.md) | `{actual test command}` |
 | Database | [DATABASE.md](DATABASE.md) | `{actual db command}` |
 | API | [API.md](API.md) | `{actual api command}` |
+| Verification | [VERIFICATION.md](VERIFICATION.md) | Custom verification gates |
 {add rows for each area that was investigated}
 
 ## Architecture
@@ -402,6 +440,7 @@ Claude will automatically discover and use this skill. The skill contains multip
 - `TESTING.md` - Test commands and patterns
 - `DATABASE.md` - Database access and debugging
 - `API.md` - API usage and authentication
+- `VERIFICATION.md` - Custom verification gates (if defined)
 {list other files}
 
 ## Proactive Maintenance

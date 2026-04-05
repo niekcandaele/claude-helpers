@@ -141,10 +141,14 @@ ls .claude/skills/*-engineer/SKILL.md 2>/dev/null
 - Read key reference files it points to (TESTING.md, architecture docs, etc.)
 - Extract: test commands, build commands, linter commands, architecture notes
 - Store as `ENGINEER_CONTEXT` — this is pre-verified knowledge from `/setup-engineer`
+- Check for `VERIFICATION.md` in the same skill directory — if it exists, read it and store as `CUSTOM_GATES`
+  - Extract **Exerciser Gates** → will be passed to cata-exerciser in Phase 7c
+  - Extract **Review Gates** → will be passed to review agents in Phase 5/6
 - The discovery phase (Phase 3) will validate these commands and only discover what's missing
 
 **If not found:**
 - `ENGINEER_CONTEXT` is empty
+- `CUSTOM_GATES` is empty
 - The discovery phase will do full discovery from scratch
 
 ## Phase 3: Discovery & Triage
@@ -266,6 +270,11 @@ TOOLCHAIN:
 - Build: {command}
 - Lint: {commands}
 
+CUSTOM REVIEW GATES:
+{Review Gates from VERIFICATION.md, or "None defined"}
+These are repo-maintainer-defined requirements. If any rule falls in your review domain,
+report PASS/FAIL for it. Failed gates should be reported as severity 9 findings.
+
 DIFF STAT:
 {output of: git diff --stat [scope args]}
 ```
@@ -277,9 +286,8 @@ DIFF STAT:
 Launch ALL review agents in parallel using the Agent tool. Every agent runs every time — no agents are skipped based on triage (only explicit `--skip-ux` or `--skip-security` flags can exclude an agent).
 
 **Model routing is handled by agent frontmatter:**
-- opus: cata-reviewer, cata-security, cata-hardener, cata-coherence, cata-architect, cata-qa
-- sonnet: cata-ux-reviewer, cata-codex-reviewer
-- haiku: cata-tester
+- sonnet: cata-reviewer, cata-security, cata-hardener, cata-coherence, cata-architect, cata-qa, cata-ux-reviewer, cata-codex-reviewer, cata-exerciser
+- haiku: cata-tester, cata-static
 
 **Each agent prompt includes:**
 1. The `CONTEXT_BUNDLE` from Phase 5
@@ -462,6 +470,14 @@ ISSUES FOUND BY REVIEW AGENTS:
 
 While exercising, attempt to trigger each reported issue and report verification status
 (CONFIRMED / NOT REPRODUCED / NOT APPLICABLE / BLOCKED).
+
+{If CUSTOM_GATES has exerciser gates:}
+CUSTOM EXERCISER GATES:
+{List of exerciser gates from VERIFICATION.md}
+
+These are mandatory repo-maintainer-defined checks. After exercising the feature, you MUST
+check each gate and report PASS/FAIL with evidence. Any failing gate means your overall
+status cannot be PASSED — use FAILED instead.
 ```
 
 **Handle exerciser barriers:**
@@ -549,6 +565,24 @@ While exercising, attempt to trigger each reported issue and report verification
 | VI-1 | [title] | CONFIRMED | [observation] |
 | VI-2 | [title] | NOT REPRODUCED | [what was tried] |
 | VI-3 | [title] | NOT APPLICABLE | [reason] |
+
+---
+
+## Custom Verification Gates
+
+{If no VERIFICATION.md exists or no custom gates defined: omit this section entirely}
+
+### Exerciser Gates
+| # | Rule | Status | Evidence |
+|---|------|--------|----------|
+| 1 | [rule from VERIFICATION.md] | PASS / FAIL / BLOCKED | [from exerciser report] |
+
+### Review Gates
+| # | Rule | Status | Checked By | Evidence |
+|---|------|--------|------------|----------|
+| 1 | [rule from VERIFICATION.md] | PASS / FAIL / NOT CHECKED | [agent name] | [from agent findings] |
+
+**Custom Gates: X/Y passed, Z blocked**
 ```
 
 ## Phase 9: Mode-Specific Post-Report

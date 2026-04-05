@@ -69,6 +69,24 @@ ls .claude/skills/*-engineer/SKILL.md 2>/dev/null
 - Fall back to discovery (check README, docker-compose, package.json, Makefile, etc.)
 - If the change is a complex backend feature and you can't figure out how to exercise it, flag as `NO_ENGINEER_SKILL` (severity 9)
 
+### 1b. Load Custom Verification Gates
+
+After reading the engineer skill, check for custom verification gates:
+
+```bash
+ls .claude/skills/*-engineer/VERIFICATION.md 2>/dev/null
+```
+
+**If found:**
+- Read VERIFICATION.md
+- Extract rules from the **Exerciser Gates** section
+- These are mandatory checks you MUST execute after exercising the feature
+- Each gate is a hard requirement — report PASS or FAIL for every gate
+- If any gate fails, your overall status CANNOT be PASSED (use FAILED)
+- If you cannot evaluate a gate (e.g., endpoint doesn't exist yet, service not available), report it as BLOCKED with an explanation
+
+**If not found:** No custom gates — proceed normally.
+
 ### 2. Determine Exercise Strategy
 
 Analyze the changed files to classify what kind of exercise is needed:
@@ -340,6 +358,17 @@ docker compose down
 | API returns results | 200 + data | 200 + empty | ❌ FAIL |
 | DB records created | rows exist | rows exist | ✅ PASS |
 
+### Custom Verification Gates:
+
+[Only include if VERIFICATION.md exists with Exerciser Gates]
+
+| # | Rule | Status | Evidence |
+|---|------|--------|----------|
+| 1 | [rule text from VERIFICATION.md] | ✅ PASS / ❌ FAIL / ⚠️ BLOCKED | [what you observed] |
+| 2 | [rule text] | ✅ PASS / ❌ FAIL / ⚠️ BLOCKED | [evidence] |
+
+**Custom Gates: X/Y passed**
+
 ### Verification Result:
 
 **Feature Works:** ✅ Yes / ❌ No
@@ -411,11 +440,12 @@ When returning BLOCKED, use these specific reasons:
 - Feature was exercised end-to-end through its natural interface
 - Data flows verified (not just status codes)
 - Feature works as expected (no issues or only severity 1-3 issues)
+- All custom verification gates passed (if any defined in VERIFICATION.md)
 
 **FAILED**
 - Environment started
 - Feature was exercised
-- Feature does NOT work (severity 7+ issues found)
+- Feature does NOT work (severity 7+ issues found), OR any custom verification gate failed
 
 **BLOCKED**
 - Could not complete the exercise

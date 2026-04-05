@@ -166,9 +166,23 @@ Look at the verification report's Agent Results Summary table for the `cata-exer
 
 3. **cata-exerciser status is BLOCKED:** The feature could not be verified. This blocks approval — treat as severity 9. The player must resolve the blocker (startup failure, missing credentials, unclear exercise strategy) so the exerciser can run. Add to feedback and continue to next turn.
 
-4. **cata-exerciser status is PASSED:** Proceed to the APPROVED/FEEDBACK decision below.
+4. **cata-exerciser status is PASSED:** Proceed to the CUSTOM GATES CHECK below.
 
 A feature cannot be approved without a passing exerciser. The exerciser is what proves the feature actually works — not just that tests pass or code reviews look clean.
+
+**CUSTOM GATES CHECK (after exerciser gate, before APPROVED/FEEDBACK):**
+
+Look at the verification report for a "Custom Verification Gates" section. This gate is mechanical — same pattern as the exerciser gate.
+
+1. **No "Custom Verification Gates" section in report:** No custom gates defined — proceed to the APPROVED/FEEDBACK decision below.
+
+2. **Any custom gate has status FAIL:** This blocks approval regardless of severity threshold — treat each failed gate as a severity 10 issue. Add the failed gates with their evidence to feedback and continue to next turn.
+
+3. **Any custom gate has status BLOCKED:** This blocks approval — treat as severity 9. The player must resolve whatever prevented the gate from being checked. Add to feedback and continue to next turn.
+
+4. **All custom gates PASS:** Proceed to the APPROVED/FEEDBACK decision below.
+
+Custom gates are repo-maintainer-defined invariants. A feature cannot be approved with failing custom gates.
 
 **If zero issues at/above threshold → APPROVED:**
 
@@ -193,6 +207,11 @@ Output to the user:
 **Issues for next turn:**
 1. VI-1 (sev 8) [tester, reviewer]: [title] — [description]
 2. VI-3 (sev 5) [hardener]: [title] — [description]
+
+{If any custom gates failed or blocked:}
+**Failed Custom Gates:**
+- Gate 1: "[rule text]" — FAILED: [evidence from report]
+- Gate 3: "[rule text]" — BLOCKED: [reason from report]
 
 [If below-threshold issues exist: "N additional issues below threshold (not blocking)."]
 ```
