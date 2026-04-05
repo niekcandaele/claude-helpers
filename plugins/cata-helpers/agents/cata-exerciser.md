@@ -161,6 +161,41 @@ If login fails or no credentials found → Return BLOCKED with `LOGIN_REQUIRED`.
 4. Check for console errors
 5. Verify elements appear/disappear as expected
 
+**4d. Interaction Fidelity (when triggered):**
+
+Apply this when scoped changes include ANY of:
+- Autocomplete / typeahead / combobox / suggestion inputs
+- Dropdown menus or popovers that open/close on interaction
+- Search inputs with debounced API calls
+- Filter / chip / tag inputs with structured token parsing
+- Components from headless UI libraries (Downshift, Radix, Ariakit, Headless UI, cmdk)
+- The same component rendered 2+ times on the same page
+- URL query params that should reflect UI state
+
+**Keyboard navigation** — use `mcp__playwright__browser_press_key`, NOT `.type()` or `.fill()`:
+- Tab when dropdown is open + item highlighted → item should be selected (not just close dropdown + move focus)
+- Escape → dropdown closes, input text preserved
+- ArrowDown/ArrowUp → cycles through items, highlighted item changes
+- Enter with dropdown open → selects highlighted item; Enter with dropdown closed → submits/triggers action (test both states separately)
+
+**Character-by-character typing** — use `pressSequentially` with `{ delay: 80 }`, NOT `.fill()`:
+- Catches typeahead auto-selecting mid-word (e.g. Downshift selecting first match while user is still typing)
+- Catches debounce race conditions (stale responses overwriting newer input)
+- Catches mid-word state transitions on special characters (`:`, `.`, `+`, `"`, space)
+
+**Focus transitions**:
+- Click input → interact → click elsewhere (blur) → click input again → verify component resets to correct state
+- If same component appears in sidebar AND main page: type in one, verify the other doesn't react
+
+**URL state** — check `mcp__playwright__browser_evaluate` for `window.location.href`:
+- After search/filter action: URL query params update to match current state
+- After page reload: UI restores same state (chips, query, results)
+- After browser back: UI shows prior state
+
+**Race conditions**:
+- Type 5+ chars rapidly via `pressSequentially`, wait for debounce → verify only ONE API call fired (check network requests)
+- Verify no error UI appears mid-typing for queries that will be valid when complete
+
 ### 5. Backend Exercise Path
 
 Use this path when changes affect APIs, services, data layers, jobs, or infrastructure.

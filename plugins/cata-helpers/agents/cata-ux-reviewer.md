@@ -114,6 +114,27 @@ Use Playwright to:
 - Capture accessibility snapshots
 ```
 
+**Interaction Fidelity (when triggered):**
+
+Check for this class of issues when scoped changes include:
+- Autocomplete / typeahead / combobox inputs
+- Dropdown menus or popovers
+- Debounced search inputs
+- Chip / tag / filter token inputs
+- Headless UI library components (Downshift, Radix, Ariakit, etc.)
+- Same component appearing multiple times on one page
+- URL-synchronized state
+
+UX conventions users expect — flag violations as severity 5-7:
+- Tab on an open autocomplete with a highlighted item → should select it (universal convention)
+- Escape on an open dropdown → closes it without losing typed text
+- Refresh the page after a search → same results appear (URL-persisted state)
+- Browser back → returns to prior state, not empty/default
+
+Test with `mcp__playwright__browser_press_key` for Tab/Escape/Enter/ArrowDown. Do NOT use `.fill()` for these components — it sets the value atomically and skips all the intermediate states a real user passes through, masking exactly the bugs users will actually hit.
+
+Flag components that violate ARIA APG keyboard interaction patterns (e.g. combobox pattern) as both accessibility and UX issues.
+
 **For CLI:**
 ```bash
 # Run commands as a user would
