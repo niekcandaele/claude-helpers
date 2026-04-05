@@ -6,7 +6,7 @@ allowed-tools: Read, Bash, Grep, Glob, Task, TodoWrite, AskUserQuestion, Skill
 
 # Player-Coach: Adversarial Cooperation Loop
 
-You are the orchestrator of a player-coach loop. The player implements code, `/cata-helpers:verify --mode=report-only` runs the full verification pipeline, and then (by default) a PR is created and CI must pass. The loop ends when a PR exists with green CI — or when `--no-pr` is set, after verification is clean.
+You are the orchestrator of a player-coach loop. The player implements code, `/cata-helpers:verify --mode=report-only --scope=branch` runs the full verification pipeline against all branch changes, and then (by default) a PR is created and CI must pass. The loop ends when a PR exists with green CI — or when `--no-pr` is set, after verification is clean.
 
 There is no separate coach agent. The verify command runs all verification agents and produces the report. You apply the severity threshold mechanically.
 
@@ -121,10 +121,12 @@ Wait for the player to complete. Extract the PLAYER REPORT from the result.
 Invoke the report-only verification pipeline via the Skill tool:
 
 ```
-/cata-helpers:verify --mode=report-only
+/cata-helpers:verify --mode=report-only --scope=branch
 ```
 
-This runs ALL verification agents (tester, exerciser, reviewer, hardener, coherence, architect, security, qa, and any others in the verify pipeline), deduplicates findings, and produces a unified verification report with VI-{n} issue IDs and severity ratings. It does NOT fix anything — that's the player's job on the next turn.
+**CRITICAL: Always use `--scope=branch`.** This ensures every turn verifies the FULL set of changes from the entire plan — not just the latest fix. Without this, later turns only scope to the most recent unstaged changes, causing verifiers to lose the bigger picture (architecture, coherence, cross-cutting concerns). The verifiers need to see everything.
+
+This runs ALL verification agents (tester, exerciser, reviewer, qa, codex, ux, and any others in the verify pipeline), deduplicates findings, and produces a unified verification report with VI-{n} issue IDs and severity ratings. It does NOT fix anything — that's the player's job on the next turn.
 
 The verify command handles agent spawning, parallelism, deduplication, and reporting. No need to manage agent lists here — if verify adds new agents in the future, they're automatically included.
 
@@ -160,7 +162,7 @@ Look at the verification report's Agent Results Summary table for the `cata-exer
    ## Turn N/M — EXERCISER MISSING
    The exerciser did not run this turn. Re-running verification.
    ```
-   Re-invoke `/cata-helpers:verify --mode=report-only`. This does not increment the turn counter.
+   Re-invoke `/cata-helpers:verify --mode=report-only --scope=branch`. This does not increment the turn counter.
 
 2. **cata-exerciser status is FAILED:** The feature does not work end-to-end. This blocks approval regardless of severity threshold — treat it as a severity 10 issue. Add the exerciser's failure description to feedback and continue to next turn.
 
