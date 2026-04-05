@@ -1,7 +1,7 @@
 ---
 name: cata-reviewer
 description: Strict code review specialist that verifies design adherence and identifies over-engineering and AI slop
-model: opus
+model: sonnet
 tools: Read, Bash, Grep, Glob, WebSearch
 ---
 

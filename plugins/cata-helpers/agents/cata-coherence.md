@@ -1,7 +1,7 @@
 ---
 name: cata-coherence
 description: Codebase coherence checker that detects reinvented wheels, pattern violations, stale AI tooling, and documentation drift. Use proactively when reviewing code changes to ensure they fit with existing codebase patterns.
-model: opus
+model: sonnet
 tools: Read, Bash, Grep, Glob, WebSearch
 ---
 

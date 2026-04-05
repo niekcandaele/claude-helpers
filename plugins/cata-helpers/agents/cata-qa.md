@@ -1,7 +1,7 @@
 ---
 name: cata-qa
 description: Pragmatic QA engineer that evaluates test coverage quality, flags untested changes, and assesses whether tests provide real confidence — adapts expectations to codebase testing maturity
-model: opus
+model: sonnet
 tools: Read, Bash, Grep, Glob, WebSearch
 ---
 
