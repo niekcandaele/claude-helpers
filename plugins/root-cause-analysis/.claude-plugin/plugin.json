@@ -1,7 +1,7 @@
 {
   "name": "root-cause-analysis",
   "version": "1.0.2",
-  "description": "Adversarial investigation loop — investigator gathers evidence and writes report, critic pushes for depth and rigor",
+  "description": "Root cause investigation in main context with adversarial coach review — investigates directly, coach spot-checks evidence and pushes for depth",
   "author": {
     "name": "Niek Candaele"
   },
