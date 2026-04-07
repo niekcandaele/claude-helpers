@@ -127,6 +127,8 @@ git diff $ORIGINAL_BRANCH..HEAD
 git diff --stat $ORIGINAL_BRANCH..HEAD
 ```
 
+If the context file includes a `## Testing Plan Hints` section, use those hints (user-facing flows, known edge cases, exerciser results) as a starting point for the Testing Plan.
+
 ### Path B: Standalone invocation (no context file)
 
 Gather context yourself:
@@ -159,6 +161,8 @@ Gather context yourself:
    ls .claude/skills/*-engineer/SKILL.md 2>/dev/null
    ```
    If found, read for architecture context.
+
+6. **Identify testable user flows:** From the plan file (if found) and the diff, identify what the feature does from the user's perspective — what inputs it accepts, what outputs it produces, and what can go wrong. This feeds the Testing Plan section.
 
 ## Phase 3: Compose Rich PR Description
 
@@ -213,6 +217,28 @@ WHAT and WHY at the component level.}
 - **Design decision**: {choices made and why, alternatives considered}
 ```
 
+**Testing plan (always present):**
+
+```markdown
+## Testing Plan
+
+{A manual QA checklist for the human reviewer. Write concrete steps for
+someone who has never seen this feature. Generate from the plan, the diff,
+friction points (which are natural edge cases), and implementation details.}
+
+### Happy Path
+- [ ] {concrete action — "Open /settings, click 'Add API Key'"}
+- [ ] {verify expected result — "Key appears in the list, status shows 'Active'"}
+
+### Edge Cases
+- [ ] {edge case — "Submit with empty required fields, verify validation errors"}
+- [ ] {edge case — "Enter special characters / very long input"}
+- [ ] {edge case — "Perform action while offline or with slow connection"}
+
+### Regression Checks
+- [ ] {anything that might have broken — "Existing feature X still works as before"}
+```
+
 **Additional sections when context file is provided (e.g., from player-coach):**
 
 ```markdown
@@ -239,6 +265,7 @@ Omit if none.}
 - **Architecture**: Even a 3-line box-and-arrow diagram is worth including for non-trivial changes. It helps the reviewer build a mental model before reading code.
 - **What Changed**: Group by logical area. "Added JWT auth middleware" is better than "modified src/middleware/auth.ts". Include WHY each area was changed.
 - **Reviewer Guide**: This is what makes your PR stand out. Point the reviewer to the entry point so they don't have to guess where to start. Flag anything that's correct but surprising.
+- **Testing Plan**: Write steps a human can follow without reading the code. Include concrete UI actions ("click X", "fill in Y", "submit"), expected results ("Z appears", "error message shows"), and edge cases. Friction points from the context file are natural edge cases to include. Keep it focused — 5-10 items total, not an exhaustive test matrix.
 
 ## Phase 4: Create the PR/MR
 

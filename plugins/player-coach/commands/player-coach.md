@@ -241,7 +241,7 @@ This phase runs after verification passes (APPROVED) when `pr_enabled` is true (
 
 ### Step 1: Write context file and create the PR
 
-Before invoking the create-pr skill, write the accumulated loop state to a temp file so the skill can produce a rich, context-aware PR description with inline review comments. The human wasn't present during implementation — this is their primary way to understand what happened.
+Before invoking the create-pr skill, write the accumulated loop state to a temp file so the skill can produce a rich, context-aware PR description with a human testing plan. The human wasn't present during implementation — this is their primary way to understand what happened.
 
 **Write the context file:**
 
@@ -273,6 +273,12 @@ For each item, include the file/line reference so the skill can post inline comm
 
 - (sev {N}) [{agent}] VI-{X}: {description}
 
+## Testing Plan Hints
+{What the feature does from a user perspective — extracted from the plan.
+Key user-facing flows and entry points. Known edge cases from friction log
+and player concerns. What the exerciser tested (from verify report) as a
+starting point for manual testing.}
+
 ## CI Failures
 {From ci_failures_log. Omit if none.}
 CONTEXT
@@ -281,10 +287,10 @@ CONTEXT
 **Invoke the create-pr skill with the context:**
 
 ```
-/cata-helpers:create-pr --context=/tmp/pc-pr-context.md
+/cata-helpers:create-pr --context=/tmp/pc-pr-context.md --no-comments
 ```
 
-The skill creates the feature branch, commits, pushes, opens the PR with a rich description, and posts inline review comments on friction areas. Extract the PR URL from the output and store it as `pr_url`.
+The skill creates the feature branch, commits, pushes, and opens the PR with a rich description including a human testing plan. Extract the PR URL from the output and store it as `pr_url`.
 
 **If a PR already exists:** The skill detects this and updates the description instead.
 
