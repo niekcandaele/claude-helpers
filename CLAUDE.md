@@ -6,12 +6,12 @@ ALWAYS use the claude-provided tools/agents/skills/... that instruct you how to 
 
 Run `just` to see available commands:
 
-- `just validate` - Validate plugin structure and JSON syntax
-- `just structure` - Show the plugin file tree
-- `just test` - Show local testing instructions
+- `just validate` - Validate the flat `skills/` layout and catch legacy references
+- `just structure` - Show the skills file tree
+- `just test` - Show local testing/sync instructions
 
 ## Making Changes
 
-After modifying commands or agents, run `just validate` to ensure the plugin structure is correct.
+After modifying any skill or supporting file, run `just validate`.
 
-Version bumping happens automatically via GitHub Actions on push to main.
+This repository is a source repo for skills only. Do not reintroduce plugin packaging, marketplace metadata, installer scripts, or repo-specific CI/version-bump logic.

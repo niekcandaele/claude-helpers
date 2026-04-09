@@ -1,55 +1,37 @@
-# Claude Code Helpers - Development Commands
+# Claude Code Skills - Development Commands
 
 # Show available commands
 default:
     @just --list
 
-# Validate plugin structure
+# Validate skill structure
 validate:
-    @echo "Validating plugin structure..."
-    @echo "\n--- cata-helpers plugin ---"
-    @test -f plugins/cata-helpers/.claude-plugin/plugin.json || (echo "Missing cata-helpers plugin.json" && exit 1)
-    @echo "✓ Found plugin.json"
-    @jq empty plugins/cata-helpers/.claude-plugin/plugin.json && echo "✓ plugin.json is valid JSON"
-    @echo "✓ Found $(find plugins/cata-helpers/commands -name '*.md' | wc -l | tr -d ' ') commands"
-    @echo "✓ Found $(find plugins/cata-helpers/agents -name '*.md' | wc -l | tr -d ' ') agents"
-    @echo "✓ Found $(find plugins/cata-helpers/skills -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ') skills"
-    @echo "\n--- kubecon plugin ---"
-    @test -f plugins/kubecon/.claude-plugin/plugin.json || (echo "Missing kubecon plugin.json" && exit 1)
-    @echo "✓ Found plugin.json"
-    @jq empty plugins/kubecon/.claude-plugin/plugin.json && echo "✓ plugin.json is valid JSON"
-    @echo "✓ Found $(find plugins/kubecon/skills -name 'SKILL.md' | wc -l | tr -d ' ') skills"
-    @echo "\n--- player-coach plugin ---"
-    @test -f plugins/player-coach/.claude-plugin/plugin.json || (echo "Missing player-coach plugin.json" && exit 1)
-    @echo "✓ Found plugin.json"
-    @jq empty plugins/player-coach/.claude-plugin/plugin.json && echo "✓ plugin.json is valid JSON"
-    @echo "✓ Found $(find plugins/player-coach/commands -name '*.md' | wc -l | tr -d ' ') commands"
-    @echo "✓ Found $(find plugins/player-coach/agents -name '*.md' | wc -l | tr -d ' ') agents"
-    @echo "\n--- root-cause-analysis plugin ---"
-    @test -f plugins/root-cause-analysis/.claude-plugin/plugin.json || (echo "Missing root-cause-analysis plugin.json" && exit 1)
-    @echo "✓ Found plugin.json"
-    @jq empty plugins/root-cause-analysis/.claude-plugin/plugin.json && echo "✓ plugin.json is valid JSON"
-    @echo "✓ Found $(find plugins/root-cause-analysis/commands -name '*.md' | wc -l | tr -d ' ') commands"
-    @echo "✓ Found $(find plugins/root-cause-analysis/agents -name '*.md' | wc -l | tr -d ' ') agents"
-    @echo "✓ Found $(find plugins/root-cause-analysis/skills -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ') skills"
-    @echo "\n--- marketplace ---"
-    @test -f .claude-plugin/marketplace.json || (echo "Missing marketplace.json" && exit 1)
-    @echo "✓ Found marketplace.json"
-    @jq empty .claude-plugin/marketplace.json && echo "✓ marketplace.json is valid JSON"
-    @echo "\n✓ Plugin validation passed!"
+    @echo "Validating skill structure..."
+    @test -d skills || (echo "Missing skills/ directory" && exit 1)
+    @test -n "$(find skills -mindepth 1 -maxdepth 1 -type d)" || (echo "No skill directories found" && exit 1)
+    @missing="$(find skills -mindepth 1 -maxdepth 1 -type d ! -exec test -f '{}/SKILL.md' ';' -print)"; \
+      test -z "${missing}" || (echo "Missing SKILL.md in:" && printf '%s\n' "${missing}" && exit 1)
+    @bad_frontmatter="$(find skills -name SKILL.md -exec sh -c 'for file do grep -q "^---$" "$file" && grep -q "^description:" "$file" || echo "$file"; done' sh {} +)"; \
+      test -z "${bad_frontmatter}" || (echo "Invalid or incomplete frontmatter:" && printf '%s\n' "${bad_frontmatter}" && exit 1)
+    @legacy="$(rg -n '/plugin|/cata-helpers:|\.claude-plugin|plugins/|cata-' README.md CLAUDE.md skills --glob '!.claude/settings.local.json' || true)"; \
+      test -z "${legacy}" || (echo "Legacy references found:" && printf '%s\n' "${legacy}" && exit 1)
+    @echo "✓ Found $(find skills -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ') skills"
+    @echo "✓ Every skill directory has SKILL.md"
+    @echo "✓ Frontmatter sanity checks passed"
+    @echo "✓ No plugin-era references in tracked skill/docs files"
+    @echo "\n✓ Skill validation passed!"
 
-# Show plugin structure
+# Show skill structure
 structure:
-    @tree -I '.git' . || find . -type f \( -name "*.md" -o -name "*.json" \) | grep -v ".git" | sort
+    @tree -I '.git|.claude' skills && printf '\nREADME.md\nCLAUDE.md\nJustfile\n' || (find skills -type f | sort && printf '\nREADME.md\nCLAUDE.md\nJustfile\n')
 
 # Show local testing instructions
 test:
-    @echo "To test this plugin locally:"
+    @echo "This repository is a source repo for skills."
     @echo ""
-    @echo "  1. Start Claude Code with the plugin directory:"
-    @echo "     claude --plugin-dir $(pwd)"
+    @echo "  1. Sync or copy skills/* into a Claude skills directory:"
+    @echo "     ~/.claude/skills/      or      .claude/skills/"
     @echo ""
-    @echo "  2. Or add the marketplace locally:"
-    @echo "     /plugin marketplace add $(pwd)"
-    @echo "     /plugin install cata-helpers"
-    @echo "     /plugin install kubecon"
+    @echo "  2. Then start Claude Code in a repo where those skills should be available."
+    @echo ""
+    @echo "  3. Run just validate before committing changes here."
