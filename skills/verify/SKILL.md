@@ -5,7 +5,7 @@ description: >
   Detects scope, discovers toolchain, triages files to relevant skills, runs static
   analysis, invokes review skills in parallel, exercises the app, and produces a
   unified report. Supports interactive, report-only, and auto-fix modes.
-argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--files=file1,file2] [--module=path] [--skip-ux] [--auto-fix-threshold=N]"
+argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--files=file1,file2] [--module=path] [--skip-ux] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>]"
 ---
 
 # Verify Changes — Triage-First Pipeline
@@ -35,6 +35,10 @@ Parse `$ARGUMENTS` for:
 **Other Options:**
 - `--skip-ux`: Skip UX review for pure backend changes
 - `--auto-fix-threshold=N`: Minimum severity for auto-fix mode (default: 3)
+
+**Output Format:**
+- `--format=`: `markdown` (default) or `json`. When `json`, the report is serialized as a JSON object conforming to the adversary CLI schema (see Phase 8c)
+- `--output=<path>`: File path to write the JSON report to. Required when `--format=json`. The Write tool is used to write the file.
 
 ## Phase 1: Scope Detection
 
@@ -551,6 +555,73 @@ status cannot be PASSED — use FAILED instead.
 **Custom Gates: X/Y passed, Z blocked**
 ```
 
+### 8c. JSON Output (`--format=json --output=<path>`)
+
+When both `--format=json` and `--output=<path>` are set, build and write a JSON report file **after** generating the internal report data (8a/8b still run to produce the deduplicated issue list).
+
+**Top-level schema:**
+
+```json
+{
+  "schemaVersion": 1,
+  "status": "ok | blocked | error",
+  "findings": [ ... ],
+  // ...plus all existing report fields preserved for backward compatibility
+}
+```
+
+**Step 1 — Determine `status`:**
+
+| Condition (checked in order) | `status` |
+|------------------------------|----------|
+| Verify itself crashed or errored internally | `"error"` |
+| Static analysis found build/typecheck **errors** (not warnings) | `"blocked"` |
+| Tester phase has test failures | `"blocked"` |
+| Everything else (zero issues, or issues found but pipeline completed) | `"ok"` |
+
+**Step 2 — Build `findings` array:**
+
+For each deduplicated issue from Phase 8a, create a finding object:
+
+```json
+{
+  "title": "<issue title>",
+  "severity": <number 1-10>,
+  "description": "<issue description>",
+  "sources": ["<skill1>", "<skill2>"],
+  "location": { "path": "<file>", "line": <number> }
+}
+```
+
+- `title`, `severity`, `description`, `sources` — copy directly from the issue
+- `location` — parse the string format `"path/to/file.js:27-36"`: split on the **last** `:`, use everything before as `path`, parse the first number after `:` as `line`. If the string has no `:` followed by a number, omit `location` entirely
+- `id` — drop, not included in findings
+
+**Step 3 — Assemble full JSON object:**
+
+Combine the adversary-required fields with existing report data:
+
+```json
+{
+  "schemaVersion": 1,
+  "status": "<mapped status>",
+  "findings": [ <transformed findings> ],
+  "overall": { "result": "<pass|issues-found>", "mode": "<scope mode>" },
+  "scope": { "files": [...], "excluded": [...] },
+  "triage": { "skills_run": [...], "skills_skipped": [...] },
+  "skillResults": { ... },
+  "issues": [ <original issues with id, string location, etc.> ],
+  "exerciserVerification": [ ... ],
+  "customGates": { ... }
+}
+```
+
+The adversary reads only `schemaVersion`, `status`, and `findings`. All other fields are preserved for other consumers and debugging.
+
+**Step 4 — Write file:**
+
+Use the Write tool to write the JSON (pretty-printed with 2-space indent) to the `--output` path.
+
 ## Phase 9: Mode-Specific Post-Report
 
 ### Mode: `report-only`
@@ -559,8 +630,15 @@ Output the report and return control to the caller. Do not triage, plan, or fix 
 
 - No user prompts — do not use `AskUserQuestion`
 - Skip triage/fix phases entirely
-- The report is the only output
 - After outputting the report, the verify execution is complete — the caller continues its own flow
+
+**If `--format=json` and `--output=<path>` are set:**
+- Phase 8c already wrote the JSON file — the file IS the report
+- Output a single confirmation line: `JSON report written to <path>` (no markdown report)
+- Return control to the caller
+
+**Otherwise (default markdown):**
+- The markdown report is the only output
 
 ### Mode: `interactive` (default)
 
