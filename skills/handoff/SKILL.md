@@ -1,7 +1,7 @@
 ---
 name: handoff
 description: Document current plan and progress into handoff file
-argument-hint: [optional: custom filename]
+argument-hint: "[optional: custom filename]"
 disable-model-invocation: true
 allowed-tools:
   - Read

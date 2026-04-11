@@ -1,7 +1,7 @@
 ---
 name: rebase
 description: Rebase current branch onto target branch with conflict resolution
-argument-hint: [optional: target branch name, defaults to main/master]
+argument-hint: "[optional: target branch name, defaults to main/master]"
 disable-model-invocation: true
 allowed-tools:
   - Read

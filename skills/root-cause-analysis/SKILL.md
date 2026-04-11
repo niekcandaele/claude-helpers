@@ -1,7 +1,7 @@
 ---
 name: root-cause-analysis
 description: Root cause analysis — investigate directly in main context, then invoke a coach skill for adversarial review
-argument-hint: [--max-turns=N] [--severity=N] [--context=skill-or-file] [problem description]
+argument-hint: "[--max-turns=N] [--severity=N] [--context=skill-or-file] [problem description]"
 disable-model-invocation: true
 allowed-tools:
   - Read

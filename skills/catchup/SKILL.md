@@ -1,7 +1,7 @@
 ---
 name: catchup
 description: Summarize all changes in current branch compared to base branch
-argument-hint: [optional: base branch name]
+argument-hint: "[optional: base branch name]"
 disable-model-invocation: true
 allowed-tools:
   - Read

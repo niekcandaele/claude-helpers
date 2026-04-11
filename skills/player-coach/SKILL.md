@@ -1,7 +1,7 @@
 ---
 name: player-coach
 description: Adversarial cooperation loop — player implements, /verify reviews, creates PR, passes CI
-argument-hint: [--max-turns=N] [--severity=N] [--no-pr]
+argument-hint: "[--max-turns=N] [--severity=N] [--no-pr]"
 disable-model-invocation: true
 allowed-tools:
   - Read

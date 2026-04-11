@@ -7,7 +7,7 @@ description: >
   filtered ICS file. Use this skill whenever the user mentions KubeCon schedule, KubeCon talks,
   filtering conference sessions, or wants help deciding which KubeCon sessions to attend —
   even if they just say "help me pick talks" or "there are too many sessions."
-argument-hint: [optional user context or preferences]
+argument-hint: "[optional user context or preferences]"
 ---
 
 # KubeCon Schedule Curator
