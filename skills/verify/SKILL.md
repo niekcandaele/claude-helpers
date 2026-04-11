@@ -574,10 +574,11 @@ When both `--format=json` and `--output=<path>` are set, build and write a JSON 
 
 | Condition (checked in order) | `status` |
 |------------------------------|----------|
-| Verify itself crashed or errored internally | `"error"` |
-| Static analysis found build/typecheck **errors** (not warnings) | `"blocked"` |
-| Tester phase has test failures | `"blocked"` |
-| Everything else (zero issues, or issues found but pipeline completed) | `"ok"` |
+| Verify itself crashed or could not execute at all (skill invocation failed, no files to analyze, internal error) | `"error"` |
+| Verify cannot produce meaningful analysis (entire codebase fails to parse, no toolchain discovered, no skills could run) | `"blocked"` |
+| Verify completed its pipeline (even if tests fail or build has errors) | `"ok"` |
+
+**Important:** Build/typecheck errors and test failures are **not** terminal statuses. They are fixable problems that should be emitted as **findings** with severity 9-10, so that callers (e.g. the adversary loop) can pass them back to the implementer. `"blocked"` means verify itself cannot function, not that the code under test has problems.
 
 **Step 2 — Build `findings` array:**
 
