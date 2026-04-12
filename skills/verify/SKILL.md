@@ -5,7 +5,7 @@ description: >
   Detects scope, discovers toolchain, triages files to relevant skills, runs static
   analysis, invokes review skills in parallel, exercises the app, and produces a
   unified report. Supports interactive, report-only, and auto-fix modes.
-argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--files=file1,file2] [--module=path] [--skip-ux] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>]"
+argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--files=file1,file2] [--module=path] [--skip-ux] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>] [--plan-file=<path>]"
 ---
 
 # Verify Changes — Triage-First Pipeline
@@ -35,6 +35,7 @@ Parse `$ARGUMENTS` for:
 **Other Options:**
 - `--skip-ux`: Skip UX review for pure backend changes
 - `--auto-fix-threshold=N`: Minimum severity for auto-fix mode (default: 3)
+- `--plan-file=<path>`: Explicit path to a plan file for completeness checking. If not provided, discover the plan from context — check if a plan is visible in conversation history (e.g., invoked from player-coach which read a plan, or a plan was created/discussed earlier in this session). If a plan is found from either source, resolve its contents for the plan completeness check in Phase 6.
 
 **Output Format:**
 - `--format=`: `markdown` (default) or `json`. When `json`, the report is serialized as a JSON object conforming to the adversary CLI schema (see Phase 8c)
@@ -377,6 +378,47 @@ Adapt expectations to codebase testing maturity.
 Focus on: 'Are these changes well-tested with good tests?'
 ```
 
+### Plan Completeness Check (Parallel, Conditional)
+
+This check runs in parallel with the review skills above. It has no dependency on their output — it only needs the plan and the branch diff.
+
+**If a plan was resolved** (via `--plan-file` flag or discovered from conversation context):
+
+Invoke a general-purpose agent (sonnet) with:
+
+```
+PLAN FILE:
+{plan file contents}
+
+BRANCH DIFF:
+{output of the diff command from SCOPE_METADATA, or `git diff {base}...HEAD`}
+
+SCOPE CONTEXT:
+{SCOPE_CONTEXT from Phase 1}
+
+You are checking whether the implementation is complete relative to the plan.
+
+Instructions:
+- Identify all phases, sections, and steps described in the plan
+- For each, determine whether the branch diff contains changes that implement it
+- A phase is "addressed" if the diff contains changes that clearly correspond to its requirements
+- If significant portions of the plan are unimplemented, emit a single finding:
+  - Title: "Plan incomplete — only phase N of M implemented" (or similar descriptive summary)
+  - Severity: 8
+  - Description: List which phases/sections are implemented and which are missing, with brief reasoning
+  - Sources: ["plan-completeness"]
+  - Location: null (omit)
+- If the plan appears fully implemented, emit NO finding (do not emit a success finding)
+
+OUTPUT FORMAT: For each issue found, provide:
+- Title (short description)
+- Severity (1-10, where 1=trivial, 10=critical)
+- Location (file:line or null)
+- Description (what the issue is and why it matters)
+```
+
+**If no plan was resolved** (no flag, nothing in context): skip this check entirely, no finding emitted.
+
 ## Phase 7: Collect Results + Conditional Agents
 
 ### 7a. Wait for all Phase 6 skills to complete
@@ -465,7 +507,7 @@ status cannot be PASSED — use FAILED instead.
 
 ### 8a. Issue Deduplication
 
-1. Collect all findings from each skill in structured format
+1. Collect all findings from each skill in structured format (including any plan-completeness finding from Phase 6)
 2. Identify duplicates: same file/location, same root cause, same symptom from different angles
 3. Merge into single issue: list all source agents, combine descriptions, use highest severity
 4. Assign sequential VI-{n} IDs
@@ -508,6 +550,7 @@ status cannot be PASSED — use FAILED instead.
 | qa | Completed | Found N items |
 | ux-reviewer | Completed / Skipped | Found N items / [reason] |
 | exerciser | PASSED / FAILED / BLOCKED | [reason if blocked] |
+| plan-completeness | Complete / Incomplete / Skipped | [summary if incomplete, reason if skipped] |
 | debugger | Ran / N/A | [if applicable] |
 
 ---
