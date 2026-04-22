@@ -156,6 +156,7 @@ One short message:
 
 - Where the file is and how to open it (`open slides.html` on macOS, double-click from file manager elsewhere).
 - How the navigation works: arrow keys, space, page up/down, touch swipe, scroll wheel, or click a nav dot.
+- Mention the PDF exporter: `scripts/export-pdf.sh <path-to-slides.html>` produces a deterministic 1280×720 one-slide-per-page PDF using headless Chrome. Only mention this if the user sounds like they might need PDF output (pitching over email, leaving behind a deck for someone, etc.).
 - A one-line offer: "Want to swap the palette, redo an image, reorder slides, or add/remove any slide? Say what you'd change and I'll update."
 
 Don't recap what you built in detail — the user just saw it.
@@ -179,4 +180,5 @@ Common asks after Phase 4 and how to handle them:
 - `references/html-template.md` — HTML skeleton, JS controller, per-slide-type snippets, gotchas. Load in Phase 3.
 - `references/design-heuristics.md` — font pairs, color rules, layout rhythm, the "AI slop" avoid-list. Load in Phase 2a and Phase 3.
 - `references/image-prompt-guide.md` — prompt anatomy, do/don't, aspect ratios, 3 worked examples. Load in Phase 2c.
-- `assets/viewport-base.css` — mandatory base CSS. Inline verbatim in Phase 3.
+- `assets/viewport-base.css` — mandatory base CSS. Inline verbatim in Phase 3. The `@media print` block makes `Ctrl/⌘+P → Save as PDF` and the bundled export script both produce deterministic 1280×720 one-slide-per-page output.
+- `scripts/export-pdf.sh` — zero-dependency PDF exporter (uses headless Chrome). Usage: `bash scripts/export-pdf.sh <slides.html> [-o output.pdf]`. Requires chromium or google-chrome on the system. Each slide becomes one page at the size declared in the deck's `@page` rule.

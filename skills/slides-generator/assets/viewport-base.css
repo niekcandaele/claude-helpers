@@ -209,13 +209,54 @@ section.slide.visible .stagger > *:nth-child(6) { animation-delay: 580ms; }
   section.slide .reveal { opacity: 1; transform: none; }
 }
 
-/* Print — every slide on its own page, no animations. */
+/* Print — deterministic 16:9 page size, one slide per page, no animations,
+   nav chrome hidden, reveal elements forced into their final state. This
+   block is what makes both browser "Print to PDF" and the bundled
+   export-pdf.sh script produce predictable output. */
 @media print {
-  html { scroll-snap-type: none; }
-  section.slide {
-    height: auto;
-    min-height: 0;
-    page-break-after: always;
+  @page {
+    size: 1280px 720px;
+    margin: 0;
   }
-  .deck-progress, .deck-nav { display: none; }
+  html {
+    scroll-snap-type: none;
+    scroll-behavior: auto;
+  }
+  body {
+    background: var(--color-bg, #fff);
+  }
+  main.slides {
+    display: block;
+  }
+  section.slide {
+    width: 1280px;
+    height: 720px;
+    min-height: 0;
+    padding: clamp(1.5rem, 4vh, 3rem) clamp(1.5rem, 4vw, 4rem);
+    overflow: hidden;
+    page-break-after: always;
+    page-break-inside: avoid;
+    break-after: page;
+    break-inside: avoid;
+  }
+  section.slide:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  /* Force reveal / stagger elements into their final visible state
+     regardless of whether the IntersectionObserver has fired. Otherwise
+     any slide that hasn't been scrolled to would print blank. */
+  section.slide .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  section.slide .stagger > * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .deck-progress,
+  .deck-nav {
+    display: none !important;
+  }
 }

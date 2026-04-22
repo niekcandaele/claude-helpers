@@ -311,3 +311,5 @@ The controller is ~90 lines of vanilla JS. No dependencies. Drop it at the end o
 6. **Don't set `overflow: auto` on a slide.** It breaks the no-scroll-within-slide contract. If content doesn't fit, split the slide.
 
 7. **Reveal animations need `.reveal` or `.stagger` — no implicit wrapping.** The base CSS only animates elements with those classes. Forgotten wrappers are the #1 reason a slide looks dead.
+
+8. **Don't override `@media print`.** The base CSS's print block forces 1280×720 pages, hides nav chrome, and snaps reveal elements into their final state so PDF exports (via `Ctrl/⌘+P` or `scripts/export-pdf.sh`) are deterministic. Adding your own print rules on top is almost always a mistake — theme CSS should stay out of the print media query.
