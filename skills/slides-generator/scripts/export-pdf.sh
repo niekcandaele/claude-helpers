@@ -122,6 +122,11 @@ TMP_PROFILE="$(mktemp -d -t slides-export-XXXXXX)"
 trap 'rm -rf "$TMP_PROFILE"' EXIT
 
 # --headless=new : modern headless mode, better print fidelity.
+# --window-size=1280,720 : match the @page size in viewport-base.css. Chrome
+#                          evaluates CSS media queries against the window
+#                          viewport, not the print page size — without this,
+#                          `@media (max-width: 800px)` rules in theme CSS
+#                          would fire during export and stack split slides.
 # --virtual-time-budget : advance JS time until N ms pass (fires timers,
 #                         loads fonts/images), then freeze — deterministic.
 # --run-all-compositor-stages-before-draw : let layout/paint settle.
@@ -134,6 +139,7 @@ trap 'rm -rf "$TMP_PROFILE"' EXIT
   --disable-gpu \
   --no-sandbox \
   --hide-scrollbars \
+  --window-size=1280,720 \
   --no-pdf-header-footer \
   --disable-pdf-tagging \
   --virtual-time-budget="$WAIT_MS" \

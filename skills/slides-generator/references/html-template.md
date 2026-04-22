@@ -124,7 +124,7 @@ Cap bullets at **6 per slide**. If you have more, split into two slides.
 </section>
 ```
 
-Theme CSS must set `.slide--split { flex-direction: row; gap: 3rem; }` (plus responsive stacking at narrow widths).
+Theme CSS must set `.slide--split { flex-direction: row; gap: 3rem; }`. Any responsive stacking for narrow screens must be scoped to `screen` so it doesn't leak into print — e.g. `@media screen and (max-width: 800px) { .slide--split { flex-direction: column; } }`. An unscoped `@media (max-width: 800px)` will fire during PDF export and break split/image-led slides (see gotcha #9 below).
 
 ### Quote slide
 
@@ -313,3 +313,5 @@ The controller is ~90 lines of vanilla JS. No dependencies. Drop it at the end o
 7. **Reveal animations need `.reveal` or `.stagger` — no implicit wrapping.** The base CSS only animates elements with those classes. Forgotten wrappers are the #1 reason a slide looks dead.
 
 8. **Don't override `@media print`.** The base CSS's print block forces 1280×720 pages, hides nav chrome, and snaps reveal elements into their final state so PDF exports (via `Ctrl/⌘+P` or `scripts/export-pdf.sh`) are deterministic. Adding your own print rules on top is almost always a mistake — theme CSS should stay out of the print media query.
+
+9. **Scope responsive breakpoints to `screen`.** A rule like `@media (max-width: 800px) { ... }` applies to *all* media types including print, and headless Chrome's print mode can evaluate media queries against its window viewport (not the `@page` size). That's why PDF exports of split/image-led slides can stack into column layout and clip. Always write `@media screen and (max-width: 800px) { ... }` in theme CSS. The base CSS's `@media print { ... }` block is the only place rules should apply to print.

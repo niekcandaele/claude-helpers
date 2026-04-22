@@ -45,7 +45,7 @@ main.slides {
   flex-direction: column;
 }
 
-section.slide {
+.slide {
   position: relative;
   scroll-snap-align: start;
   scroll-snap-stop: always;
@@ -63,46 +63,46 @@ section.slide {
 
 /* Headline scale — clamp against both viewport dims so tall + short
    screens both fit without overflow. */
-section.slide h1 {
+.slide h1 {
   font-family: var(--font-display, var(--font-body));
   font-size: clamp(2.25rem, 6vw + 1rem, 6rem);
   line-height: 1.05;
   letter-spacing: -0.02em;
 }
 
-section.slide h2 {
+.slide h2 {
   font-family: var(--font-display, var(--font-body));
   font-size: clamp(1.75rem, 4vw + 0.5rem, 4rem);
   line-height: 1.1;
   letter-spacing: -0.015em;
 }
 
-section.slide h3 {
+.slide h3 {
   font-size: clamp(1.25rem, 2vw + 0.5rem, 2.25rem);
   line-height: 1.2;
 }
 
-section.slide p,
-section.slide li {
+.slide p,
+.slide li {
   font-size: clamp(1rem, 1.2vw + 0.6rem, 1.5rem);
   line-height: 1.5;
 }
 
-section.slide img {
+.slide img {
   max-width: 100%;
   max-height: min(55vh, 500px);
   object-fit: contain;
   display: block;
 }
 
-section.slide ul,
-section.slide ol {
+.slide ul,
+.slide ol {
   list-style: none;
 }
 
 /* Reveal animation — JS adds .visible via IntersectionObserver.
    Style-specific CSS can override the translate/opacity values. */
-section.slide .reveal {
+.slide .reveal {
   opacity: 0;
   transform: translateY(1.5rem);
   transition:
@@ -110,22 +110,22 @@ section.slide .reveal {
     transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-section.slide.visible .reveal {
+.slide.visible .reveal {
   opacity: 1;
   transform: translateY(0);
 }
 
 /* Staggered reveal — children of a .stagger container come in in
    order. Decks apply this to bullet lists. */
-section.slide.visible .stagger > * {
+.slide.visible .stagger > * {
   animation: slide-fade-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-section.slide.visible .stagger > *:nth-child(1) { animation-delay: 80ms; }
-section.slide.visible .stagger > *:nth-child(2) { animation-delay: 180ms; }
-section.slide.visible .stagger > *:nth-child(3) { animation-delay: 280ms; }
-section.slide.visible .stagger > *:nth-child(4) { animation-delay: 380ms; }
-section.slide.visible .stagger > *:nth-child(5) { animation-delay: 480ms; }
-section.slide.visible .stagger > *:nth-child(6) { animation-delay: 580ms; }
+.slide.visible .stagger > *:nth-child(1) { animation-delay: 80ms; }
+.slide.visible .stagger > *:nth-child(2) { animation-delay: 180ms; }
+.slide.visible .stagger > *:nth-child(3) { animation-delay: 280ms; }
+.slide.visible .stagger > *:nth-child(4) { animation-delay: 380ms; }
+.slide.visible .stagger > *:nth-child(5) { animation-delay: 480ms; }
+.slide.visible .stagger > *:nth-child(6) { animation-delay: 580ms; }
 
 @keyframes slide-fade-in {
   from { opacity: 0; transform: translateY(1.25rem); }
@@ -179,22 +179,22 @@ section.slide.visible .stagger > *:nth-child(6) { animation-delay: 580ms; }
 /* Short-viewport dampening — on laptops with small screen
    heights, dial everything back so content still fits. */
 @media (max-height: 700px) {
-  section.slide {
+  .slide {
     padding: clamp(1.25rem, 3vh, 2rem) clamp(1.25rem, 4vw, 3rem);
   }
-  section.slide h1 { font-size: clamp(2rem, 5vw + 0.5rem, 4.5rem); }
-  section.slide h2 { font-size: clamp(1.5rem, 3.5vw + 0.25rem, 3rem); }
+  .slide h1 { font-size: clamp(2rem, 5vw + 0.5rem, 4.5rem); }
+  .slide h2 { font-size: clamp(1.5rem, 3.5vw + 0.25rem, 3rem); }
 }
 
 @media (max-height: 600px) {
-  section.slide img { max-height: 40vh; }
-  section.slide p,
-  section.slide li { font-size: clamp(0.95rem, 1vw + 0.5rem, 1.25rem); }
+  .slide img { max-height: 40vh; }
+  .slide p,
+  .slide li { font-size: clamp(0.95rem, 1vw + 0.5rem, 1.25rem); }
 }
 
 @media (max-height: 500px) {
-  section.slide { padding: 1rem 1.5rem; }
-  section.slide h1 { font-size: clamp(1.75rem, 4vw + 0.25rem, 3rem); }
+  .slide { padding: 1rem 1.5rem; }
+  .slide h1 { font-size: clamp(1.75rem, 4vw + 0.25rem, 3rem); }
 }
 
 /* Accessibility — honor the reduced-motion preference. Animations
@@ -206,7 +206,7 @@ section.slide.visible .stagger > *:nth-child(6) { animation-delay: 580ms; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
-  section.slide .reveal { opacity: 1; transform: none; }
+  .slide .reveal { opacity: 1; transform: none; }
 }
 
 /* Print — deterministic 16:9 page size, one slide per page, no animations,
@@ -228,7 +228,7 @@ section.slide.visible .stagger > *:nth-child(6) { animation-delay: 580ms; }
   main.slides {
     display: block;
   }
-  section.slide {
+  .slide {
     width: 1280px;
     height: 720px;
     min-height: 0;
@@ -239,18 +239,18 @@ section.slide.visible .stagger > *:nth-child(6) { animation-delay: 580ms; }
     break-after: page;
     break-inside: avoid;
   }
-  section.slide:last-child {
+  .slide:last-child {
     page-break-after: auto;
     break-after: auto;
   }
   /* Force reveal / stagger elements into their final visible state
      regardless of whether the IntersectionObserver has fired. Otherwise
      any slide that hasn't been scrolled to would print blank. */
-  section.slide .reveal {
+  .slide .reveal {
     opacity: 1 !important;
     transform: none !important;
   }
-  section.slide .stagger > * {
+  .slide .stagger > * {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
