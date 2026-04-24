@@ -144,13 +144,23 @@ The verify skill handles skill invocation, parallelism, deduplication, and repor
 
 Wait for verify to complete.
 
-**Output to the user:**
+### Step 2.5: Continuation anchor (REQUIRED — do not skip)
+
+Immediately after verify returns, before any summary markdown, run this bash command with the actual values substituted for `{turn}`, `{max_turns}`, and `{severity}`:
+
+```bash
+echo "VERIFY RETURNED (turn {turn}/{max_turns}, phase=verify). NEXT ACTION: apply severity threshold {severity}. If any issues >= threshold → call Skill(player) for turn {turn+1} with feedback. If zero issues at/above threshold → check exerciser/custom/codex gates then proceed to Phase 1.5 (PR). DO NOT stop here. The loop continues until PR+CI green, --no-pr approval, or turn limit."
+```
+
+This step exists because Opus 4.7 treats verify's polished report as a natural end and tends to hand control back. The echo places the continuation instruction adjacent to the verify result in context — without it, the model reads the report as done and stops. Do not skip this, even if it feels redundant with the CRITICAL note below.
+
+**Output to the user (after Step 2.5):**
 ```markdown
 ## Turn N/M — Verification Complete
 ```
 The verify skill already outputs its own detailed report (skill results table + deduplicated issues table), so just add the turn context header above it.
 
-**CRITICAL: The verify skill will output its report and return. After it returns, YOU (the player-coach) MUST continue to Step 3 — apply the severity threshold and decide whether to loop. Do NOT stop here.**
+**CRITICAL: The verify skill will output its report and return. After it returns, YOU (the player-coach) MUST run Step 2.5 (continuation anchor) and then continue to Step 3 — apply the severity threshold and decide whether to loop. Do NOT stop here.**
 
 ### Step 3: Apply severity threshold and decide
 
@@ -323,6 +333,16 @@ Invoke the check-ci skill to monitor CI status:
 ```
 
 This handles platform detection, polling, and failure investigation.
+
+### Step 2.5: Continuation anchor (REQUIRED — do not skip)
+
+Immediately after check-ci returns, before any summary markdown, run this bash command with the actual values substituted for `{turn}` and `{max_turns}`:
+
+```bash
+echo "CHECK-CI RETURNED (turn {turn}/{max_turns}, phase=ci). NEXT ACTION: if any checks failed → Step 3 (format CI feedback, spawn player for turn {turn+1}, commit+push, re-check). If all passed or no checks configured → proceed to Phase 2 (Completion). DO NOT stop here. The loop continues until CI green or turn limit."
+```
+
+Same rationale as Phase 1 Step 2.5 — check-ci also returns a polished summary that Opus 4.7 can treat as a stop point.
 
 Three possible outcomes:
 
