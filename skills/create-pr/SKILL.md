@@ -379,26 +379,61 @@ The `line` parameter is the line number in the new version of the file. `side: "
 GitLab requires diff position SHAs for inline notes. Fetch them first:
 
 ```bash
-# Get the MR's diff refs
-DIFF_REFS=$(glab api projects/{project_id}/merge_requests/{mr_iid} --jq '.diff_refs')
+# Get the MR's diff refs. Note: glab api has no --jq flag (unlike gh api) — pipe to jq instead.
+DIFF_REFS=$(glab api projects/{project_id}/merge_requests/{mr_iid} | jq '.diff_refs')
 BASE_SHA=$(echo "$DIFF_REFS" | jq -r '.base_sha')
 START_SHA=$(echo "$DIFF_REFS" | jq -r '.start_sha')
 HEAD_SHA=$(echo "$DIFF_REFS" | jq -r '.head_sha')
 ```
 
-Then post each comment as a discussion:
+Then post each comment as a discussion. **You must send a JSON body with an explicit `Content-Type: application/json` header.** The form-encoded `-f "position[base_sha]=..."` style gets accepted by GitLab (HTTP 201) but silently drops the nested `position` object — your note lands as a top-level MR comment instead of an inline `DiffNote`. Write the payload to a temp JSON file and post via `--input`:
+
+```bash
+cat > /tmp/mr-note.json <<EOF
+{
+  "body": "This retry logic works but is a workaround...",
+  "position": {
+    "base_sha": "$BASE_SHA",
+    "start_sha": "$START_SHA",
+    "head_sha": "$HEAD_SHA",
+    "position_type": "text",
+    "new_path": "src/auth/middleware.ts",
+    "new_line": 45
+  }
+}
+EOF
+
+glab api projects/{project_id}/merge_requests/{mr_iid}/discussions \
+  --method POST \
+  --header "Content-Type: application/json" \
+  --input /tmp/mr-note.json
+```
+
+If the comment body is composed from a multi-line string or contains quotes/newlines, build the JSON with `jq` rather than string interpolation to get the escaping right:
+
+```bash
+jq -n --arg body "$COMMENT_BODY" --arg path "$FILE_PATH" --argjson line "$LINE_NUM" \
+  --arg base "$BASE_SHA" --arg start "$START_SHA" --arg head "$HEAD_SHA" \
+  '{body: $body, position: {base_sha: $base, start_sha: $start, head_sha: $head, position_type: "text", new_path: $path, new_line: $line}}' \
+  > /tmp/mr-note.json
+```
+
+**Verify the note posted as a true inline DiffNote:**
 
 ```bash
 glab api projects/{project_id}/merge_requests/{mr_iid}/discussions \
-  --method POST \
-  -f "body=This retry logic works but is a workaround..." \
-  -f "position[base_sha]=$BASE_SHA" \
-  -f "position[start_sha]=$START_SHA" \
-  -f "position[head_sha]=$HEAD_SHA" \
-  -f "position[position_type]=text" \
-  -f "position[new_path]=src/auth/middleware.ts" \
-  -f "position[new_line]=45"
+  | jq '.[-1].notes[0] | {type, position}'
 ```
+
+Expected: `type` is `"DiffNote"` and `position` is a non-null object. If you see `"DiscussionNote"` with `position: null`, the position object was stripped — almost always because `Content-Type: application/json` was missing and the request was form-encoded. (HTTP 415 `"The provided content-type '' is not supported."` is the same problem surfacing as an error rather than a silent strip.)
+
+**To delete a wrongly-posted note** (e.g., it landed as a top-level comment instead of inline) — note that GitLab does not let you delete at the discussion level, only at the underlying note:
+
+```bash
+glab api projects/{project_id}/merge_requests/{mr_iid}/notes/{note_id} --method DELETE
+```
+
+The `note_id` comes from the discussion's `.notes[0].id` field, not the discussion's own `id`.
 
 For the project ID and MR IID, extract from the MR created in Phase 4:
 ```bash
