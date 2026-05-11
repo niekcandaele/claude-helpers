@@ -5,7 +5,7 @@ description: >
   Detects scope, discovers toolchain, triages files to relevant skills, runs static
   analysis, invokes review skills in parallel, exercises the app, and produces a
   unified report. Supports interactive, report-only, and auto-fix modes.
-argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--files=file1,file2] [--module=path] [--skip-ux] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>] [--plan-file=<path>]"
+argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--files=file1,file2] [--module=path] [--skip-ux] [--skip-visual] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>] [--plan-file=<path>]"
 ---
 
 # Verify Changes — Triage-First Pipeline
@@ -34,6 +34,7 @@ Parse `$ARGUMENTS` for:
 
 **Other Options:**
 - `--skip-ux`: Skip UX review for pure backend changes
+- `--skip-visual`: Skip visual review for changes the human has already eyeballed (e.g. copy-only). Visual review is also auto-skipped when `visual-verify` is not present in the available skills (project-scoped skill).
 - `--auto-fix-threshold=N`: Minimum severity for auto-fix mode (default: 3)
 - `--plan-file=<path>`: Explicit path to a plan file for completeness checking. If not provided, discover the plan from context — check if a plan is visible in conversation history (e.g., invoked from player-coach which read a plan, or a plan was created/discussed earlier in this session). If a plan is found from either source, resolve its contents for the plan completeness check in Phase 6.
 
@@ -195,6 +196,7 @@ Categories:
 - GENERAL_SECOND_OPINION: Entire scoped diff → codex-reviewer
 - QA: Test files or files that need test coverage assessment → qa
 - UX: UI components, CLI output, user-facing strings → ux-reviewer
+- VISUAL: UI-rendering files where the change affects what a user sees on the rendered page — components (.astro, .tsx, .vue, .svelte), pages, layouts, templates, CSS files, design tokens, public assets the page depends on for rendering. NOT JSON config, NOT server-side handlers without UI side effects, NOT pure copy strings handled by ux-reviewer. → visual-verify (only if `visual-verify` skill is present)
 - TEST_EXECUTION: Any code change that could affect tests → tester
 
 A file can have multiple categories.
@@ -212,6 +214,7 @@ Output a JSON-like mapping:
     "codex-reviewer": ["all scoped files"],
     "qa": ["test files and files needing test coverage"],
     "ux-reviewer": ["UI/CLI/user-facing files"],
+    "visual-verify": ["UI-rendering files (components, pages, layouts, templates, CSS, design tokens, rendering-affecting public assets)"],
     "tester": ["all"],
   },
   "toolchain": {
@@ -223,6 +226,7 @@ Output a JSON-like mapping:
 ```
 
 **If `--skip-ux`:** The UX reviewer skill is skipped (explicit user override only).
+**If `--skip-visual`:** The visual-verify skill is skipped. Also auto-skipped when `visual-verify` is not present in the available skills (it's project-scoped).
 
 **Output:** Store the skill assignments as `TRIAGE_RESULT` and toolchain commands as `TOOLCHAIN`.
 
@@ -283,11 +287,14 @@ DIFF STAT:
 
 ## Phase 6: Launch Review Skills (Parallel)
 
-Invoke ALL review skills in parallel using the Skill tool. Every skill runs every time — no skills are skipped based on triage (only explicit `--skip-ux` flag can exclude `ux-reviewer`).
+Invoke ALL review skills in parallel using the Skill tool. Every skill runs every time — no skills are skipped based on triage. Skips are explicit and limited:
+- `--skip-ux` excludes `ux-reviewer`.
+- `--skip-visual` excludes `visual-verify`.
+- `visual-verify` is also auto-skipped if it is not present in the available skills list (it is project-scoped: each project that wants visual review ships its own `.claude/skills/visual-verify/`).
 
 **Model routing is handled by skill frontmatter:**
 - opus: reviewer (comprehensive review: design, architecture, coherence, hardening, security)
-- sonnet: codex-reviewer, qa, ux-reviewer, exerciser
+- sonnet: codex-reviewer, qa, ux-reviewer, exerciser, visual-verify
 - haiku: tester, static-analysis
 
 **Each skill prompt includes:**
@@ -378,6 +385,17 @@ Adapt expectations to codebase testing maturity.
 Focus on: 'Are these changes well-tested with good tests?'
 ```
 
+**visual-verify:** *(only invoked if the skill is present in the available skills list and `--skip-visual` was not passed)*
+```
+Read the engineer skill for screenshot mechanics (wrapper command, dev URLs, viewport conventions) — typically VISUAL.md or the engineer SKILL.md.
+For each UI-rendering file in YOUR ASSIGNED FILES, identify at least one route that renders it (grep imports for components; page files render directly).
+Take screenshots at desktop (1440-wide, full-page) AND mobile (390-wide, full-page). If responsive sizing changed, sample boundary widths too.
+Open every PNG with `Read` and apply the holistic articulation step described in the skill: write 2-3 sentences describing the composition in designer's terms (balance, weight, hierarchy, rhythm, alignment, density, color, typography). Anything in that paragraph that reads as a complaint becomes a finding.
+Focus on: 'Would a designer ship this?' — not 'is anything imperfect?'
+If no UI-rendering files in scope or no running app discoverable, return STATUS: SKIPPED with a one-line factual reason — same convention as codex-reviewer.
+Output structured findings (Title / Severity / Location / Category / Description) per the skill's reviewer-mode protocol.
+```
+
 ### Plan Completeness Check (Parallel, Conditional)
 
 This check runs in parallel with the review skills above. It has no dependency on their output — it only needs the plan and the branch diff.
@@ -436,6 +454,10 @@ For `codex-reviewer`, also collect skill status if no findings were produced:
 - `COMPLETED`
 - `BLOCKED`
 - `SKIPPED_UNSUPPORTED_SCOPE`
+
+For `visual-verify`, also collect skill status if no findings were produced:
+- `COMPLETED`
+- `SKIPPED` with reason (`NO_UI_FILES_IN_SCOPE`, `NO_RUNNING_APP_DISCOVERABLE`, `NO_SCREENSHOT_MECHANISM`). SKIPPED is expected behavior, not a warning — it just means there was nothing visual in scope.
 
 **Codex BLOCKED handling:** If `codex-reviewer` reports BLOCKED, this is a significant event — the independent second-model review did not run. Flag it prominently in the report:
 - In `report-only` mode: Include BLOCKED status with high visibility in the Agent Results Summary and add a prominent warning after the summary table.
@@ -533,8 +555,8 @@ status cannot be PASSED — use FAILED instead.
 
 ## Triage Summary
 
-**Skills run:** reviewer, codex-reviewer, tester, qa, ux-reviewer, exerciser
-**Skills skipped:** [none, or list if --skip-ux was used]
+**Skills run:** reviewer, codex-reviewer, tester, qa, ux-reviewer, visual-verify, exerciser
+**Skills skipped:** [none, or list if --skip-ux / --skip-visual was used, or if visual-verify was not present in available skills]
 **Static analysis:** ESLint (3 findings), tsc (1 finding)
 
 ---
@@ -549,6 +571,7 @@ status cannot be PASSED — use FAILED instead.
 | codex-reviewer | Completed / **BLOCKED** / Skipped | Found N items / [reason] |
 | qa | Completed | Found N items |
 | ux-reviewer | Completed / Skipped | Found N items / [reason] |
+| visual-verify | Completed / Skipped / Not Available | Found N items / [reason] |
 | exerciser | PASSED / FAILED / BLOCKED | [reason if blocked] |
 | plan-completeness | Complete / Incomplete / Skipped | [summary if incomplete, reason if skipped] |
 | debugger | Ran / N/A | [if applicable] |
@@ -774,6 +797,17 @@ Severity reflects "how big is this issue?" — NOT "must you fix it?" The human 
 - Pure backend, infrastructure, or internal refactoring only
 
 When in doubt, don't use `--skip-ux` — let it run.
+
+## When to Skip Visual Review
+
+`visual-verify` is project-scoped (each project that wants visual review ships its own `.claude/skills/visual-verify/`). It runs whenever:
+1. The skill is present in the available skills list, AND
+2. `--skip-visual` was not passed, AND
+3. The triage assigns at least one UI-rendering file to it (it self-skips with `STATUS: SKIPPED` if not).
+
+Use `--skip-visual` only when you have already eyeballed the rendered change in a browser and want to suppress the duplicate review (e.g. mid-session iteration where you ran `/visual-verify` manually 30 seconds ago). For copy-only changes that don't affect layout, the skill self-skips — you don't need the flag.
+
+Visual review is the design-quality gate, not just a bug check — it asks "would a designer ship this?". Skipping it on UI work is the same kind of regret-generator as skipping mobile testing. When in doubt, don't pass `--skip-visual` — let it run.
 
 ## Context Window Discipline
 
