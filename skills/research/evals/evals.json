@@ -1,0 +1,23 @@
+{
+  "skill_name": "research",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "research the current state of WebGPU support across the major browsers",
+      "expected_output": "Standard mode: a cited report in chat (not a fanned-out deep run, no auto-saved file, no HTML page). Findings have dated source URLs and confidence levels. Ends with an offer to save/build a page or go deep.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "deep research the tradeoffs between Postgres logical replication and Debezium for change-data-capture",
+      "expected_output": "Deep mode: a reconnaissance pass produces 4-8 distinct branches and confirms them, fans out parallel general-purpose sub-agents (capped at 5), synthesizes into ./research-*.md, then invokes explainer-page to produce ./research-*.html. Hands back both paths.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "can you look into what's going on with the EU AI Act enforcement timelines",
+      "expected_output": "Should TRIGGER the research skill (casual 'look into' phrasing) and run standard mode: cited report in chat with dated sources, no auto file/page.",
+      "files": []
+    }
+  ]
+}
