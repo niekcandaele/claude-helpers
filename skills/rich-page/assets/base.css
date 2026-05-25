@@ -1,0 +1,179 @@
+/* =============================================================
+   base.css — minimal baseline for a rich-page output.
+   -------------------------------------------------------------
+   Inline this verbatim near the top of the <style> block, BEFORE
+   the page's theme/layout CSS so the theme can override.
+
+   What this provides:
+   - Modern reset (box-sizing, margin/padding wipe)
+   - Smooth scroll + responsive root font
+   - Reveal-on-scroll baseline (.reveal / .reveal.in)
+   - Stagger pattern for sequenced list reveals
+   - prefers-reduced-motion handling (animations disabled, reveals
+     forced visible — pages must still be usable for reduced-motion
+     readers)
+   - 880px breakpoint helpers (single column at narrow widths)
+   - :focus-visible default
+
+   What this does NOT provide:
+   - Colors, fonts, sizes — those are theme decisions, set them in
+     :root in the page's own <style> block.
+   - Slide viewport scroll-snap — rich-page is scroll-based, not
+     slide-based. If you want presentation-style scroll snapping per
+     section, opt in section-by-section with `scroll-snap-align`.
+   ============================================================= */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  font-family: var(--font-sans, ui-sans-serif, system-ui, -apple-system, sans-serif);
+  color: var(--text, #111);
+  background: var(--bg, #fafafa);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img, svg, canvas, video {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: var(--accent, currentColor);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+a:hover { text-decoration-thickness: 2px; }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* -------- Reveal-on-scroll baseline ------------------------- */
+/* Add class="reveal" to any element you want to fade up when it
+   scrolls into view. The IntersectionObserver pattern that adds
+   .in lives in the page's <script>:
+
+     const io = new IntersectionObserver(es => {
+       for (const e of es) if (e.isIntersecting) {
+         e.target.classList.add('in'); io.unobserve(e.target);
+       }
+     }, { threshold: .12 });
+     document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+*/
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity .7s cubic-bezier(.2, .8, .2, 1),
+    transform .7s cubic-bezier(.2, .8, .2, 1);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* -------- Stagger pattern ----------------------------------- */
+/* Wrap a sequence of children in .stagger to have them fade in
+   80ms apart once the container becomes visible. Combine with
+   .reveal on the container so the stagger fires on scroll. */
+.stagger > * {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity .5s cubic-bezier(.2, .8, .2, 1),
+    transform .5s cubic-bezier(.2, .8, .2, 1);
+}
+.reveal.in.stagger > *,
+.stagger.in > * {
+  opacity: 1;
+  transform: none;
+}
+.reveal.in.stagger > *:nth-child(1),
+.stagger.in > *:nth-child(1) { transition-delay:  80ms; }
+.reveal.in.stagger > *:nth-child(2),
+.stagger.in > *:nth-child(2) { transition-delay: 180ms; }
+.reveal.in.stagger > *:nth-child(3),
+.stagger.in > *:nth-child(3) { transition-delay: 280ms; }
+.reveal.in.stagger > *:nth-child(4),
+.stagger.in > *:nth-child(4) { transition-delay: 380ms; }
+.reveal.in.stagger > *:nth-child(5),
+.stagger.in > *:nth-child(5) { transition-delay: 480ms; }
+.reveal.in.stagger > *:nth-child(6),
+.stagger.in > *:nth-child(6) { transition-delay: 580ms; }
+
+/* -------- Focus ring ---------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* -------- 880px breakpoint helpers -------------------------- */
+/* The design system uses a single breakpoint at 880px to stack
+   multi-column grids. Most components opt in via their own rules;
+   these helpers are for one-off cases. */
+@media (max-width: 880px) {
+  .stack-mobile { display: block !important; }
+  .hide-mobile  { display: none !important; }
+}
+
+/* -------- Reduced motion ------------------------------------ */
+/* When the user's OS asks for reduced motion, kill all animations
+   and force reveal elements into their final visible state — the
+   page stays readable, just quiet. Pages SHOULD NOT override this. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal,
+  .reveal.in,
+  .stagger > *,
+  .stagger.in > * {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* -------- Print --------------------------------------------- */
+/* Sensible defaults so Ctrl/⌘+P → Save as PDF produces a readable
+   document. The bundled scripts/export-pdf.sh uses this. */
+@media print {
+  html, body {
+    background: white !important;
+    color: black !important;
+  }
+  .reveal, .stagger > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  nav.sticky { position: static !important; }
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
+}

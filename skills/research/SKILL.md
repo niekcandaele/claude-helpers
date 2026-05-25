@@ -9,8 +9,8 @@ description: >
   landscape ("give me the lay of the land on Z"). Two depths: a normal request
   gives a fast cited report in chat; saying "deep research" (or passing --deep)
   runs a multi-phase investigation that fans out parallel sub-agents across the
-  branches of the topic, synthesises them, and renders the result as an
-  interactive HTML page via the explainer-page skill. Prefer this skill over
+  branches of the topic, synthesises them, and renders the result as a rich
+  visual HTML page via the rich-page skill. Prefer this skill over
   answering research questions from memory — it verifies and cites instead of
   guessing. Not for reviewing code, summarising a single document you already
   have, or debugging a specific failure (use reviewer / technical-writer /
@@ -94,17 +94,18 @@ Combine the branch reports into one coherent investigation — don't just concat
 - **Assign overall confidence** per finding and call out what the whole investigation still couldn't establish.
 - **`Write` the master report** to `./research-<topic-slug>.md` using the full report structure. This file is the durable artifact and the source for the page.
 
-### Phase 4 — Handoff to explainer-page
+### Phase 4 — Handoff to rich-page
 
-Invoke the **`explainer-page` skill via the Skill tool**, passing the saved report as the source:
+Invoke the **`rich-page` skill via the Skill tool**, passing the saved report as the source:
 
 ```
-Build an interactive explainer page from this research report: ./research-<topic-slug>.md
+Build a rich visual HTML page from this research report: ./research-<topic-slug>.md
 Audience: <whoever the user mentioned, else "the user / their team">. Language: <match the report>.
 Output path: ./research-<topic-slug>.html
+Just build it — don't ask for confirmation on the visual plan.
 ```
 
-`explainer-page` already accepts "a research bundle" as a source, so the markdown report drops straight in. Let it run its own workflow. When it's done, hand back both paths to the user — the markdown report and the HTML page — in one short message, and note they can ask for any branch to be re-researched or the page restyled.
+`rich-page` accepts a research bundle as a source — its Phase 1 reads the markdown report end-to-end and identifies "candidate visual moments" (charts for quantitative claims, comparison toggles for "X vs Y" branches, node diagrams for any architecture mentioned, etc.). Telling it "just build it" skips the Phase 2 confirmation pause so the deep-research run ends with the artifact in hand, not another approval gate. When it's done, hand back both paths to the user — the markdown report and the HTML page — in one short message, and note they can ask for any branch to be re-researched or the page restyled.
 
 ---
 
@@ -112,7 +113,7 @@ Output path: ./research-<topic-slug>.html
 
 When the report is done, **stop and let the user act on it.** Research exists to inform a human decision — what to build, which option to pick, whether a claim holds up. If you slide straight from "here's what I found" into changing code, configs, or dependencies, you erase the decision point the research was meant to create, and you do it based on findings the user hasn't even read yet.
 
-So after presenting findings (standard) or handing off the artifacts (deep): don't implement, refactor, reconfigure, or "go ahead and apply the best practice." Answer follow-up questions about the sources and analysis, and wait for the user to tell you what to do with it. The one exception is the explainer-page handoff in deep mode — that's part of producing the research deliverable, not acting on it.
+So after presenting findings (standard) or handing off the artifacts (deep): don't implement, refactor, reconfigure, or "go ahead and apply the best practice." Answer follow-up questions about the sources and analysis, and wait for the user to tell you what to do with it. The one exception is the rich-page handoff in deep mode — that's part of producing the research deliverable, not acting on it.
 
 ---
 

@@ -1,44 +1,45 @@
 #!/usr/bin/env bash
-# export-pdf.sh — deterministically render a slides-generator HTML deck to PDF.
+# export-pdf.sh — render a rich-page HTML file to PDF.
 #
-# Uses headless Chrome's native print-to-PDF. No Python or Node dependencies.
-# Page size, per-slide pagination, animation suppression, and nav-chrome
-# hiding are all controlled by the `@media print` block in viewport-base.css
-# so this script stays minimal and the deck's author has one place to tune
-# behavior.
+# Uses headless Chrome's native print-to-PDF. No Python or Node
+# dependencies. The page's own @media print block (provided by
+# assets/base.css) controls pagination, animation suppression, and
+# nav-chrome hiding so this script stays minimal.
 #
 # Usage:
-#   export-pdf.sh <slides.html> [-o output.pdf] [--chrome <binary>] [--wait-ms N]
+#   export-pdf.sh <page.html> [-o output.pdf] [--chrome <binary>] [--wait-ms N]
 
 set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: export-pdf.sh <slides.html> [options]
+Usage: export-pdf.sh <page.html> [options]
 
-Render a slides-generator HTML deck to a PDF using headless Chrome.
-Each slide becomes one page; page size (1280x720 by default) comes from
-the @page rule in viewport-base.css.
+Render a rich-page HTML file to PDF using headless Chrome. The page
+prints with @media print rules from base.css applied (nav chrome
+hidden, reveal animations forced visible, link URLs annotated).
 
 Arguments:
-  <slides.html>          Path to the deck's HTML file.
+  <page.html>            Path to the HTML file.
 
 Options:
   -o, --output PATH      Output PDF path. Default: replace .html with .pdf.
   --chrome PATH          Chromium/Chrome binary to use. Default: auto-detect
                          in PATH. Looks for chromium, chromium-browser,
                          google-chrome, google-chrome-stable, chrome.
-  --wait-ms N            Milliseconds to let JS, fonts, and images settle
-                         before snapshotting. Default: 10000 (10s).
+  --wait-ms N            Milliseconds to let JS, fonts, CDN libs, and
+                         images settle before snapshotting. Default: 10000
+                         (10s). Increase if charts/diagrams are missing
+                         from the PDF — they may need more time to render.
   -h, --help             Show this help and exit.
 
 Example:
-  export-pdf.sh slides.html -o final.pdf
+  export-pdf.sh page.html -o report.pdf
 
 Dependencies:
   - Chromium or Google Chrome installed on the system.
-  - The HTML deck must include the base @media print rules from
-    viewport-base.css so pagination and animations behave.
+  - The HTML page should include the @media print rules from
+    rich-page's assets/base.css so pagination behaves.
 EOF
 }
 
@@ -79,18 +80,17 @@ if [[ ! -f "$INPUT" ]]; then
   echo "Input file not found: $INPUT" >&2; exit 1
 fi
 
-# Resolve input to an absolute path so file:// URLs work regardless of cwd.
+# Resolve input to absolute path so file:// URLs work regardless of cwd.
 INPUT_ABS="$(cd "$(dirname "$INPUT")" && pwd)/$(basename "$INPUT")"
 
 if [[ -z "$OUTPUT" ]]; then
   OUTPUT="${INPUT_ABS%.html}.pdf"
-  # If input doesn't end in .html, just append .pdf.
   if [[ "$OUTPUT" == "$INPUT_ABS" ]]; then
     OUTPUT="${INPUT_ABS}.pdf"
   fi
 fi
 
-# Auto-detect Chrome if not supplied.
+# Auto-detect Chrome.
 if [[ -z "$CHROME" ]]; then
   for candidate in chromium chromium-browser google-chrome google-chrome-stable chrome; do
     if command -v "$candidate" >/dev/null 2>&1; then
@@ -114,32 +114,27 @@ fi
 echo "Chrome:  $CHROME"
 echo "Input:   $INPUT_ABS"
 echo "Output:  $OUTPUT"
-echo "Wait:    ${WAIT_MS}ms for fonts/images/JS to settle"
+echo "Wait:    ${WAIT_MS}ms for fonts/CDN libs/images to settle"
 
-# Use a private user-data-dir so we don't step on the user's Chrome profile
-# (and so the run is reproducible — no stored state).
-TMP_PROFILE="$(mktemp -d -t slides-export-XXXXXX)"
+# Private user-data-dir so we don't step on the user's Chrome profile.
+TMP_PROFILE="$(mktemp -d -t rich-page-export-XXXXXX)"
 trap 'rm -rf "$TMP_PROFILE"' EXIT
 
 # --headless=new : modern headless mode, better print fidelity.
-# --window-size=1280,720 : match the @page size in viewport-base.css. Chrome
-#                          evaluates CSS media queries against the window
-#                          viewport, not the print page size — without this,
-#                          `@media (max-width: 800px)` rules in theme CSS
-#                          would fire during export and stack split slides.
+# --window-size=1280,1800 : tall viewport so long scrolling pages
+#                            paginate cleanly. Adjust if page is wider/taller.
 # --virtual-time-budget : advance JS time until N ms pass (fires timers,
-#                         loads fonts/images), then freeze — deterministic.
+#                         loads fonts/images from CDN), then freeze.
 # --run-all-compositor-stages-before-draw : let layout/paint settle.
-# --hide-scrollbars : irrelevant for print but keeps snapshots clean.
+# --hide-scrollbars : keeps snapshots clean.
 # --no-pdf-header-footer : drop Chrome's default URL/page-number header.
-# --disable-pdf-tagging : smaller file, we don't need accessibility tags here.
 # --no-sandbox : needed in many container/CI environments.
 "$CHROME" \
   --headless=new \
   --disable-gpu \
   --no-sandbox \
   --hide-scrollbars \
-  --window-size=1280,720 \
+  --window-size=1280,1800 \
   --no-pdf-header-footer \
   --disable-pdf-tagging \
   --virtual-time-budget="$WAIT_MS" \

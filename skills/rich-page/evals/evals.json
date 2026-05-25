@@ -1,0 +1,120 @@
+{
+  "skill_name": "rich-page",
+  "evals": [
+    {
+      "id": 0,
+      "name": "research-paper-explainer",
+      "prompt": "I've got this research paper PDF at ./generative-ui-paper.pdf about Google's Generative UI work — basically they trained a model to render whole web interfaces instead of just text. Can you turn it into a rich page my eng team can actually read? Should have the headline numbers, the architecture, and the evaluation. Output to ./genui-explainer.html. Just build it, don't ask me a bunch of stuff first.",
+      "expected_output": "A single self-contained HTML file at ./genui-explainer.html with 6–9 sections, a hero, key-facts strip, an architecture diagram, an evaluation chart with annotation, and one walkthrough of the pipeline. No external file references; CDN libs OK; any images base64-inlined. At least half the centerpiece visuals are interactive.",
+      "files": [],
+      "assertions": [
+        {"id": "single-html-file", "text": "Output is a single .html file at the requested path"},
+        {"id": "parses-cleanly", "text": "HTML parses without errors via Python's html.parser"},
+        {"id": "no-external-file-refs", "text": "grep -Pn 'src=\"(?!data:|https://)|href=\"(?!#|https://|mailto:|tel:)' returns nothing (or only the optional source link back)"},
+        {"id": "uses-cdn-libs", "text": "At least one CDN library is loaded (Chart.js, Mermaid, GSAP, D3, Tailwind, Lucide, or similar)"},
+        {"id": "annotated-chart-present", "text": "At least one Chart.js canvas exists and the page wires the chartjs-plugin-annotation; the annotation labels a real metric from the paper (ELO improvement, preference percentage, or comparable)"},
+        {"id": "interactive-minimum", "text": "Page contains at least one interactive widget. Grading rule: `grep -cP 'class=\"(tab|tabpanel|toggle|accordion|phase|node)\\b|data-(comparison|tab|expand|collapse|id)|role=\"tab\"|aria-(selected|expanded)|<details\\b|<input[^>]+type=\"range\"|ScrollTrigger\\.create' <file>` must return ≥ 1. Static SVG diagrams and rendered charts alone do not satisfy this."},
+        {"id": "card-grid-cap", "text": "Count of card-grid layouts is ≤ 3 (no card-grid sprawl). Grading rule: `grep -cP 'class=\"[^\"]*\\b(grid\\s+cols-|grid-cols-)' <file>` must return ≤ 3. Matches both the skill's custom `class=\"grid cols-N\"` and Tailwind's `grid-cols-N`, regardless of class-attribute order (e.g. `class=\"reveal grid cols-3\"` still matches)."},
+        {"id": "centerpiece-visual-count", "text": "Page has 4–7 centerpiece visuals total, counted as: <canvas> tags with Chart.js init + <div class=\"mermaid\"> blocks + <svg> elements with ≥3 child shape elements (excluding decorative dividers) + tab containers + scroll-tied sections"},
+        {"id": "no-inter-font", "text": "Page does NOT load Inter as a body font. Grading rule: `grep -iE 'family\\s*[:=]\\s*[\"\\'']?Inter|family=Inter' <file>` must return nothing. (Catches both CSS `font-family: 'Inter'` and Google Fonts `?family=Inter`. Mentions inside HTML comments don't match.)"},
+        {"id": "oklch-palette", "text": "CSS uses oklch() color notation for the palette tokens on :root"},
+        {"id": "reveal-on-scroll", "text": "Page implements reveal-on-scroll via IntersectionObserver and the .reveal/.in pattern from base.css"},
+        {"id": "responsive-880", "text": "Page has a media query at 880px that collapses multi-column grids to one column"},
+        {"id": "respects-reduced-motion", "text": "Page respects prefers-reduced-motion (either via base.css or per-element guards on animations)"}
+      ]
+    },
+    {
+      "id": 1,
+      "name": "prd-one-pager",
+      "prompt": "Need a PRD-style one-pager for an internal project called 'Atlas' — it's our new internal observability platform replacing Datadog. Audience is the engineering org leadership. Should cover: the problem with Datadog, what Atlas does differently, the migration plan with phases, cost comparison (Datadog ~$2M/yr → Atlas ~$300K/yr), and our north-star metrics. Make it look like something I'd be proud to share. No need for placeholder images, just clean visuals.",
+      "expected_output": "A single self-contained HTML PRD-style page with hero, problem statement, what-Atlas-does section, an annotated cost-comparison chart, a phased migration timeline (interactive click-to-expand), north-star metrics fact strip, and a footer. Card-grid count ≤ 3. At least 2 interactive visuals.",
+      "files": [],
+      "assertions": [
+        {"id": "single-html-file", "text": "Output is a single .html file"},
+        {"id": "parses-cleanly", "text": "HTML parses without errors"},
+        {"id": "no-external-file-refs", "text": "grep -Pn for non-CDN, non-data src/href returns nothing"},
+        {"id": "cost-comparison-chart", "text": "Page contains a Chart.js or Plot chart visualizing the cost comparison ($2M vs $300K) with annotation calling out the delta or savings ratio"},
+        {"id": "migration-timeline-interactive", "text": "Page contains an interactive phased timeline (click-to-expand markup: class=\"phase\" with click handler OR data-expand attributes OR <details> elements) — not just a static numbered list"},
+        {"id": "fact-strip", "text": "Page has a key-facts strip with the headline numbers from the brief"},
+        {"id": "no-inter-font", "text": "grep -iE 'family\\s*[:=]\\s*[\"\\'']?Inter|family=Inter' returns nothing"},
+        {"id": "section-shape-variety", "text": "Page mixes section shapes — not all card grids; uses ≥1 full-width canvas, ≥1 prose section, ≥1 fact strip"},
+        {"id": "card-grid-cap", "text": "Count of card-grid layouts ≤ 3. Grading rule: `grep -cP 'class=\"[^\"]*\\b(grid\\s+cols-|grid-cols-)' <file>` must return ≤ 3."},
+        {"id": "interactive-minimum", "text": "Page has ≥ 2 interactive widgets. Grading rule: the same grep as eval id 0's interactive-minimum must return ≥ 2."},
+        {"id": "complete-after-followup", "text": "After the user replies to the Phase 2 plan with 'build it' (a second-turn approval — the initial prompt did NOT contain a 'just go' phrase, so the agent SHOULD pause at Phase 2), the artifact file exists and is complete with all requested sections. If the harness only supports single-turn evals, score this assertion based on whether the agent's Phase 2 pause was correctly structured (visual direction + section list + visual inventory)."}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "make-it-less-boring",
+      "prompt": "ok so i wrote up our team's q4 retro as a markdown doc and it's deeply boring. can u make it less boring? like give it some eye candy, some charts maybe, make it visual. the doc is at ./q4-retro.md, just turn it into ./q4-retro.html. our team color is teal-ish if that helps. team of 8 engineers, we shipped 3 big features, 14 incidents, p99 latency went from 800ms to 320ms, on-call burden dropped a lot. there's also stuff in there about morale and process changes we made.",
+      "expected_output": "A single self-contained HTML page that takes the markdown retro and renders it as a visual one-pager with teal accent, an annotated latency-improvement chart, an incidents chart or visual, a morale/process section with interactivity (tabbed view of process changes or click-to-expand), and the team-of-8 + 3-features + 14-incidents as key facts.",
+      "files": [{"path": "q4-retro.md", "content": "# Q4 2025 Retro — Platform Team\n\n## Team\n- 8 engineers (no changes this quarter)\n- New EM: Priya joined in October\n\n## What we shipped\n1. **Streaming ingest v2** — moved from batch to streaming, p99 ingestion latency cut from 800ms to 320ms.\n2. **Multi-region failover** — completed the EU region, now serving from 3 regions.\n3. **Self-serve onboarding** — new customers can provision a workspace without a CSM call.\n\n## Incidents\n- 14 incidents this quarter (down from 22 in Q3).\n- 2 were SEV-1 (one a bad config rollout, one a dependency CVE).\n- Mean time to recovery dropped from 47min to 22min.\n\n## On-call\n- On-call burden dropped — avg pages per shift went from 8 → 3.\n- Big factor: better runbooks (we wrote 12 new ones), and the new alert routing splits noisy alerts off the main rotation.\n\n## Morale and process changes\n- Team morale survey: 4.1/5 (was 3.4/5 in Q3).\n- Started Friday demos — 20 min, low-pressure, optional. Attendance is consistent.\n- Killed the daily standup, switched to async updates in Slack. Mixed feedback — half love it, half want it back. Will revisit Q1.\n- Started rotating the on-call hand-off doc — owner of the previous shift writes a 5-line summary for the next shift.\n\n## Q1 2026 focus\n- Cost reduction (target: -20% on observability spend).\n- Hiring: one senior, one mid.\n- Tech debt: API v3 migration starts in Feb.\n"}],
+      "assertions": [
+        {"id": "single-html-file", "text": "Output is a single .html file at ./q4-retro.html"},
+        {"id": "parses-cleanly", "text": "HTML parses without errors"},
+        {"id": "no-external-file-refs", "text": "grep -Pn for non-CDN, non-data src/href returns nothing"},
+        {"id": "teal-accent", "text": "Page uses a teal/cyan-family accent color (OKLCH hue 180–210 OR named teal/cyan/turquoise hex)"},
+        {"id": "latency-improvement-chart", "text": "Page has a chart showing the p99 latency improvement (800ms → 320ms) with annotation calling out the magnitude of the change"},
+        {"id": "fact-strip", "text": "Key-facts strip includes the team size, features shipped, incident count, and latency numbers from the source"},
+        {"id": "morale-section-interactive", "text": "The morale/process-changes section contains at least one interactive element (tabbed view of process changes, comparison toggle for 'before async standup vs after', click-to-expand on each change) — not just a prose paragraph or card grid"},
+        {"id": "no-inter-font", "text": "grep -iE 'family\\s*[:=]\\s*[\"\\'']?Inter|family=Inter' returns nothing"},
+        {"id": "card-grid-cap", "text": "Count of card-grid layouts ≤ 3. Grading rule: `grep -cP 'class=\"[^\"]*\\b(grid\\s+cols-|grid-cols-)' <file>` must return ≤ 3."},
+        {"id": "interactive-minimum", "text": "Page has ≥ 2 interactive widgets. Grading rule: the same grep as eval id 0's interactive-minimum must return ≥ 2."},
+        {"id": "section-shape-variety", "text": "Page mixes at least 3 distinct section shapes"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "pitch-deck-as-scroll-page",
+      "prompt": "I'm pitching a side project to angel investors next week — a CLI tool called Patchwork that auto-generates patches from natural-language bug reports. Need something I can walk through on a Zoom call (or send as a link). 6-8 'slides'-worth of content but as a rich scrolling page is fine, I don't need slide nav. Tone confident but grounded — these are engineer VCs. Cover: problem, product, demo (with a code example), traction so far (130 GitHub stars in 3 weeks, 8 design partners), market, ask ($500K seed). Build it.",
+      "expected_output": "A single self-contained HTML page styled as a long-scroll pitch with hero, problem, product, demo with syntax-highlighted code, traction fact strip, market visual, and ask. At least one interactive widget — comparison toggle for 'manual patch vs Patchwork', or tabbed view of demo examples, or sliders for market sizing.",
+      "files": [],
+      "assertions": [
+        {"id": "single-html-file", "text": "Output is a single .html file"},
+        {"id": "parses-cleanly", "text": "HTML parses without errors"},
+        {"id": "no-external-file-refs", "text": "grep -Pn for non-CDN, non-data src/href returns nothing"},
+        {"id": "covers-all-sections", "text": "Page covers all requested topics: problem, product, demo with code, traction with the 130-stars/8-partners numbers, market, $500K ask"},
+        {"id": "code-example-styled", "text": "The demo section includes a styled code block (monospace font, padded, contrasted background) — not just <pre>"},
+        {"id": "traction-fact-strip", "text": "Traction numbers (130 stars, 8 design partners, 3 weeks) appear as a key-facts strip with large type"},
+        {"id": "ask-section-stands-out", "text": "The $500K ask is visually emphasized — a CTA button, a fact card, or its own section, not buried in prose"},
+        {"id": "no-inter-font", "text": "grep -iE 'family\\s*[:=]\\s*[\"\\'']?Inter|family=Inter' returns nothing"},
+        {"id": "card-grid-cap", "text": "Count of card-grid layouts ≤ 3. Grading rule: `grep -cP 'class=\"[^\"]*\\b(grid\\s+cols-|grid-cols-)' <file>` must return ≤ 3."},
+        {"id": "interactive-minimum", "text": "Page has ≥ 1 interactive widget (could be demo input → output toggle, tabbed view of demo examples, comparison of 'manual patch vs Patchwork', etc.). Grading rule: the same grep as eval id 0's interactive-minimum must return ≥ 1."},
+        {"id": "single-reply-build", "text": "Since the user said 'Build it', the file exists and is complete — the agent did not block waiting for a Phase 2 confirmation it could not have received"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "prd-with-mandatory-interactivity",
+      "prompt": "Build a rich page from the PRD I'll describe inline (no file, just this brief). Project: 'Hearth' — a public-facing storefront/community site for video-game-server hosting customers. Each customer (a game-server operator) gets a branded site at hearth.example.com/<slug>/ with their server's shop, community pages, and event calendar. Audience for the PRD: the engineering team that's going to build it. Cover:\n\n- The problem (current shop is in-game only, invisible to the open web; SEO and casual-visitor flow are zero)\n- The concept (one public web property per customer; per-server content; branded shell with template constraints in V1)\n- What's in V1 vs deferred to V2/V3 (V1: 6 pages, basic theming, Steam OAuth, item purchase; deferred: voting, custom domains, real money, user-authored themes)\n- The customer (server-operator) flow vs the visitor (gamer) flow — these are two very different user journeys\n- URL/routing strategy (subdomain on Takaro TLD, wildcard cert, no per-customer DNS)\n- Identity & auth (Steam OAuth via Kratos, lazy User creation, auto-link Player)\n- Fulfillment flow (web order → next player presence → auto-deliver, no claim step)\n- Theming model (first-party themes, JSON-schema config; what customers CAN change vs what they CANNOT change in V1)\n- Operator dashboard (new top-level section, existing shop tab unchanged)\n- Image fallback strategy (uploaded image → item icon → generic fallback)\n\nOutput ./hearth-prd.html. Tone: opinionated and specific, engineering team will see through hand-wave. Build it.",
+      "expected_output": "A single self-contained HTML PRD page covering all the listed sections, with interactive visuals for the natural shapes: V1-vs-deferred as a comparison toggle or tabbed view; customer-vs-operator flow as a tabbed view; what-can-change-vs-cannot as a comparison toggle; image fallback as click-to-expand or animated waterfall. Card-grid count ≤ 3.",
+      "files": [],
+      "assertions": [
+        {"id": "single-html-file", "text": "Output is a single .html file at ./hearth-prd.html"},
+        {"id": "parses-cleanly", "text": "HTML parses without errors"},
+        {"id": "no-external-file-refs", "text": "grep -Pn for non-CDN, non-data src/href returns nothing"},
+        {"id": "interactive-minimum-prd", "text": "Page contains AT LEAST 2 distinct interactive widgets — at minimum: one tabbed view OR comparison toggle for V1-vs-deferred, AND one tabbed view OR comparison toggle for customer-vs-operator flow. Static SVG diagrams do not count."},
+        {"id": "v1-vs-deferred-interactive", "text": "The 'V1 vs deferred' content is rendered as one of the interactive patterns from the SKILL.md PRD-shape table — NOT as two side-by-side card grids. Grading rule: the section containing both 'V1' and 'deferred' text must also contain `class=\"toggle` OR `data-comparison` OR `class=\"tab\\b` OR `role=\"tab\"` OR `class=\"accordion\\b` OR `<details\\b`."},
+        {"id": "customer-vs-operator-interactive", "text": "The two-audience-flow content (customer flow vs operator flow) is rendered as a tabbed view per audience OR a comparison toggle — NOT as two card grids. Grading rule: section containing both 'customer' and 'operator' must contain `class=\"tab\\b` OR `role=\"tab\"` OR `class=\"toggle` OR `data-comparison`."},
+        {"id": "card-grid-cap-strict", "text": "Card-grid count ≤ 3 (PRD shape provokes the failure mode; enforce strictly). Grading rule: `grep -cP 'class=\"[^\"]*\\b(grid\\s+cols-|grid-cols-)' <file>` must return ≤ 3."},
+        {"id": "at-least-one-chart", "text": "Page contains at least one rendered chart. Grading rule (most reliable signal across libraries): a `<canvas>` element AND `new Chart(` appearing in a `<script>` block (Chart.js init), OR a `<div>` with `Plot.plot(` in a script (Observable Plot), OR `d3.select(` with axis/scale calls (D3). The PRD has numbers (cost, page counts, scope breakdown) that warrant at least one chart."},
+        {"id": "all-sections-covered", "text": "Page contains sections for: problem, concept, V1-vs-deferred, customer-vs-operator flow, URL/routing, identity, fulfillment, theming, operator dashboard, image fallback"},
+        {"id": "no-inter-font", "text": "grep -iE 'family\\s*[:=]\\s*[\"\\'']?Inter|family=Inter' returns nothing"},
+        {"id": "oklch-palette", "text": "CSS uses oklch() on :root"},
+        {"id": "single-reply-build", "text": "User said 'Build it' — file exists and is complete in one flow"}
+      ]
+    },
+    {
+      "id": 5,
+      "name": "topic-only-no-source",
+      "prompt": "Can you make me a rich page about chronic dehydration in cyclists? I don't have a source doc, I just want a page I can share with my road-cycling club. The audience is amateur club cyclists who do 60-120km weekend rides. Want it to feel scientific but accessible.",
+      "expected_output": "Because the user provided a topic but no source file, the agent's FIRST reply should be a single bundled AskUserQuestion (or equivalent inline question) covering: language preference (default to English here since user wrote in English), output path (default ./chronic-dehydration-cyclists.html), and any sources they'd like to lean on. Should NOT immediately build the file because the user did not use a 'just go' phrase.",
+      "files": [],
+      "assertions": [
+        {"id": "no-file-built-yet", "text": "No HTML file has been written to disk in this first reply (the outputs directory is empty). Grading rule: `ls <outputs_dir>` returns no .html file."},
+        {"id": "asks-via-tool-call", "text": "Agent's first reply invokes the AskUserQuestion tool (not an inline natural-language question — required so the harness can deterministically detect the clarification). Grading rule: the transcript contains exactly one `AskUserQuestion` tool call in the first turn."},
+        {"id": "question-bundles-output-path-and-sources", "text": "The AskUserQuestion call covers AT MINIMUM: output path and source-material-optional. (Topic, audience, and language are already implied in this prompt — the SKILL.md says skip items the user has already provided.) Grading rule: the AskUserQuestion's text or option labels must mention 'output' or 'path' or 'file' AND 'source' or 'doc' or 'material'."}
+      ]
+    }
+  ]
+}

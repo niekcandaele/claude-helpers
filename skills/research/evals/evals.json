@@ -10,7 +10,7 @@
     {
       "id": 2,
       "prompt": "deep research the tradeoffs between Postgres logical replication and Debezium for change-data-capture",
-      "expected_output": "Deep mode: a reconnaissance pass produces 4-8 distinct branches and confirms them, fans out parallel general-purpose sub-agents (capped at 5), synthesizes into ./research-*.md, then invokes explainer-page to produce ./research-*.html. Hands back both paths.",
+      "expected_output": "Deep mode: a reconnaissance pass produces 4-8 distinct branches and confirms them, fans out parallel general-purpose sub-agents (capped at 5), synthesizes into ./research-*.md, then invokes rich-page to produce ./research-*.html. Hands back both paths.",
       "files": []
     },
     {
