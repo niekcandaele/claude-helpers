@@ -97,6 +97,7 @@ Common signals:
 - login/authentication error -> `CODEX_AUTH_MISSING`
 - websocket/DNS/permission denied network errors -> `CODEX_NETWORK_BLOCKED`
 - inability to create/use temp workspace or run required git commands -> `PATCH_CONSTRUCTION_FAILED`
+- Codex exceeded `CODEX_REVIEW_TIMEOUT` (a genuine hang, not a too-short wrapper) -> `CODEX_REVIEW_FAILED`, with a note that it ran past the budget. NOTE: an exit-124 from a foreground Bash `timeout` means the wrapper was too short, not that Codex hung — fix by running detached in the background (see Review Procedure step 3), not by treating it as a real failure.
 
 If `SCOPE_METADATA` and the reconstructed workspace would diverge, fail closed with `PATCH_CONSTRUCTION_FAILED`. A blocked Codex pass is better than a mis-scoped review.
 
@@ -134,10 +135,31 @@ The temp workspace must contain ONLY the intended review diff.
 
 ### 3. Run Codex review
 
-In the temp workspace:
-```bash
-codex review --uncommitted
-```
+`codex review` is long-running. On larger diffs it routinely runs well past the Bash tool's
+**default 120 s timeout** (hard foreground max 600 s / 10 min). Running it as a plain
+foreground Bash call is what produced spurious exit-124 / `CODEX_REVIEW_FAILED` BLOCKED
+results — Codex was killed mid-review before it could emit findings. Do NOT run it as a
+bounded foreground call.
+
+**Run Codex detached in the background and poll for completion:**
+
+1. Launch it with the Bash tool's `run_in_background: true`, redirecting stdout+stderr to a
+   log file inside the temp workspace (no `&`, no `timeout` wrapper):
+   ```bash
+   codex review --uncommitted > "$TMP_REVIEW_DIR/codex-review.log" 2>&1
+   ```
+2. The harness re-invokes you when the background command exits — wait for that exit rather
+   than a fixed `sleep`. Once it has exited, read `$TMP_REVIEW_DIR/codex-review.log` to get
+   the full output.
+3. Apply an **overall budget** as the only stop condition, configurable via the
+   `CODEX_REVIEW_TIMEOUT` env var (milliseconds), **default `1800000` (30 min)**. If Codex
+   has not exited within the budget, stop the background process and report
+   `CODEX_REVIEW_FAILED` with a note that it exceeded `CODEX_REVIEW_TIMEOUT`. This stays a
+   non-fatal blocked result — never fail the overall verify run.
+
+**Foreground fallback:** only if background execution is unavailable, run `codex review`
+foreground with the Bash `timeout` set explicitly to the **`600000` ms max** (never the
+120 s default), accepting that very large diffs may still hit the 10-min ceiling.
 
 Capture stdout/stderr exactly.
 

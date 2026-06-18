@@ -352,6 +352,7 @@ Focus on: 'Is this change well-designed, structurally sound, pattern-consistent,
 ```
 Run the local Codex CLI as an independent second-opinion reviewer.
 Use `codex review` via Bash, not Claude's native analysis alone.
+`codex review` is long-running: run it as a detached background command (no short Bash timeout) and poll for completion, honoring `CODEX_REVIEW_TIMEOUT` (default 30 min), so larger changes are not killed mid-review.
 Use `SCOPE_METADATA` as the source of truth for scope reconstruction.
 Adapt the verify scope into a temporary diff-only workspace under /tmp so Codex reviews only the intended changes.
 Do NOT infer staged vs unstaged vs branch vs path-filtered scope from assigned files or prose if `SCOPE_METADATA` says otherwise.
