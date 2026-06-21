@@ -1,0 +1,98 @@
+# Canonical thin just surface for a golden repo.
+#
+# This file holds ZERO logic. Every recipe is a one-line shell into the repo's dev CLI, so the
+# verbs are identical across every repo and language. Adjust only the `dev` alias below to match
+# how this repo's CLI is invoked:
+#
+#   JS repo:     dev := "node scripts/dev/index.mjs"   (or "npm run dev --")
+#   Python repo: dev := "python -m devctl"
+#   Go repo:     dev := "go run ./cmd/devctl"
+#
+# If you ever want to add a loop or a conditional here, that logic belongs in the CLI instead.
+
+dev := "node scripts/dev/index.mjs"
+
+# Show available commands
+default:
+    @just --list
+
+# ---- Lifecycle ----------------------------------------------------------------
+
+# Generate env, build if stale, start, wait until healthy. Optional instance index.
+up index="":
+    @{{dev}} up {{index}}
+
+# Stop & remove containers, keep data. The "I'm done" reflex — frees RAM.
+down:
+    @{{dev}} down
+
+restart:
+    @{{dev}} restart
+
+# This instance: are services healthy? which ports?
+status:
+    @{{dev}} status
+
+logs svc="":
+    @{{dev}} logs {{svc}}
+
+# Exec a shell into a container (default: the main app service).
+shell svc="":
+    @{{dev}} shell {{svc}}
+
+# Open a DB debug shell / run quick debug queries.
+db *args:
+    @{{dev}} db {{args}}
+
+# ---- Environment --------------------------------------------------------------
+
+# (Re)generate .env from the single INDEX var. Usually runs automatically on `up`.
+env index="":
+    @{{dev}} env {{index}}
+
+# Validate golden-state invariants for this repo. `just doctor --fix` repairs the safe subset.
+doctor *args:
+    @{{dev}} doctor {{args}}
+
+# ---- Data ---------------------------------------------------------------------
+
+# Create dev data, idempotent.
+seed:
+    @{{dev}} seed
+
+# Wipe data + re-seed. Fully autonomous, zero manual steps.
+reset-data:
+    @{{dev}} reset-data
+
+# Down + destroy all volumes for this instance (full data wipe).
+nuke:
+    @{{dev}} nuke
+
+# ---- Build --------------------------------------------------------------------
+
+# Clean deps/artifacts, install, build images (the clean build).
+rebuild:
+    @{{dev}} rebuild
+
+# ---- Tests --------------------------------------------------------------------
+
+# The whole suite — the correct default.
+test:
+    @{{dev}} test
+
+test-unit:
+    @{{dev}} test-unit
+
+test-integration:
+    @{{dev}} test-integration
+
+test-e2e:
+    @{{dev}} test-e2e
+
+# Run a single test file.
+test-file path:
+    @{{dev}} test-file {{path}}
+
+# Run tests matching a pattern.
+test-one pattern:
+    @{{dev}} test-one {{pattern}}

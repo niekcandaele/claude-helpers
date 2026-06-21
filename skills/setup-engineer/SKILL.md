@@ -1,6 +1,6 @@
 ---
 name: setup-engineer
-description: Setup or update repository engineer skill with validated, multi-file knowledge
+description: Reconcile this repository toward the opinionated "golden state" for agentic local development — a per-repo dev CLI, a thin justfile surface, a generated port-offset env contract, a four-file engineer skill, thin CI, and a doctor invariant-enforcer. Run /setup-engineer whenever you want to set up, audit, or repair a repo's local-dev tooling: a fresh repo with nothing, a half-built repo with organic scripts that needs consolidating, or a finished repo you just want to verify still conforms.
 disable-model-invocation: true
 allowed-tools:
   - Read
@@ -13,521 +13,159 @@ allowed-tools:
   - Task
 ---
 
-# /setup-engineer - Repository Engineer Skill Management
+# /setup-engineer — Golden-State Reconciler
 
-## Goal
+This command does not "generate documentation." It **reconciles a repository toward a fixed,
+opinionated golden state** for agentic local development, then hands ongoing enforcement to a
+`doctor` command that lives in the repo. Think of it as `terraform apply` for a repo's dev
+tooling: it reads the current world, diffs against the desired world, and closes the gap in
+verified phases.
 
-Create a comprehensive, **multi-file skill** for this repository with **validated content**. Every piece of information should be verified by actually running commands and exercising the systems.
+You are the **guardian** of this golden state. Every time it runs, the repo should end up the
+same shape — predictable, parallel-instance-safe, self-healing.
 
-This command:
-- Reads existing documentation first
-- Detects areas to investigate (tests, database, API, etc.)
-- Presents an investigation plan for approval
-- Spawns agents to exercise each area
-- Generates a multi-file skill with real, verified content
+## What "golden state" means
 
-## Process
+A repo is golden when all six of these are true. The full invariant checklist (the thing
+`doctor` enforces) lives in [references/golden-state.md](references/golden-state.md) — read it
+before you diff anything.
 
-### Step 1: Determine Repository Identity
+1. **A per-repo dev CLI** — a *deep module* in the repo's native language (JS repo → JS,
+   Python repo → Python). Simple verb surface, all the messy orchestration hidden inside. It
+   owns the entire local-dev lifecycle. Spec: [references/cli-and-just.md](references/cli-and-just.md).
+2. **A thin `just` surface** — identical verbs across every repo and language, zero logic, each
+   line shells into the CLI. This is what makes your muscle memory and the engineer skill
+   portable. Template: [templates/justfile](templates/justfile).
+3. **A generated env / port contract** — one `ENV_INDEX`, one `DEV_HOST`, a slot table as the
+   single source of truth, `BASE + INDEX*100 + slot`, and the in-docker-DNS-vs-host-offset
+   boundary law. Spec: [references/env-and-ports.md](references/env-and-ports.md).
+4. **A four-file engineer skill** — `SKILL.md` / `ARCHITECTURE.md` / `TESTING.md` /
+   `GOTCHAS.md`. Commands-out, why-in. Spec: [references/engineer-skill.md](references/engineer-skill.md).
+5. **Thin CI** — workflows call the same `just`/CLI surface and hold ~zero logic. This is both
+   reuse and resistance to CI-vendor lock-in.
+6. **`doctor` is wired and green** — the in-repo invariant enforcer (a CLI verb) passes, and CI
+   runs it.
 
-```bash
-REPO_URL=$(git remote get-url origin 2>/dev/null)
-if [ -n "$REPO_URL" ]; then
-  REPO_NAME=$(basename -s .git "$REPO_URL")
-else
-  REPO_NAME=$(basename "$(pwd)")
-fi
-echo "Repository: $REPO_NAME"
-```
+`setup-engineer` reconciles the **existence and shape** of 1–6. `doctor` enforces the
+**invariants** at runtime once the shape exists. Keep that split clear: setup-engineer is the
+meta-reconciler that *creates and migrates*; doctor is the in-repo guard that *catches drift*.
+setup-engineer runs `doctor` as its final gate.
 
-### Step 2: Check for Existing Skill
+## The reconciler loop
 
-```bash
-SKILL_DIR=".claude/skills/${REPO_NAME}-engineer"
-if [ -d "$SKILL_DIR" ]; then
-  echo "Existing skill found at: $SKILL_DIR"
-  ls -la "$SKILL_DIR"
-else
-  echo "No existing skill - will create new one"
-fi
-```
+Run these steps in order. Do not skip the diff and do not big-bang an existing repo.
 
-If skill exists, read all files for later merging.
+### 1. Detect
 
-### Step 3: Read Existing Documentation
-
-**Critical:** Before generating anything, find and read the repository's own documentation:
-
-```bash
-# Find documentation
-find . -maxdepth 3 -type f \( -name "README.md" -o -name "CONTRIBUTING.md" -o -name "DEVELOPMENT.md" \) 2>/dev/null
-find . -maxdepth 2 -type d \( -name "docs" -o -name "documentation" \) 2>/dev/null
-ls docs/*.md 2>/dev/null | head -10
-```
-
-Read these files and extract:
-- Project overview and architecture
-- Developer setup instructions
-- Build/test commands mentioned
-- Repo-specific patterns and conventions
-- Known gotchas or requirements
-
-This becomes the foundation for skill content.
-
-### Step 4: Detect Areas to Investigate
-
-Scan the repository to identify what areas need investigation:
+Inventory what exists. Don't assume — look.
 
 ```bash
-# Testing
-ls package.json 2>/dev/null && jq -r '.scripts | keys[]' package.json | grep -i test
-ls pytest.ini pyproject.toml jest.config.* vitest.config.* 2>/dev/null
-find . -type d -name "__tests__" -o -name "test" -o -name "tests" 2>/dev/null | head -5
+# Identity
+basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
-# Database
-ls docker-compose*.yml 2>/dev/null
-grep -l "postgres\|mysql\|mongo\|redis" docker-compose*.yml 2>/dev/null
-find . -type d -name "migrations" 2>/dev/null | head -3
-
-# API
-find . -type d -name "api" -o -name "routes" -o -name "endpoints" 2>/dev/null | head -5
-grep -r "app.get\|app.post\|router\." --include="*.ts" --include="*.js" -l 2>/dev/null | head -5
-
-# Frontend
-grep -l "react\|vue\|angular\|svelte" package.json 2>/dev/null
-ls -d src/components packages/*/src/components 2>/dev/null
-
-# Build system
-ls Makefile 2>/dev/null && grep -E "^[a-zA-Z_-]+:" Makefile | head -10
-ls package.json 2>/dev/null && jq -r '.scripts | keys[]' package.json
+# Stack / package manager
+ls package.json pyproject.toml go.mod Cargo.toml 2>/dev/null
+# Compose + existing env tooling
+ls docker-compose*.yml compose*.yml .env .env.example 2>/dev/null
+ls scripts/ 2>/dev/null
+# Existing command surface
+ls justfile Justfile Makefile 2>/dev/null
+# Existing engineer skill
+ls .claude/skills/*-engineer/ 2>/dev/null
+# CI
+ls .github/workflows/ .gitlab-ci.yml 2>/dev/null
 ```
 
-Build a list of areas to investigate based on what exists.
+Read whatever you find. Existing organic scripts (a `setup-env.mjs`, a `dev-data.mjs`, a
+`reset-data.sh`) are not junk to delete — they are the **logic you will migrate into the CLI**.
+Read them to learn the repo's real lifecycle before you propose anything.
 
-### Step 5: Present Investigation Plan
+### 2. Classify
 
-Before spawning agents, present the plan to the user using AskUserQuestion:
+Put the repo in exactly one bucket. This decides how aggressive you are.
 
-```
-Based on my analysis, I found these areas to investigate:
+- **Greenfield** — no CLI, no `just`, no env tooling, no engineer skill. → Scaffold the whole
+  golden state from the per-language template. Low risk; little to break.
+- **Partial** — has organic scripts and/or a monolith engineer skill (this is the akari/takaro
+  case). → **Migrate**, phase by phase, verifying after each. Highest risk; never big-bang.
+- **Golden** — already conforms. → Run `just doctor`, report green, stop. Don't churn a repo
+  that's already correct.
 
-1. **Testing** - Found jest/vitest config, test directories
-2. **Database** - Found PostgreSQL in docker-compose
-3. **API** - Found Express routes in packages/api
-4. **Frontend** - Found React components
+### 3. Diff
 
-I will spawn investigation agents to:
-- Run tests and document patterns
-- Connect to database and document queries
-- Exercise API endpoints
-- Document frontend development workflow
-
-Each agent will actually execute commands and report real findings.
-
-Proceed with investigation?
-```
-
-Additionally, offer to create a `VERIFICATION.md` with custom verification gates:
+Produce a concrete drift report against the golden-state checklist. For each of the six
+elements, state: present / partial / missing, and the specific gap. Example:
 
 ```
-I can also create a VERIFICATION.md file with custom verification gates.
-These are hard requirements that the verify pipeline enforces every time it runs.
-
-Examples:
-- "POST /api/search must return results after seeding"
-- "All files in src/api/routes/ must have corresponding tests"
-- "The health endpoint must return 200 with database connectivity"
-
-Would you like to add custom verification gates?
+CLI            partial   logic lives in 4 loose scripts/*.mjs, no single entrypoint, no `doctor`
+just           missing   no justfile
+env contract   partial   setup-env.mjs exists but 2 services hardcode host ports in compose
+engineer skill partial   1 monolith SKILL.md (33KB) + 3 helper scripts inside the skill dir
+CI             partial   workflow reimplements test orchestration inline instead of calling CLI
+doctor         missing
 ```
 
-Options:
-- "Yes, investigate all areas"
-- "Let me select which areas"
-- "Skip investigation, create skeleton"
+### 4. Plan
 
-### Step 6: Spawn Investigation Agents
+Turn the diff into an **ordered, phased** remediation plan. For a Partial repo the order that
+keeps the repo working at every step is:
 
-**Spawn agents in parallel** for each detected area. Each agent should:
+1. **Scaffold the CLI skeleton** (verb surface + `doctor`, delegating to existing scripts at
+   first) and the thin justfile over it.
+2. **Migrate organic logic into the CLI** one concern at a time (env → lifecycle → data →
+   tests), deleting each loose script only once its verb works.
+3. **Bring the env/port contract to spec** (slot table as truth, kill hardcoded ports, derive
+   boundary URLs) until `doctor` passes.
+4. **Restructure the engineer skill** to the four-file floor; move commands out, move scripts
+   into the CLI, keep only why/architecture/gotchas.
+5. **Thin the CI** to call `just`/CLI.
 
-1. **Actually exercise the system** - run commands, make requests, query databases
-2. **Document what works** - exact commands with real output
-3. **Note gotchas** - things that failed and why
-4. **Report findings** - structured output for skill file generation
+Present the plan and get sign-off before applying. This matches the repo owner's standing rule:
+multi-phase plans verify at the end of each phase.
 
-#### Testing Investigation Agent
+### 5. Apply — phase-gated, never big-bang
 
-```
-Task: Investigate testing in this repository
-
-You must ACTUALLY RUN things, not just describe them.
-
-1. Find test configuration:
-   - Look for jest.config.*, vitest.config.*, pytest.ini, etc.
-   - Read the config to understand the setup
-
-2. Run tests (start small):
-   - Try running a single test file first
-   - Then try the full test suite
-   - Note any setup required (env vars, services)
-
-3. Document findings:
-   - Test framework used
-   - Command to run all tests
-   - Command to run specific tests
-   - Command to run tests in watch mode
-   - Any required setup (docker services, env vars)
-   - Gotchas discovered
-
-4. Report format:
-   ## Test Framework
-   {what framework, version if discoverable}
-
-   ## Commands
-   ### Run All Tests
-   \`\`\`bash
-   {actual command you ran}
-   \`\`\`
-   Output: {summary of what happened}
-
-   ### Run Specific Tests
-   \`\`\`bash
-   {pattern that works}
-   \`\`\`
-
-   ## Setup Required
-   {any setup needed before tests work}
-
-   ## Gotchas
-   {issues you encountered}
-```
-
-#### Database Investigation Agent
-
-```
-Task: Investigate database in this repository
-
-You must ACTUALLY CONNECT and RUN QUERIES.
-
-1. Find database configuration:
-   - Check docker-compose.yml for database services
-   - Find connection strings in config files
-   - Check for migration tools
-
-2. Connect to database:
-   - Use docker compose exec to access database
-   - Run sample queries to understand schema
-   - Try common debugging queries
-
-3. Document findings:
-   - Database type and version
-   - How to connect (exact command)
-   - How to run migrations
-   - Useful debugging queries
-   - Schema overview (key tables)
-
-4. Report format:
-   ## Database Type
-   {postgres/mysql/mongo/etc}
-
-   ## Connection
-   \`\`\`bash
-   {exact docker compose exec command}
-   \`\`\`
-
-   ## Migrations
-   \`\`\`bash
-   {command to run migrations}
-   \`\`\`
-
-   ## Useful Queries
-   \`\`\`sql
-   -- List tables
-   {query}
-
-   -- Debug common issues
-   {query}
-   \`\`\`
-
-   ## Gotchas
-   {issues you encountered}
-```
-
-#### API Investigation Agent
-
-```
-Task: Investigate API in this repository
-
-You must ACTUALLY MAKE REQUESTS.
-
-1. Find API structure:
-   - Locate route definitions
-   - Find authentication patterns
-   - Check for API documentation (OpenAPI, etc.)
-
-2. Exercise the API:
-   - Find how to start the API server
-   - Make sample requests
-   - Test authentication flow
-
-3. Document findings:
-   - How to start the API
-   - Base URL pattern
-   - Authentication method
-   - Key endpoints
-   - Example requests that work
-
-4. Report format:
-   ## Starting the API
-   \`\`\`bash
-   {command to start}
-   \`\`\`
-
-   ## Authentication
-   {how auth works, how to get tokens}
-
-   ## Key Endpoints
-   | Method | Endpoint | Description |
-   |--------|----------|-------------|
-   | GET | /api/... | ... |
-
-   ## Example Requests
-   \`\`\`bash
-   curl {actual request that works}
-   \`\`\`
-
-   ## Gotchas
-   {issues you encountered}
-```
-
-#### Frontend Investigation Agent (if applicable)
-
-```
-Task: Investigate frontend development in this repository
-
-1. Find frontend setup:
-   - Framework (React, Vue, etc.)
-   - Build tools (Vite, webpack, etc.)
-   - Component structure
-
-2. Run development server:
-   - Find the dev command
-   - Note the URL and port
-   - Check for hot reload
-
-3. Document findings:
-   - Framework and build tool
-   - Dev server command
-   - How to add new components
-   - Testing approach for frontend
-
-4. Report format:
-   ## Framework
-   {React/Vue/etc with version}
-
-   ## Development Server
-   \`\`\`bash
-   {command to start dev server}
-   \`\`\`
-   URL: {localhost:port}
-
-   ## Component Structure
-   {where components live, naming conventions}
-
-   ## Gotchas
-   {issues you encountered}
-```
-
-### Step 7: Generate Multi-File Skill
-
-Create the skill directory structure:
+After **each** phase:
 
 ```bash
-mkdir -p .claude/skills/${REPO_NAME}-engineer
+just doctor      # invariants hold
+just test        # nothing broke   (use the repo's real test verb if `just` isn't wired yet)
 ```
 
-Generate files based on investigation results:
+If a phase breaks something, stop and fix it before the next phase. Spawn verification
+subagents with the Task tool for the heavier checks (run the full suite, exercise the app) so a
+phase isn't declared done on a hunch. Do not delete an organic script until its replacement
+verb is green.
 
-#### VERIFICATION.md (optional — if user opted in for custom gates)
+### 6. Verify and report
 
-```markdown
-# Verification Rules
+End on a green `doctor` plus the report in [references/report-format.md](references/report-format.md):
+what changed, what each phase verified, and any drift left for a follow-up.
 
-Custom gates checked by the verification pipeline every /verify run.
-Each gate is a hard requirement — all must pass for verification to approve.
+## Two behavioral laws you must install
 
-## Exerciser Gates
+These go into the engineer skill's `SKILL.md` so **every** agent that later works in the repo
+follows them ambiently — they are the heart of "guardian / continuous improvement." Full text
+and rationale in [references/engineer-skill.md](references/engineer-skill.md).
 
-Checked by exerciser while the app is running.
+- **Lifecycle hygiene** — *you brought the environment up, you tear it down when finished.*
+  `just down` is the cheap reflex (keeps data, frees RAM so more instances run in parallel).
+  This matters because the repo owner runs many headless instances at once; stale environments
+  eating RAM is the failure mode.
+- **Self-improvement (executable-encoding-first)** — when an agent fights through friction, the
+  fix is routed to the most permanent layer that can hold it: a new `just`/CLI verb > a new
+  `doctor` check > a `GOTCHAS.md` note. Prose is the fallback, not the default. This includes
+  the **infra-change law**: adding or changing a service (datastore, queue, cache, IdP) means,
+  in the same change, adding its port slot + healthcheck + `nuke` volume-coverage + regenerated
+  `.env` — and `doctor` fails until all four are true.
 
-- [ ] {describe what must work when the app is running}
+## Reference map
 
-## Review Gates
-
-Checked by review agents during code analysis (no running app needed).
-
-- [ ] {describe what must be true about the code}
-```
-
-If the user provides specific gates during the conversation, populate the file with those instead of the skeleton placeholders.
-
-#### SKILL.md (entry point)
-
-```markdown
----
-name: {REPO_NAME}-engineer
-description: {REPO_NAME} repository knowledge - architecture, testing, database, API, development workflows. Use when working on this codebase, running tests, debugging, or understanding the project.
----
-
-# {REPO_NAME} Engineer
-
-{Brief overview from README/docs - actual content, not placeholder}
-
-## Quick Reference
-
-| Area | File | Key Command |
-|------|------|-------------|
-| Testing | [TESTING.md](TESTING.md) | `{actual test command}` |
-| Database | [DATABASE.md](DATABASE.md) | `{actual db command}` |
-| API | [API.md](API.md) | `{actual api command}` |
-| Verification | [VERIFICATION.md](VERIFICATION.md) | Custom verification gates |
-{add rows for each area that was investigated}
-
-## Architecture
-
-{From documentation - actual architecture info}
-
-## Getting Started
-
-{From documentation - actual setup steps}
-
-## Maintenance
-
-This skill should stay accurate. During work:
-
-- **Discover something useful?** → Ask the human if it should be added
-- **Find outdated info?** → Ask the human if it should be updated
-- **Run `/setup-engineer`** → Bulk update from current session
-```
-
-#### TESTING.md
-
-```markdown
-# Testing
-
-{Content from Testing Investigation Agent - real, verified commands}
-```
-
-#### DATABASE.md
-
-```markdown
-# Database
-
-{Content from Database Investigation Agent - real, verified commands}
-```
-
-#### API.md
-
-```markdown
-# API
-
-{Content from API Investigation Agent - real, verified commands}
-```
-
-(Create additional files for each investigated area)
-
-### Step 8: Ensure CLAUDE.md Reference
-
-Check and update CLAUDE.md:
-
-```markdown
-# Repository Engineer Skill
-
-This repository has an engineer skill at `.claude/skills/{REPO_NAME}-engineer/`.
-
-Claude will automatically discover and use this skill. The skill contains multiple files:
-- `SKILL.md` - Overview and quick reference
-- `TESTING.md` - Test commands and patterns
-- `DATABASE.md` - Database access and debugging
-- `API.md` - API usage and authentication
-- `VERIFICATION.md` - Custom verification gates (if defined)
-{list other files}
-
-## Proactive Maintenance
-
-During your work, if you discover something that should be in the engineer skill:
-- A debugging technique that worked
-- A command or workflow that's useful
-- A gotcha or non-obvious behavior
-
-**ASK THE HUMAN:** "Should I add this to the engineer skill?"
-
-Also watch for **outdated information**:
-- Commands that no longer work
-- Patterns that have changed
-
-**ASK THE HUMAN:** "The skill says X but I found Y - should I update it?"
-
----
-
-{rest of existing CLAUDE.md content}
-```
-
-### Step 9: Report Results
-
-```
-✅ Engineer skill created: .claude/skills/{REPO_NAME}-engineer/
-
-Files created:
-- SKILL.md (overview and quick reference)
-- TESTING.md (verified test commands)
-- DATABASE.md (verified database access)
-- API.md (verified API usage)
-{list all files}
-
-All content has been verified by actually running commands.
-
-💡 Claude will automatically discover and use this skill.
-💡 Run /setup-engineer anytime to add new knowledge.
-```
-
-## Updating Existing Skills
-
-When a skill already exists and you're adding session knowledge:
-
-1. Read all existing skill files
-2. Identify what new knowledge to add from the session
-3. Determine which file(s) should be updated
-4. Merge new content, preserving existing verified content
-5. Update any outdated information discovered
-
-## Error Handling
-
-### Investigation Agent Fails
-
-If an agent can't complete its investigation:
-- Note what worked and what failed
-- Include partial findings in the skill
-- Mark sections as "needs verification"
-
-### No Areas Detected
-
-If nothing is detected:
-- Ask user what areas exist
-- Create skeleton files for user to fill in
-
-### Cannot Write Files
-
-```
-❌ Cannot write to .claude/skills/
-Check directory permissions.
-```
-
-## Session-Aware Updates
-
-When run after a work session:
-
-1. Analyze conversation for new knowledge
-2. Identify which skill file(s) should be updated
-3. Present changes to user for approval
-4. Update specific files, not the whole skill
+| Read this | When |
+|---|---|
+| [references/golden-state.md](references/golden-state.md) | Before diffing — the full invariant checklist |
+| [references/cli-and-just.md](references/cli-and-just.md) | Scaffolding/migrating the CLI + justfile + doctor |
+| [references/env-and-ports.md](references/env-and-ports.md) | Working the env/port contract, devbox, HTTPS |
+| [references/engineer-skill.md](references/engineer-skill.md) | Restructuring the engineer skill + the two laws |
+| [templates/justfile](templates/justfile) | The canonical thin verb surface to drop in |
+| [references/report-format.md](references/report-format.md) | The final golden-state report |
