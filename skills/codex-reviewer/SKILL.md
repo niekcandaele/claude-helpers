@@ -33,7 +33,7 @@ The verify command will provide:
 
 `SCOPE_METADATA` is authoritative. Do not infer scope mode from assigned files or surrounding prose when `SCOPE_METADATA` gives explicit instructions.
 
-`codex review` is diff-oriented. It does not reliably accept the same rich per-skill prompt bundle as the other reviewers. To keep the review aligned with scope, you must adapt the scope into a temporary Git workspace and run Codex there.
+Codex reviews whatever diff exists in its working directory. To keep the review aligned with the requested scope, you must adapt the scope into a temporary Git workspace and run Codex there.
 
 ### Supported scope handling
 
@@ -43,8 +43,8 @@ Use this deterministic flow:
 2. Create a temporary workspace under `/tmp`
 3. Initialize or copy a Git worktree there
 4. Materialize ONLY the scoped diff into that workspace
-5. Run `codex review --uncommitted` in the temp workspace
-6. Parse the output into structured findings
+5. Run `codex exec` against the scoped diff in the temp workspace (see step 3 of the procedure)
+6. Parse the structured verdict file into findings
 7. Delete the temp workspace when finished
 
 ### Scope mapping rules
@@ -78,7 +78,7 @@ Use this deterministic flow:
 - Do NOT fake a whole-repo diff
 - Return a non-fatal unsupported result:
   - Status: `SKIPPED_UNSUPPORTED_SCOPE`
-  - Notes: `codex review` is diff-based and cannot perform a reliable whole-codebase audit in this pipeline
+  - Notes: this skill reviews a scoped diff and cannot perform a reliable whole-codebase audit in this pipeline
 
 ## Failure Handling
 
@@ -98,6 +98,7 @@ Common signals:
 - websocket/DNS/permission denied network errors -> `CODEX_NETWORK_BLOCKED`
 - inability to create/use temp workspace or run required git commands -> `PATCH_CONSTRUCTION_FAILED`
 - Codex exceeded `CODEX_REVIEW_TIMEOUT` (a genuine hang, not a too-short wrapper) -> `CODEX_REVIEW_FAILED`, with a note that it ran past the budget. NOTE: an exit-124 from a foreground Bash `timeout` means the wrapper was too short, not that Codex hung — fix by running detached in the background (see Review Procedure step 3), not by treating it as a real failure.
+- `Reading additional input from stdin...` in the log with no further progress -> NOT a real hang: stdin was left open. Re-run with `< /dev/null` (mandatory, see step 3). Do not report this as `CODEX_REVIEW_FAILED`.
 
 If `SCOPE_METADATA` and the reconstructed workspace would diverge, fail closed with `PATCH_CONSTRUCTION_FAILED`. A blocked Codex pass is better than a mis-scoped review.
 
@@ -109,7 +110,7 @@ When blocked or skipped, output a short status report instead of findings.
 
 Check:
 - `which codex`
-- `codex review --help`
+- `codex exec --help`
 - `SCOPE_METADATA` fields needed to build the scoped patch
 
 If any prerequisite is missing, stop and report blocked status.
@@ -133,52 +134,95 @@ Never substitute a simpler baseline if reconstruction is ambiguous.
 
 The temp workspace must contain ONLY the intended review diff.
 
-### 3. Run Codex review
+### 3. Run Codex via `codex exec` (NOT `codex review`)
 
-`codex review` is long-running. On larger diffs it routinely runs well past the Bash tool's
-**default 120 s timeout** (hard foreground max 600 s / 10 min). Running it as a plain
-foreground Bash call is what produced spurious exit-124 / `CODEX_REVIEW_FAILED` BLOCKED
-results — Codex was killed mid-review before it could emit findings. Do NOT run it as a
-bounded foreground call.
+**Use `codex exec`, not `codex review`.** `codex review` cannot be captured reliably in a
+headless pipeline: it rejects `--json` and `--output-last-message` (verified —
+`error: unexpected argument`), so it has no clean machine-readable output. Its verdict only
+appears as a trailing human-rendered markdown block on stdout that is **duplicated** and
+**interleaved with `ERROR codex_core::session` log lines**, and is lost entirely if the run is
+stopped at the budget. That fragility is the cause of the spurious `CODEX_REVIEW_FAILED` /
+"findings lost" results.
 
-**Run Codex detached in the background and poll for completion:**
+`codex exec` runs the **same model** and we already materialise the scoped diff in the temp
+workspace, so this is not "reinventing review" — it reuses our diff plus a review prompt and
+adds deterministic, file-based capture (`--output-last-message`, `--json`, `--output-schema`).
 
-1. Launch it with the Bash tool's `run_in_background: true`, redirecting stdout+stderr to a
-   log file inside the temp workspace (no `&`, no `timeout` wrapper):
-   ```bash
-   codex review --uncommitted > "$TMP_REVIEW_DIR/codex-review.log" 2>&1
-   ```
-2. The harness re-invokes you when the background command exits — wait for that exit rather
-   than a fixed `sleep`. Once it has exited, read `$TMP_REVIEW_DIR/codex-review.log` to get
-   the full output.
+**The run command:**
+```bash
+codex exec --json \
+  --output-last-message "$TMP_REVIEW_DIR/codex-verdict.json" \
+  --output-schema       "$TMP_REVIEW_DIR/findings.schema.json" \
+  --sandbox read-only \
+  "Review ONLY the uncommitted tracked changes shown by \`git diff\` in this workspace. Ignore untracked files. Report every correctness, security, design, or test-coverage concern. Return findings as JSON matching the provided schema." \
+  < /dev/null \
+  > "$TMP_REVIEW_DIR/codex-events.jsonl" 2>&1
+```
+
+**`< /dev/null` is mandatory.** `codex exec` blocks indefinitely on
+`Reading additional input from stdin...` if stdin is left open — a silent hang that looks like a
+timeout. Always close stdin.
+
+Write `findings.schema.json` into the temp workspace before running (see step 4 for the schema).
+
+**Run detached in the background and wait for exit:**
+
+1. Launch with the Bash tool's `run_in_background: true` (no `&`, no `timeout` wrapper).
+2. The harness re-invokes you when the background command exits — wait for that exit rather than
+   a fixed `sleep`.
 3. Apply an **overall budget** as the only stop condition, configurable via the
-   `CODEX_REVIEW_TIMEOUT` env var (milliseconds), **default `1800000` (30 min)**. If Codex
-   has not exited within the budget, stop the background process and report
-   `CODEX_REVIEW_FAILED` with a note that it exceeded `CODEX_REVIEW_TIMEOUT`. This stays a
-   non-fatal blocked result — never fail the overall verify run.
+   `CODEX_REVIEW_TIMEOUT` env var (milliseconds), **default `1800000` (30 min)**. If Codex has
+   not exited within the budget, stop the background process and report `CODEX_REVIEW_FAILED`
+   with a note that it exceeded `CODEX_REVIEW_TIMEOUT`. This stays a non-fatal blocked result —
+   never fail the overall verify run.
 
-**Foreground fallback:** only if background execution is unavailable, run `codex review`
-foreground with the Bash `timeout` set explicitly to the **`600000` ms max** (never the
+**Foreground fallback:** only if background execution is unavailable, run the same `codex exec`
+command foreground with the Bash `timeout` set explicitly to the **`600000` ms max** (never the
 120 s default), accepting that very large diffs may still hit the 10-min ceiling.
 
-Capture stdout/stderr exactly.
+### 4. Capture and normalize
 
-Do not use `codex exec` for this skill unless the verify prompt explicitly instructs otherwise. This skill is a wrapper around `codex review`.
+The `findings.schema.json` you wrote in step 3 forces Codex's final message into structured JSON:
 
-### 4. Parse and normalize
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["findings"],
+  "properties": {
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "severity", "location", "description"],
+        "properties": {
+          "title": { "type": "string" },
+          "severity": { "type": "integer", "minimum": 1, "maximum": 10 },
+          "location": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}
+```
 
-Extract review findings from Codex output and convert them into the standard verifier schema.
+**Capture contract — deterministic, in priority order:**
 
-For each issue found, provide:
-- Title
-- Severity (1-10)
-- Location (`file:line` when available, otherwise `file` or `unknown`)
-- Description
+1. **Source of truth: `$TMP_REVIEW_DIR/codex-verdict.json`** (the `--output-last-message` file).
+   It is always written on clean exit. Parse it as the `findings` array — `location` is already
+   `file:line`, `severity` already on the 1-10 scale. No prose scraping, no de-duplication, no
+   stripping of interleaved `ERROR` lines (none of that noise reaches this file).
+2. **Fallback** if the verdict file is missing/empty/non-JSON: scan
+   `$TMP_REVIEW_DIR/codex-events.jsonl` for the last `agent_message` / `item.completed` events
+   and extract findings from the model's final message.
+3. Only if **both** yield nothing **and** the exit code was non-zero → report BLOCKED
+   `CODEX_REVIEW_FAILED`. A clean exit with zero findings is a valid "no issues" result, not a
+   failure.
 
-If Codex gives prose rather than structured findings:
-- split distinct concerns into separate issues
-- preserve the substance, not the wording
-- infer severity conservatively
+If a fallback message is prose rather than JSON, split distinct concerns into separate issues,
+preserve substance over wording, and infer severity conservatively using the table below.
 
 ### 5. Severity mapping
 
@@ -235,7 +279,7 @@ or
 SKIPPED_UNSUPPORTED_SCOPE
 
 ## Notes
-`--scope=all` is not compatible with a diff-based `codex review` pass.
+`--scope=all` is not compatible with this skill's scoped-diff review pass.
 ```
 
 ## What NOT To Do
