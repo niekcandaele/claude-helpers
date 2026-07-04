@@ -194,6 +194,7 @@ For each file, assign it to the skills whose review is most relevant:
 Categories:
 - REVIEWER: Business logic, application code, architecture, patterns, security, robustness → reviewer
 - GENERAL_SECOND_OPINION: Entire scoped diff → codex-reviewer
+- OVER_ENGINEERING: Entire scoped diff → ponytail-review
 - QA: Test files or files that need test coverage assessment → qa
 - UX: UI components, CLI output, user-facing strings → ux-reviewer
 - VISUAL: UI-rendering files where the change affects what a user sees on the rendered page — components (.astro, .tsx, .vue, .svelte), pages, layouts, templates, CSS files, design tokens, public assets the page depends on for rendering. NOT JSON config, NOT server-side handlers without UI side effects, NOT pure copy strings handled by ux-reviewer. → visual-verify (only if `visual-verify` skill is present)
@@ -207,11 +208,14 @@ the full scope (they may catch cross-cutting concerns).
 
 Always assign the full scoped file list to `codex-reviewer`. It is a general second-opinion pass, not a specialist router target.
 
+Always assign the full scoped file list to `ponytail-review`. Complexity and reuse hunting needs breadth across the whole diff, not per-file routing.
+
 Output a JSON-like mapping:
 {
   "skill_assignments": {
     "reviewer": ["all scoped files"],
     "codex-reviewer": ["all scoped files"],
+    "ponytail-review": ["all scoped files"],
     "qa": ["test files and files needing test coverage"],
     "ux-reviewer": ["UI/CLI/user-facing files"],
     "visual-verify": ["UI-rendering files (components, pages, layouts, templates, CSS, design tokens, rendering-affecting public assets)"],
@@ -294,7 +298,7 @@ Invoke ALL review skills in parallel using the Skill tool. Every skill runs ever
 
 **Model routing is handled by skill frontmatter:**
 - opus: reviewer (comprehensive review: design, architecture, coherence, hardening, security)
-- sonnet: codex-reviewer, qa, ux-reviewer, exerciser, visual-verify
+- sonnet: codex-reviewer, ponytail-review, qa, ux-reviewer, exerciser, visual-verify
 - haiku: tester, static-analysis
 
 **Each skill prompt includes:**
@@ -360,6 +364,17 @@ If exact reconstruction from `SCOPE_METADATA` is not possible, report PATCH_CONS
 If Codex is unavailable (missing CLI, auth missing, network blocked, sandbox blocked), report BLOCKED status with a short factual reason.
 If scope is `--scope=all`, report SKIPPED_UNSUPPORTED_SCOPE rather than attempting a whole-codebase audit.
 Normalize Codex output into: title, severity, location, description.
+```
+
+**ponytail-review:**
+```
+Review the scoped diff for over-engineering ONLY: reinvented stdlib, unneeded
+dependencies, speculative abstractions, dead flexibility, shrinkable logic.
+Correctness, security, and performance are out of scope — other skills own those.
+Verify each proposed replacement actually exists (grep for the codebase helper,
+confirm the stdlib/native feature) before reporting it.
+Normalize findings into: title, severity (cap 5), location, category (tag), description.
+If nothing to cut, report COMPLETED with zero findings ("Lean already. Ship.").
 ```
 
 **tester:**
@@ -556,7 +571,7 @@ status cannot be PASSED — use FAILED instead.
 
 ## Triage Summary
 
-**Skills run:** reviewer, codex-reviewer, tester, qa, ux-reviewer, visual-verify, exerciser
+**Skills run:** reviewer, codex-reviewer, ponytail-review, tester, qa, ux-reviewer, visual-verify, exerciser
 **Skills skipped:** [none, or list if --skip-ux / --skip-visual was used, or if visual-verify was not present in available skills]
 **Static analysis:** ESLint (3 findings), tsc (1 finding)
 
@@ -570,6 +585,7 @@ status cannot be PASSED — use FAILED instead.
 | tester | X passed, Y failed | [brief note] |
 | reviewer | Completed | Found N items (design, arch, coherence, hardening, security) |
 | codex-reviewer | Completed / **BLOCKED** / Skipped | Found N items / [reason] |
+| ponytail-review | Completed | Found N items (net -N lines possible) / Lean already |
 | qa | Completed | Found N items |
 | ux-reviewer | Completed / Skipped | Found N items / [reason] |
 | visual-verify | Completed / Skipped / Not Available | Found N items / [reason] |
@@ -837,6 +853,7 @@ This is critical since verify runs in the main context window.
 
 - **All skills, every time**: Triage assigns files to focus each skill, but never skips skills — missed regressions cost more than the extra skill runs
 - **Codex reviewer is a hard gate**: The independent second-model review is critical for catching blind spots. If Codex is BLOCKED, flag it prominently — the human must decide whether to proceed without it
+- **Ponytail reviewer hunts complexity only**: over-engineering findings are quality debt (severity ≤5), never correctness — zero findings is the expected happy path
 - **Static analysis pre-step**: Linter findings feed into review skills for context
 - **Engineer skill integration**: Pre-verified knowledge speeds up discovery
 - **Exerciser verifies issues**: Reported issues get E2E verification status
