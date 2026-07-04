@@ -195,6 +195,7 @@ Categories:
 - REVIEWER: Business logic, application code, architecture, patterns, security, robustness → reviewer
 - GENERAL_SECOND_OPINION: Entire scoped diff → codex-reviewer
 - OVER_ENGINEERING: Entire scoped diff → ponytail-review
+- COMMENT_HYGIENE: Entire scoped diff → comment-review
 - QA: Test files or files that need test coverage assessment → qa
 - UX: UI components, CLI output, user-facing strings → ux-reviewer
 - VISUAL: UI-rendering files where the change affects what a user sees on the rendered page — components (.astro, .tsx, .vue, .svelte), pages, layouts, templates, CSS files, design tokens, public assets the page depends on for rendering. NOT JSON config, NOT server-side handlers without UI side effects, NOT pure copy strings handled by ux-reviewer. → visual-verify (only if `visual-verify` skill is present)
@@ -210,12 +211,15 @@ Always assign the full scoped file list to `codex-reviewer`. It is a general sec
 
 Always assign the full scoped file list to `ponytail-review`. Complexity and reuse hunting needs breadth across the whole diff, not per-file routing.
 
+Always assign the full scoped file list to `comment-review`. Ephemeral references and history comments can appear in any changed file.
+
 Output a JSON-like mapping:
 {
   "skill_assignments": {
     "reviewer": ["all scoped files"],
     "codex-reviewer": ["all scoped files"],
     "ponytail-review": ["all scoped files"],
+    "comment-review": ["all scoped files"],
     "qa": ["test files and files needing test coverage"],
     "ux-reviewer": ["UI/CLI/user-facing files"],
     "visual-verify": ["UI-rendering files (components, pages, layouts, templates, CSS, design tokens, rendering-affecting public assets)"],
@@ -298,7 +302,7 @@ Invoke ALL review skills in parallel using the Skill tool. Every skill runs ever
 
 **Model routing is handled by skill frontmatter:**
 - opus: reviewer (comprehensive review: design, architecture, coherence, hardening, security)
-- sonnet: codex-reviewer, ponytail-review, qa, ux-reviewer, exerciser, visual-verify
+- sonnet: codex-reviewer, ponytail-review, comment-review, qa, ux-reviewer, exerciser, visual-verify
 - haiku: tester, static-analysis
 
 **Each skill prompt includes:**
@@ -375,6 +379,20 @@ Verify each proposed replacement actually exists (grep for the codebase helper,
 confirm the stdlib/native feature) before reporting it.
 Normalize findings into: title, severity (cap 5), location, category (tag), description.
 If nothing to cut, report COMPLETED with zero findings ("Lean already. Ship.").
+```
+
+**comment-review:**
+```
+Review ONLY comments and docstrings added or modified in the scoped diff
+(plus pre-existing comments the changes make stale).
+Flag: ephemeral review-ID references (VI-N, CI-N, "per review feedback"),
+historical change-narration ("previously", "now we", "replaced X with Y"),
+stale comments contradicting the code, reviewer-appeasement, and redundant restatement.
+Comments must describe the current code and its intent — git owns history.
+Code correctness, design, and prose docs are out of scope — other skills own those.
+Normalize findings into: title, severity (floor 5, cap 6 — the floor is deliberate),
+location, category (tag), description including a concrete rewrite (or "delete").
+If comments are clean, report COMPLETED with zero findings.
 ```
 
 **tester:**
@@ -571,7 +589,7 @@ status cannot be PASSED — use FAILED instead.
 
 ## Triage Summary
 
-**Skills run:** reviewer, codex-reviewer, ponytail-review, tester, qa, ux-reviewer, visual-verify, exerciser
+**Skills run:** reviewer, codex-reviewer, ponytail-review, comment-review, tester, qa, ux-reviewer, visual-verify, exerciser
 **Skills skipped:** [none, or list if --skip-ux / --skip-visual was used, or if visual-verify was not present in available skills]
 **Static analysis:** ESLint (3 findings), tsc (1 finding)
 
@@ -586,6 +604,7 @@ status cannot be PASSED — use FAILED instead.
 | reviewer | Completed | Found N items (design, arch, coherence, hardening, security) |
 | codex-reviewer | Completed / **BLOCKED** / Skipped | Found N items / [reason] |
 | ponytail-review | Completed | Found N items (net -N lines possible) / Lean already |
+| comment-review | Completed | Found N items / Comments clean |
 | qa | Completed | Found N items |
 | ux-reviewer | Completed / Skipped | Found N items / [reason] |
 | visual-verify | Completed / Skipped / Not Available | Found N items / [reason] |
@@ -854,6 +873,7 @@ This is critical since verify runs in the main context window.
 - **All skills, every time**: Triage assigns files to focus each skill, but never skips skills — missed regressions cost more than the extra skill runs
 - **Codex reviewer is a hard gate**: The independent second-model review is critical for catching blind spots. If Codex is BLOCKED, flag it prominently — the human must decide whether to proceed without it
 - **Ponytail reviewer hunts complexity only**: over-engineering findings are quality debt (severity ≤5), never correctness — zero findings is the expected happy path
+- **comment-review enforces a severity floor**: comment-hygiene findings are deliberately rated 5-6 so they clear the default fix threshold — do not re-rate them downward during dedup
 - **Static analysis pre-step**: Linter findings feed into review skills for context
 - **Engineer skill integration**: Pre-verified knowledge speeds up discovery
 - **Exerciser verifies issues**: Reported issues get E2E verification status

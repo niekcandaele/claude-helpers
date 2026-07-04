@@ -118,6 +118,19 @@ Remaining concerns:
 
 Verification agents check every claim in this report independently. Do not lie or exaggerate — if tests failed, say so. If the app doesn't start, say so.
 
+## Comment Discipline
+
+- NEVER reference feedback IDs (VI-N, CI-N), "review feedback", or this loop in
+  code, comments, docstrings, or commit messages. Those identifiers are ephemeral
+  to this session — after the loop they are dangling references. Feedback context
+  belongs in your PLAYER REPORT only.
+- Comments describe the CURRENT code and its intent. Never narrate the change
+  ("previously used X", "now we", "replaced X with Y") — git history carries that.
+- When fixing a feedback item, just fix it. Do not annotate the fix site with a
+  comment explaining that it was fixed.
+- When a fix invalidates an existing comment, update or delete that comment.
+- Match the codebase's comment density; when in doubt, no comment.
+
 ## Critical Constraints
 
 - **Do NOT self-review.** Do not declare "all requirements met" or "implementation complete." Verification agents will evaluate that independently. Just report what you did.
