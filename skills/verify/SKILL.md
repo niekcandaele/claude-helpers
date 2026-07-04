@@ -34,7 +34,7 @@ Parse `$ARGUMENTS` for:
 
 **Other Options:**
 - `--skip-ux`: Skip UX review for pure backend changes
-- `--skip-visual`: Skip visual review for changes the human has already eyeballed (e.g. copy-only). Visual review is also auto-skipped when `visual-verify` is not present in the available skills (project-scoped skill).
+- `--skip-visual`: Skip visual review for changes the human has already eyeballed (e.g. copy-only). Visual review is also auto-skipped when `visual-verify` is not present in the available skills (defensive — it ships as a global skill; a project can override it with its own `.claude/skills/visual-verify/`).
 - `--auto-fix-threshold=N`: Minimum severity for auto-fix mode (default: 3)
 - `--plan-file=<path>`: Explicit path to a plan file for completeness checking. If not provided, discover the plan from context — check if a plan is visible in conversation history (e.g., invoked from player-coach which read a plan, or a plan was created/discussed earlier in this session). If a plan is found from either source, resolve its contents for the plan completeness check in Phase 6.
 
@@ -234,7 +234,7 @@ Output a JSON-like mapping:
 ```
 
 **If `--skip-ux`:** The UX reviewer skill is skipped (explicit user override only).
-**If `--skip-visual`:** The visual-verify skill is skipped. Also auto-skipped when `visual-verify` is not present in the available skills (it's project-scoped).
+**If `--skip-visual`:** The visual-verify skill is skipped. Also auto-skipped when `visual-verify` is not present in the available skills (defensive; it is normally always present as a global skill).
 
 **Output:** Store the skill assignments as `TRIAGE_RESULT` and toolchain commands as `TOOLCHAIN`.
 
@@ -298,7 +298,7 @@ DIFF STAT:
 Invoke ALL review skills in parallel using the Skill tool. Every skill runs every time — no skills are skipped based on triage. Skips are explicit and limited:
 - `--skip-ux` excludes `ux-reviewer`.
 - `--skip-visual` excludes `visual-verify`.
-- `visual-verify` is also auto-skipped if it is not present in the available skills list (it is project-scoped: each project that wants visual review ships its own `.claude/skills/visual-verify/`).
+- `visual-verify` is also auto-skipped if it is not present in the available skills list (defensive: it ships globally and is normally always present; a project may shadow it with its own `.claude/skills/visual-verify/` to customize capture conventions).
 
 **Model routing is handled by skill frontmatter:**
 - opus: reviewer (comprehensive review: design, architecture, coherence, hardening, security)
@@ -836,7 +836,7 @@ When in doubt, don't use `--skip-ux` — let it run.
 
 ## When to Skip Visual Review
 
-`visual-verify` is project-scoped (each project that wants visual review ships its own `.claude/skills/visual-verify/`). It runs whenever:
+`visual-verify` is a global skill (a project can override it by shipping its own `.claude/skills/visual-verify/`). It runs whenever:
 1. The skill is present in the available skills list, AND
 2. `--skip-visual` was not passed, AND
 3. The triage assigns at least one UI-rendering file to it (it self-skips with `STATUS: SKIPPED` if not).
