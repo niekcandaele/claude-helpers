@@ -300,10 +300,10 @@ Invoke ALL review skills in parallel using the Skill tool. Every skill runs ever
 - `--skip-visual` excludes `visual-verify`.
 - `visual-verify` is also auto-skipped if it is not present in the available skills list (defensive: it ships globally and is normally always present; a project may shadow it with its own `.claude/skills/visual-verify/` to customize capture conventions).
 
-**Model routing is handled by skill frontmatter:**
-- opus: reviewer (comprehensive review: design, architecture, coherence, hardening, security)
-- sonnet: codex-reviewer, ponytail-review, comment-review, qa, ux-reviewer, exerciser, visual-verify
-- haiku: tester, static-analysis
+**Model routing is handled by skill frontmatter (models are pinned to explicit versions so they don't silently upgrade):**
+- claude-opus-4-8: reviewer (comprehensive review: design, architecture, coherence, hardening, security)
+- claude-sonnet-4-6: codex-reviewer, ponytail-review, comment-review, qa, ux-reviewer, exerciser, visual-verify
+- claude-haiku-4-5: tester, static-analysis
 
 **Each skill prompt includes:**
 1. The `CONTEXT_BUNDLE` from Phase 5
@@ -877,7 +877,7 @@ This is critical since verify runs in the main context window.
 - **Static analysis pre-step**: Linter findings feed into review skills for context
 - **Engineer skill integration**: Pre-verified knowledge speeds up discovery
 - **Exerciser verifies issues**: Reported issues get E2E verification status
-- **Model routing via frontmatter**: Skill files specify their own model (opus/sonnet/haiku)
+- **Model routing via frontmatter**: Skill files specify their own model, pinned to explicit versions (claude-opus-4-8 / claude-sonnet-4-6 / claude-haiku-4-5)
 - **Scope-aware**: Always detect and communicate scope to agents
 - **Run review skills in parallel**: Use single message with multiple Skill tool calls
 - **Run exerciser after reviews**: Sequential — it needs the issue list

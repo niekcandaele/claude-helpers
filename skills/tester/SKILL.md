@@ -1,7 +1,7 @@
 ---
 name: tester
 description: No-nonsense test executor that reports failures without attempting fixes
-model: haiku
+model: claude-haiku-4-5
 context: fork
 user-invocable: false
 allowed-tools:

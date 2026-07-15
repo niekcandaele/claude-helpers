@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Comprehensive code reviewer combining design review, architecture, coherence, hardening, and security analysis
-model: opus
+model: claude-opus-4-8
 context: fork
 user-invocable: false
 allowed-tools:

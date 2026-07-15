@@ -1,7 +1,8 @@
 ---
 name: ponytail-review
 description: Over-engineering-only reviewer based on the ponytail skill — finds what to delete (reinvented stdlib, unneeded dependencies, speculative abstractions, dead flexibility) and normalizes findings into the verify pipeline format
-model: sonnet
+model: claude-sonnet-4-6
+effort: low
 context: fork
 user-invocable: false
 allowed-tools:

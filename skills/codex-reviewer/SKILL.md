@@ -1,7 +1,7 @@
 ---
 name: codex-reviewer
 description: Independent second-opinion reviewer that shells out to the local Codex CLI for a broad code review, then normalizes findings into the verify pipeline format
-model: sonnet
+model: claude-sonnet-4-6
 context: fork
 user-invocable: false
 allowed-tools:

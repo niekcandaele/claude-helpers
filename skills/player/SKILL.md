@@ -1,7 +1,7 @@
 ---
 name: player
 description: Implementation skill for player-coach. Reads the plan, writes code and tests, and addresses verification feedback.
-model: sonnet
+model: claude-sonnet-4-6
 context: fork
 user-invocable: false
 allowed-tools:

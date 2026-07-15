@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Pragmatic QA engineer that evaluates test coverage quality, flags untested changes, and assesses whether tests provide real confidence — adapts expectations to codebase testing maturity
-model: sonnet
+model: claude-sonnet-4-6
 context: fork
 user-invocable: false
 allowed-tools:

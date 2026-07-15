@@ -1,7 +1,7 @@
 ---
 name: visual-verify
 description: Vision-based visual QA reviewer — captures rendered output (live web pages, static HTML artifacts, PDFs) as screenshots, inspects them with a designer's eye for layout defects a human catches instantly, and normalizes findings into the verify pipeline format
-model: sonnet
+model: claude-sonnet-4-6
 context: fork
 user-invocable: false
 allowed-tools:
