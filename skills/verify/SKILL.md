@@ -187,43 +187,62 @@ Output concrete commands that can be executed.
 
 ### Job B: Triage Changed Files
 
+Triage does two things: assign files to focus each skill, and decide whether the two
+user-facing skills apply at all.
+
 ```
 Read each changed file (not just the extension — look at actual content).
-For each file, assign it to the skills whose review is most relevant:
 
-Categories:
-- REVIEWER: Business logic, application code, architecture, patterns, security, robustness → reviewer
-- GENERAL_SECOND_OPINION: Entire scoped diff → codex-reviewer
-- OVER_ENGINEERING: Entire scoped diff → ponytail-review
-- COMMENT_HYGIENE: Entire scoped diff → comment-review
-- QA: Test files or files that need test coverage assessment → qa
-- UX: UI components, CLI output, user-facing strings → ux-reviewer
-- VISUAL: UI-rendering files where the change affects what a user sees on the rendered page — components (.astro, .tsx, .vue, .svelte), pages, layouts, templates, CSS files, design tokens, public assets the page depends on for rendering. NOT JSON config, NOT server-side handlers without UI side effects, NOT pure copy strings handled by ux-reviewer. → visual-verify (only if `visual-verify` skill is present)
-- TEST_EXECUTION: Any code change that could affect tests → tester
+ALWAYS-ON SKILLS — these run on every verification, no exceptions.
+Assign each the full scoped file list:
+- reviewer          Business logic, architecture, patterns, security, robustness,
+                    over-engineering. Needs breadth across the whole diff.
+- codex-reviewer    General second-opinion pass, not a specialist router target.
+- comment-review    Ephemeral references and history comments appear in any changed file.
+- qa                Test coverage assessment for everything that changed.
+- tester            Any code change could affect tests.
 
-A file can have multiple categories.
+GATED SKILLS — these run only if the scope contains surfaces they can review.
+Decide applies: true/false for each, and state your reason either way.
 
-IMPORTANT: ALL skills always run — triage assigns files to focus each skill,
-but never skips skills. Skills with no specifically assigned files review
-the full scope (they may catch cross-cutting concerns).
+- ux-reviewer   APPLIES if the scope touches ANY user-facing surface:
+                UI components, CLI output or help text, user-facing strings,
+                error messages, API response messages, user-visible log output.
+                Assign the specific user-facing files.
 
-Always assign the full scoped file list to `codex-reviewer`. It is a general second-opinion pass, not a specialist router target.
+                SKIP only when ALL of those are absent — pure backend,
+                infrastructure, or internal refactoring with no user-visible
+                surface whatsoever.
 
-Always assign the full scoped file list to `ponytail-review`. Complexity and reuse hunting needs breadth across the whole diff, not per-file routing.
+                WHEN IN DOUBT, APPLY. A wasted ux-reviewer run costs tokens;
+                a missed one ships a confusing error message to users.
 
-Always assign the full scoped file list to `comment-review`. Ephemeral references and history comments can appear in any changed file.
+- visual-verify APPLIES if the scope contains UI-rendering files where the change
+                affects what a user sees on the rendered page — components
+                (.astro, .tsx, .vue, .svelte), pages, layouts, templates, CSS,
+                design tokens, public assets the page depends on for rendering.
+                Assign those files.
+
+                SKIP if none are present. NOT JSON config, NOT server-side
+                handlers without UI side effects, NOT pure copy strings
+                (those are ux-reviewer's).
+
+A file can be assigned to multiple skills.
 
 Output a JSON-like mapping:
 {
   "skill_assignments": {
     "reviewer": ["all scoped files"],
     "codex-reviewer": ["all scoped files"],
-    "ponytail-review": ["all scoped files"],
     "comment-review": ["all scoped files"],
-    "qa": ["test files and files needing test coverage"],
-    "ux-reviewer": ["UI/CLI/user-facing files"],
-    "visual-verify": ["UI-rendering files (components, pages, layouts, templates, CSS, design tokens, rendering-affecting public assets)"],
+    "qa": ["all scoped files"],
     "tester": ["all"],
+    "ux-reviewer": ["UI/CLI/user-facing files"],
+    "visual-verify": ["UI-rendering files"]
+  },
+  "gating": {
+    "ux-reviewer": { "applies": true,  "reason": "CLI help text modified in src/cli/help.ts" },
+    "visual-verify": { "applies": false, "reason": "no UI-rendering files in scope" }
   },
   "toolchain": {
     "test": "npm test",
@@ -233,10 +252,13 @@ Output a JSON-like mapping:
 }
 ```
 
-**If `--skip-ux`:** The UX reviewer skill is skipped (explicit user override only).
-**If `--skip-visual`:** The visual-verify skill is skipped. Also auto-skipped when `visual-verify` is not present in the available skills (defensive; it is normally always present as a global skill).
+**Explicit user overrides** force a skip regardless of what triage decided:
+- `--skip-ux` → `ux-reviewer` is skipped.
+- `--skip-visual` → `visual-verify` is skipped. Use this when you have already eyeballed the rendered change in a browser and want to suppress the duplicate review. Visual review is the design-quality gate, not just a bug check — it asks "would a designer ship this?"
 
-**Output:** Store the skill assignments as `TRIAGE_RESULT` and toolchain commands as `TOOLCHAIN`.
+`visual-verify` is also skipped if it is not present in the available skills list (defensive — it ships as a global skill and is normally always present; a project may shadow it with its own `.claude/skills/visual-verify/` to customize capture conventions).
+
+**Output:** Store the skill assignments and gating decisions as `TRIAGE_RESULT` and toolchain commands as `TOOLCHAIN`.
 
 ## Phase 4: Static Analysis
 
@@ -295,14 +317,15 @@ DIFF STAT:
 
 ## Phase 6: Launch Review Skills (Parallel)
 
-Invoke ALL review skills in parallel using the Skill tool. Every skill runs every time — no skills are skipped based on triage. Skips are explicit and limited:
-- `--skip-ux` excludes `ux-reviewer`.
-- `--skip-visual` excludes `visual-verify`.
-- `visual-verify` is also auto-skipped if it is not present in the available skills list (defensive: it ships globally and is normally always present; a project may shadow it with its own `.claude/skills/visual-verify/` to customize capture conventions).
+Invoke the applicable review skills **in parallel** — a single message with multiple Skill tool calls.
+
+**Always run, every time:** `reviewer`, `codex-reviewer`, `comment-review`, `qa`, `tester`. Triage focuses these with file assignments but never suppresses them — for correctness-facing review, a missed regression costs more than an extra skill run.
+
+**Run if triage says they apply:** `ux-reviewer`, `visual-verify` (see Phase 3 Job B gating). `--skip-ux` / `--skip-visual` override triage and force a skip.
 
 **Model routing is handled by skill frontmatter (models are pinned to explicit versions so they don't silently upgrade):**
-- claude-opus-4-8: reviewer (comprehensive review: design, architecture, coherence, hardening, security)
-- claude-sonnet-4-6: codex-reviewer, ponytail-review, comment-review, qa, ux-reviewer, exerciser, visual-verify
+- claude-opus-4-8: reviewer (comprehensive review: design, architecture, coherence, hardening, security, over-engineering)
+- claude-sonnet-4-6: codex-reviewer, comment-review, qa, ux-reviewer, exerciser, visual-verify
 - claude-haiku-4-5: tester, static-analysis
 
 **Each skill prompt includes:**
@@ -354,6 +377,11 @@ Comprehensive review across all five dimensions:
 
 Research the project's structure, patterns, and security approach BEFORE evaluating changes.
 Focus on: 'Is this change well-designed, structurally sound, pattern-consistent, robust, and secure?'
+
+Work the over-engineering lens in Dimension 1 deliberately — it is easy to review only
+for what is missing and never for what should be cut. Tag those findings
+(delete / stdlib / native / yagni / shrink), verify each proposed replacement actually
+exists before reporting it, and close the report with the net-lines metric.
 ```
 
 **codex-reviewer:**
@@ -368,17 +396,6 @@ If exact reconstruction from `SCOPE_METADATA` is not possible, report PATCH_CONS
 If Codex is unavailable (missing CLI, auth missing, network blocked, sandbox blocked), report BLOCKED status with a short factual reason.
 If scope is `--scope=all`, report SKIPPED_UNSUPPORTED_SCOPE rather than attempting a whole-codebase audit.
 Normalize Codex output into: title, severity, location, description.
-```
-
-**ponytail-review:**
-```
-Review the scoped diff for over-engineering ONLY: reinvented stdlib, unneeded
-dependencies, speculative abstractions, dead flexibility, shrinkable logic.
-Correctness, security, and performance are out of scope — other skills own those.
-Verify each proposed replacement actually exists (grep for the codebase helper,
-confirm the stdlib/native feature) before reporting it.
-Normalize findings into: title, severity (cap 5), location, category (tag), description.
-If nothing to cut, report COMPLETED with zero findings ("Lean already. Ship.").
 ```
 
 **comment-review:**
@@ -517,6 +534,8 @@ If failures are unrelated to scope, note that explicitly.
 
 ### 7c. Always: exerciser with issue verification
 
+Runs **after** the Phase 6 reviews, not in parallel with them — it needs the collected issue list as input.
+
 Invoke `exerciser` (sonnet) with:
 ```
 {CONTEXT_BUNDLE}
@@ -569,6 +588,12 @@ status cannot be PASSED — use FAILED instead.
 4. Assign sequential VI-{n} IDs
 5. Sort by severity descending
 
+**Never re-rate `comment-review` findings downward during dedup.** Its 5-6 severities are a
+deliberate floor, not an assessment — they correct a reproducible bias where comment
+findings get rated low and then skipped for being low. Merging one into a lower-severity
+issue, or "contextualizing" it next to real correctness bugs, reintroduces exactly the
+bias the floor exists to cancel.
+
 ### 8b. Report Format
 
 ```markdown
@@ -589,9 +614,11 @@ status cannot be PASSED — use FAILED instead.
 
 ## Triage Summary
 
-**Skills run:** reviewer, codex-reviewer, ponytail-review, comment-review, tester, qa, ux-reviewer, visual-verify, exerciser
-**Skills skipped:** [none, or list if --skip-ux / --skip-visual was used, or if visual-verify was not present in available skills]
+**Skills run:** reviewer, codex-reviewer, comment-review, tester, qa, ux-reviewer, visual-verify, exerciser
+**Skills skipped:** [none, or each skipped skill with its reason — `visual-verify (gated: no UI-rendering files in scope)`, `ux-reviewer (--skip-ux)`, `visual-verify (not present in available skills)`]
 **Static analysis:** ESLint (3 findings), tsc (1 finding)
+
+A gated skip must always name its reason. A mis-gate is only correctable if it is visible in the report.
 
 ---
 
@@ -601,13 +628,12 @@ status cannot be PASSED — use FAILED instead.
 |-------|--------|-------|
 | static-analysis | Completed | 4 findings (3 warnings, 1 error) |
 | tester | X passed, Y failed | [brief note] |
-| reviewer | Completed | Found N items (design, arch, coherence, hardening, security) |
+| reviewer | Completed | Found N items (design, arch, coherence, hardening, security; net -N lines possible) |
 | codex-reviewer | Completed / **BLOCKED** / Skipped | Found N items / [reason] |
-| ponytail-review | Completed | Found N items (net -N lines possible) / Lean already |
 | comment-review | Completed | Found N items / Comments clean |
 | qa | Completed | Found N items |
-| ux-reviewer | Completed / Skipped | Found N items / [reason] |
-| visual-verify | Completed / Skipped / Not Available | Found N items / [reason] |
+| ux-reviewer | Completed / Skipped | Found N items / [gating or override reason] |
+| visual-verify | Completed / Skipped / Not Available | Found N items / [gating or override reason] |
 | exerciser | PASSED / FAILED / BLOCKED | [reason if blocked] |
 | plan-completeness | Complete / Incomplete / Skipped | [summary if incomplete, reason if skipped] |
 | debugger | Ran / N/A | [if applicable] |
@@ -823,28 +849,6 @@ The report must be brutally honest:
 
 Severity reflects "how big is this issue?" — NOT "must you fix it?" The human decides what to act on.
 
-## When to Skip UX Review
-
-`ux-reviewer` runs by default like all other skills. It can only be skipped via the explicit `--skip-ux` flag. Use `--skip-ux` when ALL are true:
-- No changes to UI components, templates, or frontend code
-- No changes to CLI output formatting or help text
-- No changes to error messages or user-facing strings
-- No changes to API response messages
-- Pure backend, infrastructure, or internal refactoring only
-
-When in doubt, don't use `--skip-ux` — let it run.
-
-## When to Skip Visual Review
-
-`visual-verify` is a global skill (a project can override it by shipping its own `.claude/skills/visual-verify/`). It runs whenever:
-1. The skill is present in the available skills list, AND
-2. `--skip-visual` was not passed, AND
-3. The triage assigns at least one UI-rendering file to it (it self-skips with `STATUS: SKIPPED` if not).
-
-Use `--skip-visual` only when you have already eyeballed the rendered change in a browser and want to suppress the duplicate review (e.g. mid-session iteration where you ran `/visual-verify` manually 30 seconds ago). For copy-only changes that don't affect layout, the skill self-skips — you don't need the flag.
-
-Visual review is the design-quality gate, not just a bug check — it asks "would a designer ship this?". Skipping it on UI work is the same kind of regret-generator as skipping mobile testing. When in doubt, don't pass `--skip-visual` — let it run.
-
 ## Context Window Discipline
 
 This is critical since verify runs in the main context window.
@@ -854,32 +858,3 @@ This is critical since verify runs in the main context window.
 - **Structured extraction only**: When collecting skill results, extract ONLY: title, severity, location, category, description. Discard investigation narratives.
 - **No full file reads in orchestrator**: Never read source files except during the fix execution phase (interactive/auto-fix modes).
 - **Compact context bundle**: Scope + static summary + diff stat. ~50-100 lines max.
-
-## Execution Summary
-
-1. Parse arguments and mode
-2. Detect scope (git state → file list with line ranges)
-3. Load engineer skill (if `.claude/skills/*-engineer/` exists)
-4. Launch Explore for discovery + triage
-5. Invoke static-analysis with discovered commands
-6. Build compact context bundle
-7. Invoke review skills in parallel (per triage assignments)
-8. Collect results, invoke conditional skills (debugger if failures, exerciser always)
-9. Generate unified report (dedupe, VI-IDs, severity sort, exerciser verification)
-10. Mode-specific post-report (report-only → return, interactive → triage, auto-fix → auto-accept)
-
-## Important Notes
-
-- **All skills, every time**: Triage assigns files to focus each skill, but never skips skills — missed regressions cost more than the extra skill runs
-- **Codex reviewer is a hard gate**: The independent second-model review is critical for catching blind spots. If Codex is BLOCKED, flag it prominently — the human must decide whether to proceed without it
-- **Ponytail reviewer hunts complexity only**: over-engineering findings are quality debt (severity ≤5), never correctness — zero findings is the expected happy path
-- **comment-review enforces a severity floor**: comment-hygiene findings are deliberately rated 5-6 so they clear the default fix threshold — do not re-rate them downward during dedup
-- **Static analysis pre-step**: Linter findings feed into review skills for context
-- **Engineer skill integration**: Pre-verified knowledge speeds up discovery
-- **Exerciser verifies issues**: Reported issues get E2E verification status
-- **Model routing via frontmatter**: Skill files specify their own model, pinned to explicit versions (claude-opus-4-8 / claude-sonnet-4-6 / claude-haiku-4-5)
-- **Scope-aware**: Always detect and communicate scope to agents
-- **Run review skills in parallel**: Use single message with multiple Skill tool calls
-- **Run exerciser after reviews**: Sequential — it needs the issue list
-- **In interactive mode**: Do not auto-proceed to commit after fixes — return control to the caller
-- **Be honest**: Surface all issues, don't minimize or hide

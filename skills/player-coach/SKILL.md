@@ -136,7 +136,7 @@ Invoke the report-only verification pipeline via the Skill tool:
 
 **CRITICAL: Always use `--scope=branch`.** This ensures every turn verifies the FULL set of changes from the entire plan — not just the latest fix. Without this, later turns only scope to the most recent unstaged changes, causing verifiers to lose the bigger picture (architecture, coherence, cross-cutting concerns). The verifiers need to see everything.
 
-This runs ALL verification skills (tester, exerciser, reviewer, qa, codex-reviewer, ponytail-review, comment-review, ux-reviewer, and any others in the verify pipeline), deduplicates findings, and produces a unified verification report with VI-{n} issue IDs and severity ratings. It does NOT fix anything — that's the player's job on the next turn.
+This runs the verification skills (tester, exerciser, reviewer, qa, codex-reviewer, comment-review, and — when the changes touch user-facing surfaces — ux-reviewer and visual-verify), deduplicates findings, and produces a unified verification report with VI-{n} issue IDs and severity ratings. It does NOT fix anything — that's the player's job on the next turn.
 
 The verify skill handles skill invocation, parallelism, deduplication, and reporting. No need to manage helper lists here — if verify adds new skills in the future, they're automatically included.
 

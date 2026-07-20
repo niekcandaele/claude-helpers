@@ -71,6 +71,50 @@ Detection checklist:
 - Documentation drift / dead code: 3-5
 - AI slop phrases / cosmetic: 1-4
 
+#### The over-engineering lens: find what to delete
+
+The best outcome for a diff is getting shorter. When evaluating the over-engineering,
+gold-plating, dependency-hygiene, and dead-code rows above, work this lens deliberately —
+it is easy to review only for what is *missing* and never for what should be *cut*.
+
+Tag every over-engineering finding with what kind of weight it removes:
+
+- `delete:` dead code, unused flexibility, speculative feature. Replacement: nothing.
+- `stdlib:` hand-rolled thing the standard library ships. Name the function.
+- `native:` dependency or code doing what the platform already does. Name the feature.
+- `yagni:` abstraction with one implementation, config nobody sets, layer with one caller.
+- `shrink:` same logic, fewer lines. Show the shorter form.
+
+**Style: terse and concrete.** Location, what to cut, what replaces it. Never vague
+"might be more complex than necessary" prose.
+
+❌ "This EmailValidator class might be more complex than necessary, have you considered
+whether all these validation rules are needed at this stage?"
+
+✅ `L12-38: stdlib: 27-line validator class. "@" in email, 1 line, real validation is the confirmation mail.`
+
+✅ `L4: native: moment.js imported for one format call. Intl.DateTimeFormat, 0 deps.`
+
+✅ `repo.py:L88: yagni: AbstractRepository with one implementation. Inline it until a second one exists.`
+
+✅ `L52-71: delete: retry wrapper around an idempotent local call. Nothing replaces it.`
+
+✅ `L30-44: shrink: manual loop builds dict. dict(zip(keys, values)), 1 line.`
+
+**Reuse verification — required before flagging.** You review real files, not an abstract
+diff. Verify every proposed replacement actually exists:
+- `stdlib:` — confirm the standard-library function is real and does the job.
+- `native:` — confirm the platform feature (or existing dependency) covers the case.
+- `yagni:`/`shrink:`/`delete:` — grep the codebase for the helper you'd inline to, or
+  confirm nothing else depends on the flexibility you'd remove.
+
+A finding whose replacement doesn't exist is noise. Drop it.
+
+**Never flag the minimum smoke test.** A single smoke test or `assert`-based self-check is
+the floor, not bloat. Never propose deleting it.
+
+Zero over-engineering findings is a success, not a gap — a lean diff is the happy path.
+
 ### Dimension 2: Architecture
 
 **Does this change maintain healthy codebase structure?**
@@ -368,6 +412,10 @@ Each issue uses this format:
 1. [Sev X] [Short title] — [file:line]
 2. [Sev X] [Short title] — [file:line]
 3. [Sev X] [Short title] — [file:line]
+
+**Over-engineering metric:**
+[If there is something to cut: `net: -N lines possible.`]
+[If there is nothing to cut: `Lean already. Ship.`]
 ```
 
 ## Severity Scale
@@ -390,6 +438,7 @@ Each issue uses this format:
 - **Enumerate then check (hardening)** — List all input/state/entry-point scenarios first, then check each
 - **Research patterns first (security)** — Understand how auth/authz/tenant isolation works before flagging deviations
 - **Count before flagging (architecture)** — Three occurrences minimum for "duplication"; check both directions of imports
+- **Verify the replacement exists (over-engineering)** — Grep for the helper, confirm the stdlib function is real, before proposing a cut. An unverified replacement is noise
 - **Be framework-aware** — Don't flag concerns the ORM, framework, or middleware demonstrably handles
 
 ## STOP — Never Fix
