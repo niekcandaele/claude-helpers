@@ -89,12 +89,21 @@ Work down this ladder before ever declaring a mechanism missing:
 3. Static HTML + Chrome binary → Tier 2
 4. PDF → Tier 3 (always available — `Read` needs no external tools)
 5. Live target, app won't start / no URL discoverable → `SKIPPED: NO_RUNNING_APP_DISCOVERABLE`
-6. No Playwright AND no Chrome binary, and every target needs a browser render → `SKIPPED: NO_SCREENSHOT_MECHANISM`
+6. Chrome binary missing but Playwright is resolvable (a `node_modules/playwright`
+   or `playwright-core`, or a `~/.cache/ms-playwright` cache dir that's empty) →
+   run `npx playwright install chromium`, then retry the detection. Only after
+   that install itself fails do you drop to the next rung.
+7. No Playwright AND no Chrome binary anywhere, and every target needs a browser
+   render → `SKIPPED: NO_SCREENSHOT_MECHANISM`
 
-`NO_SCREENSHOT_MECHANISM` is legal only after `command -v` fails for every
-Chrome candidate (`chromium chromium-browser google-chrome
-google-chrome-stable chrome`) AND a Playwright tool call has actually failed.
-Never report it preemptively.
+The gate for `NO_SCREENSHOT_MECHANISM` is a **real launch attempt that failed**,
+not a `PATH` lookup. It is legal only after all of: (a) a Playwright tool call
+has actually failed, (b) the binary search below found nothing in either
+Playwright's managed cache OR on `PATH`, and (c) `npx playwright install
+chromium` was unavailable or errored. A failing `command -v` on its own proves
+nothing — Playwright keeps its Chromium off `PATH`, and headless needs no
+display server, so neither a bare `PATH` nor an unset `DISPLAY` is evidence that
+no browser exists. Never report `NO_SCREENSHOT_MECHANISM` preemptively.
 
 ## Step 3: Capture
 
@@ -138,12 +147,32 @@ Save all screenshots to a `mktemp -d` directory with descriptive names:
 ### Tier 1b / Tier 2 — Headless Chrome
 
 Works for both `http://` (live app, no Playwright) and `file://` (static
-artifact). Binary auto-detect and flags follow rich-page's export script:
+artifact). Binary auto-detect and flags follow rich-page's export script.
+Search Playwright's managed cache *before* `PATH` — its bundled Chromium is a
+real, launchable binary that simply isn't on `PATH`, and headless rendering
+needs no `DISPLAY`:
 
 ```bash
-for c in chromium chromium-browser google-chrome google-chrome-stable chrome; do
+CHROME=""
+# 1. Playwright's own Chromium build (off PATH; newest build wins). Use `find`,
+#    not raw globs — an empty cache dir must not abort the script under shells
+#    where an unmatched glob is fatal.
+for root in "${PLAYWRIGHT_BROWSERS_PATH:-}" "$HOME/.cache/ms-playwright" \
+            "$HOME/Library/Caches/ms-playwright" "${LOCALAPPDATA:-}/ms-playwright"; do
+  [ -d "$root" ] || continue
+  cand="$(find "$root" -maxdepth 6 -type f \( -name chrome -o -name Chromium \) 2>/dev/null | sort -V | tail -1)"
+  [ -z "$cand" ] && cand="$(find "$root" -maxdepth 6 -type f -name 'chrome-headless-shell*' 2>/dev/null | sort -V | tail -1)"
+  [ -n "$cand" ] && [ -x "$cand" ] && CHROME="$cand" && break
+done
+# 2. Fall back to a system binary on PATH.
+[ -z "$CHROME" ] && for c in chromium chromium-browser google-chrome google-chrome-stable chrome; do
   command -v "$c" >/dev/null 2>&1 && CHROME="$(command -v "$c")" && break
 done
+# 3. Nothing found but Playwright is installed? Fetch its browser, then re-scan.
+if [ -z "$CHROME" ] && npx playwright install chromium >/dev/null 2>&1; then
+  cand="$(find "${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}" -maxdepth 6 -type f \( -name chrome -o -name 'chrome-headless-shell*' \) 2>/dev/null | sort -V | tail -1)"
+  [ -n "$cand" ] && [ -x "$cand" ] && CHROME="$cand"
+fi
 TMP_PROFILE="$(mktemp -d)"
 
 "$CHROME" --headless=new --disable-gpu --no-sandbox --hide-scrollbars \

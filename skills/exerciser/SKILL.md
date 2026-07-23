@@ -176,6 +176,30 @@ cat README.md | head -100
 
 Use this path when changes affect UI components, pages, or client-side behavior.
 
+**Confirm browser capability first (probe, don't assume):**
+
+Your browser is the Playwright MCP server. Confirm it can actually launch by
+*using* it — navigate to `about:blank` (or straight to the app URL once you have
+it) and see if it succeeds. Do **not** infer availability from `which chrome`,
+`google-chrome`, or whether `DISPLAY` is set: Playwright manages its own Chromium
+build under `$PLAYWRIGHT_BROWSERS_PATH` / `~/.cache/ms-playwright/`, off `PATH`,
+and headless renders off-screen with no display server. A bare `PATH` and an
+unset `DISPLAY` are the normal, working state here — not a missing browser.
+
+- **Self-heal if the browser isn't installed.** If a navigation fails because
+  the browser binary is absent, call `mcp__playwright__browser_install`, then
+  retry the navigation once. Installing the browser is the fix; reporting
+  "no browser" without trying to install it is not.
+- **If the MCP server itself is unavailable**, a repo-local Playwright is still a
+  valid mechanism: if `playwright` (or `playwright-core`) resolves from the
+  repo's `node_modules`, drive a headless launch from a short Node script run
+  **from the repo root** (package resolution fails from `/tmp`). `npx playwright
+  install chromium` fetches the browser if the cache is empty.
+- Treat a **real launch attempt** as the source of truth. Only report
+  `BROWSER_UNAVAILABLE` (below) after `browser_install` / `npx playwright install
+  chromium` has genuinely failed — and keep it distinct from "the app frontend
+  isn't up," which is a separate failure with its own reason codes.
+
 **4a. Determine Application URL:**
 ```bash
 # Check docker-compose for port mappings
@@ -455,6 +479,7 @@ When returning BLOCKED, use these specific reasons:
 | `UNCLEAR_FEATURE` | Cannot determine what feature to exercise from scope |
 | `ENVIRONMENT_ERROR` | Port conflict, dependency missing, or similar |
 | `EXERCISE_BLOCKED` | Got partway through but hit unexpected barrier |
+| `BROWSER_UNAVAILABLE` | A browser could not be launched **after** attempting `mcp__playwright__browser_install` / `npx playwright install chromium`. State the specific failure (browsers not installed and install failed, sandbox denied launch). Do NOT use this for "app frontend isn't up" — that's `STARTUP_FAILED`. Only legal after a real launch attempt failed. |
 | `NO_EXERCISE_STRATEGY` | Cannot determine how to exercise this change type — no engineer skill, unclear data flow. **Severity 9-10.** |
 | `SERVICE_UNAVAILABLE` | A required backing service (database, search, queue) won't start or connect. **Severity 9-10.** |
 | `NO_ENGINEER_SKILL` | Repo lacks engineer skill and change requires repo-specific knowledge to exercise. **Severity 9.** Recommend running `/setup-engineer`. |

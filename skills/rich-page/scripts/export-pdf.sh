@@ -90,7 +90,27 @@ if [[ -z "$OUTPUT" ]]; then
   fi
 fi
 
-# Auto-detect Chrome.
+# Auto-detect a Chrome/Chromium binary.
+# Order: explicit --chrome (already set above) -> Playwright's managed browser
+# cache -> system binaries on PATH. Playwright installs its own Chromium build
+# OFF the PATH (under $PLAYWRIGHT_BROWSERS_PATH or ~/.cache/ms-playwright), and
+# headless rendering needs no display server -- so "nothing on PATH" is not
+# evidence that no browser exists. Check the cache before giving up.
+if [[ -z "$CHROME" ]]; then
+  for root in "${PLAYWRIGHT_BROWSERS_PATH:-}" \
+              "$HOME/.cache/ms-playwright" \
+              "$HOME/Library/Caches/ms-playwright" \
+              "${LOCALAPPDATA:-}/ms-playwright"; do
+    [[ -n "$root" && -d "$root" ]] || continue
+    # `find` (not raw globs) so an empty cache doesn't abort under shells with
+    # nomatch set. Prefer a full Chromium build; accept the headless shell too.
+    # Newest build wins.
+    cand="$(find "$root" -maxdepth 6 -type f \( -name chrome -o -name Chromium -o -name chrome.exe \) 2>/dev/null | sort -V | tail -1)"
+    [[ -z "$cand" ]] && cand="$(find "$root" -maxdepth 6 -type f -name 'chrome-headless-shell*' 2>/dev/null | sort -V | tail -1)"
+    [[ -n "$cand" && -x "$cand" ]] && CHROME="$cand" && break
+  done
+fi
+
 if [[ -z "$CHROME" ]]; then
   for candidate in chromium chromium-browser google-chrome google-chrome-stable chrome; do
     if command -v "$candidate" >/dev/null 2>&1; then
@@ -107,6 +127,7 @@ Could not find chromium or chrome. Install one of the following, or pass
 
   - chromium / chromium-browser (Debian/Ubuntu: apt install chromium)
   - google-chrome / google-chrome-stable
+  - Playwright's bundled Chromium: npx playwright install chromium
 EOF
   exit 1
 fi
