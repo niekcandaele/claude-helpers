@@ -1,7 +1,7 @@
 ---
 name: check-ci
 description: Monitor CI/CD pipeline status after pushes and investigate failures.
-argument-hint: '[optional: commit-sha or branch]'
+argument-hint: '[optional: commit-sha or branch] [--once]'
 allowed-tools:
   - Read
   - Bash
@@ -20,6 +20,28 @@ Monitor CI/CD pipeline status after pushing commits. When failures occur, delega
 
 Optional commit reference: $ARGUMENTS (e.g., `HEAD`, `abc1234`, `feature-branch`)
 - Defaults to the latest commit on the current branch if not specified
+- `--once` — take a single reading and return immediately, without waiting
+
+## `--once`: single-reading mode
+
+Take one reading of CI status, report it, and return. Do not watch, do not sleep, do not
+poll. Output exactly one of:
+
+```
+CI: PENDING  — <n> running, <n> queued, <n> completed
+CI: PASSED   — <n> checks
+CI: FAILED   — <failing check names>
+CI: NONE     — no CI configuration detected for this commit
+```
+
+`PENDING` is a normal, expected answer — return it and stop. Do **not** launch `debugger`
+on a pending pipeline; investigation is only for a terminal `FAILED`.
+
+This mode exists for callers that are managing several pieces of work at once. Watching a
+pipeline means holding the session hostage for as long as CI takes, which on a thoroughly
+instrumented project can be an hour — time the caller could spend on other work. A caller
+that owns its own scheduling wants a cheap reading it can take whenever it likes, not a
+blocking wait. Everything below this section describes the default watching mode.
 
 ## Process
 
@@ -197,8 +219,20 @@ The skill's report provides evidence-based findings without implementing fixes.
 - **Authentication Required:** Guide user to authenticate with CI platform
 - **API Rate Limits:** Handle rate limiting with appropriate delays
 - **Network Issues:** Retry with exponential backoff
-- **Timeout:** Stop monitoring after 30 minutes with timeout message
+- **Long-running CI:** Keep waiting. Extensive CI is a feature, not a fault — see "Patience" below
 - **Partial Logs:** Attempt to work with available information
+
+## Patience
+
+A pipeline that has been running for an hour is not a stalled pipeline. On projects where
+CI is trusted enough to gate a merge, the suite is extensive on purpose — and when several
+branches land at once, shared runners queue, so a job can sit in `Queued` for a long while
+before it even starts. Both are normal.
+
+So: never conclude from elapsed time alone that CI is stuck, broken, or worth abandoning.
+Do not suggest skipping it, re-running it to "unstick" it, or merging without it. The only
+things that end the wait are a terminal result, an explicit `CI_CHECK_TIMEOUT`, or the user
+telling you to stop. If it's taking a while, say what it's still waiting on and keep going.
 
 ## Platform-Specific Features
 
@@ -220,7 +254,7 @@ The skill's report provides evidence-based findings without implementing fixes.
 
 Users can customize behavior via environment variables:
 
-- `CI_CHECK_TIMEOUT`: Maximum time to wait for CI completion (default: 30m)
+- `CI_CHECK_TIMEOUT`: Maximum time to wait for CI completion (default: unset — wait indefinitely)
 - `CI_POLL_INTERVAL`: How often to check status (default: 10s)
 
 ## Final Instructions
@@ -248,7 +282,7 @@ Users can customize behavior via environment variables:
 
 ### Error Handling
 10. Handle multiple CI platforms if repository uses several
-11. If CI is still running after 30 minutes, report timeout and current status
+11. If CI is still running, keep waiting and reporting progress — a long pipeline is not a stalled one
 
 ## Usage Examples
 

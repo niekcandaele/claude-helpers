@@ -1,8 +1,14 @@
 ---
 name: player-coach
-description: Adversarial cooperation loop — player implements, /verify reviews, creates PR, passes CI
-argument-hint: "[--max-turns=N] [--severity=N] [--no-pr]"
-disable-model-invocation: true
+description: >
+  Adversarial cooperation loop for ONE ticket — player implements, /verify reviews,
+  a PR is created, CI passes. Invoke only when the user explicitly asks for the
+  player-coach loop, or when `epic-runner` orchestrates it for a single issue.
+  Do not reach for this on your own to satisfy an ordinary coding request: it runs
+  for a long time, creates branches and PRs, and is not a general implementation
+  helper. For a whole epic of tickets, use `epic-runner` instead — it drives this
+  skill once per issue.
+argument-hint: "[--max-turns=N] [--severity=N] [--no-pr] [--no-ci] [--plan-file=<path>] [--target=<branch>] [--on-codex-blocked=continue|stop]"
 allowed-tools:
   - Read
   - Bash
@@ -16,15 +22,34 @@ allowed-tools:
 
 # Player-Coach: Adversarial Cooperation Loop
 
-You are the orchestrator of a player-coach loop. The player implements code, `/verify --mode=report-only --scope=branch` runs the full verification pipeline against all branch changes, and then (by default) a PR is created and CI must pass. The loop ends when a PR exists with green CI — or when `--no-pr` is set, after verification is clean.
+You are the orchestrator of a player-coach loop. The player implements code, `/verify --mode=report-only --scope=branch` runs the full verification pipeline against all branch changes, and then (by default) a PR is created and CI must pass.
+
+The loop ends when:
+- a PR exists with green CI (default), or
+- a PR exists and CI has been handed back to the caller (`--no-ci`), or
+- verification is clean and no PR was requested (`--no-pr`), or
+- the turn budget runs out.
+
+**This loop holds the local development environment for its entire life** — ports, memory,
+the working tree — because verification boots the app every turn. Anything else that needs
+that environment has to wait until this returns. That is why `--no-ci` exists: waiting out
+an hour of CI while holding all of it blocks work that could otherwise be proceeding.
 
 There is no separate coach skill. The verify skill runs all verification skills and produces the report. You apply the severity threshold mechanically.
 
 ## Phase 0: Pre-Loop Setup
 
-### 1. Check that a plan exists
+### 1. Locate the plan
 
 The plan file is the requirements document for this loop. Without it, there's nothing to implement.
+
+**If `--plan-file=<path>` was passed, use that path.** It may live anywhere — an orchestrator
+running many loops keeps its plans outside the repository so a large batch of work doesn't
+litter the working tree. Confirm the file exists and stop if it doesn't; a caller that named
+a path expects that exact plan, so silently falling back to a different one would implement
+the wrong thing.
+
+**Otherwise, discover it:**
 
 ```bash
 ls .claude/plans/*.md 2>/dev/null | head -5
@@ -45,8 +70,25 @@ Check `$ARGUMENTS` for:
 - `--max-turns=N` — maximum iterations
 - `--severity=N` — minimum severity threshold for issues that must be fixed
 - `--no-pr` — skip PR creation and CI checking (just run the verify loop)
+- `--no-ci` — create the PR, then return immediately without waiting on CI
+- `--plan-file=<path>` — explicit plan path (see step 1)
+- `--target=<branch>` — the branch the PR should target; defaults to the repo's default branch
+- `--on-codex-blocked=continue|stop` — what to do when the Codex gate is blocked and no human is available
+
+Also check for:
+- `--headless` — there is no human on the other end of this run
+- `--resume-ci` — re-enter an existing PR to fix CI failures (see Phase 1.5 Step 3)
+
+**`--headless` must be explicit, never inferred.** It is tempting to guess it from the
+presence of `--max-turns` and `--severity`, but a human who types those flags still wants
+step 4's clarifying questions about an unclear plan — inferring would silently take that
+away from them. Running headless means `AskUserQuestion` reaches nobody: instead of
+prompting, it stalls the run for hours. So when `--headless` is set, skip step 4 entirely
+and resolve every would-be question from arguments and defaults (10 turns, severity 5).
 
 ### 4. Clarify with the user
+
+**Skip this step entirely when headless.**
 
 Use `AskUserQuestion` to fill in anything not specified. Only ask what's genuinely needed — don't ask for the sake of asking.
 
@@ -68,10 +110,63 @@ Use `AskUserQuestion` to fill in anything not specified. Only ask what's genuine
 - Missing critical information the player will need
 - Anything that would cause the player to get stuck
 
-### 5. Confirm and start
+### 5. Create the feature branch
+
+**Skip this step entirely when `--no-pr` is set.** Without a PR at the end, a human running
+this loop expects to be left where they started, with an inspectable uncommitted diff they
+can `git diff`, `git stash`, or throw away. Creating a branch and committing to it takes
+that away and hands them commits to unwind instead.
+
+Otherwise create the branch **now**, before turn 1, so that every turn can commit onto it.
+
+```bash
+git fetch origin
+TARGET_BRANCH=<--target, else the repo's default branch>
+git checkout -b <branch-name> origin/$TARGET_BRANCH
+```
+
+Base off `origin/$TARGET_BRANCH`, not the local branch. When several tickets are being
+worked in sequence, local trunk can be an hour stale, and branching off it silently reverts
+work that merged while the previous ticket was in CI.
+
+Name it from the plan: `feature/`, `fix/`, `docs/`, or `refactor/` prefix plus a kebab-case
+summary, max 50 chars. If an orchestrator supplied an issue id, put it in the branch name —
+that identifier is how a resumed run recognises which issue an in-flight branch belongs to.
+
+You'll hand `TARGET_BRANCH` to `create-pr` later so the PR targets trunk rather than this
+new branch.
+
+**If you are already on a non-default branch** that looks like it belongs to this task
+(an orchestrator resuming, or a human who branched first), stay on it rather than creating
+a second branch, and set `TARGET_BRANCH` to the repo's default branch.
+
+**If the working tree has uncommitted changes**, they come along to the new branch, which
+is usually what you want when a human started editing before invoking the loop. But it also
+means unrelated work-in-progress gets swept into turn 1's commit — if the changes look
+unrelated to the plan, say so and let the user deal with them before continuing.
+
+### 6. Confirm and start
 
 Briefly summarize the configuration to the user:
-> "Starting player-coach loop: [max_turns] turns, severity threshold [N], PR+CI [enabled/disabled]. Plan: [1-line plan summary]"
+> "Starting player-coach loop: [max_turns] turns, severity threshold [N], PR+CI [enabled/disabled]. Branch: [branch] → [TARGET_BRANCH]. Plan: [1-line plan summary]"
+
+## Phase 0.5: Resuming to fix CI (`--resume-ci` only)
+
+When a caller owns CI (because it invoked with `--no-ci`) and the pipeline comes back red,
+it needs a way back in that doesn't redo work. `--resume-ci` is that door.
+
+You are handed an existing PR and the CI failure text. The branch already exists, already
+has every turn's commits, and already has a PR pointed at trunk. So:
+
+- **Skip Phase 0 step 5** — do not create a branch. Check out the PR's existing branch.
+- **Skip Phase 1 entirely** — do not re-run the implement/verify loop. Verification already
+  passed; what failed is CI, and re-running the full pipeline would cost an hour to
+  rediscover nothing.
+- **Enter at Phase 1.5 Step 3** with the supplied failure text as the CI feedback.
+
+Required arguments in this mode: `--plan-file=<path>`, the PR reference, and the failure
+detail. Turn budget still applies — a caller that keeps re-entering a PR that cannot be
+fixed should hit the same limit as any other runaway loop.
 
 ## Phase 1: The Loop
 
@@ -86,7 +181,14 @@ Initialize:
   phase = "verify"          # "verify" or "ci"
   pr_url = ""
   pr_enabled = true         # false if --no-pr
+  ci_enabled = true         # false if --no-ci
+  headless = false          # true if --headless
+  branch = ""               # set in Phase 0 step 5 when pr_enabled
+  target_branch = ""        # from --target, else the repo default branch
 ```
+
+`--no-pr` wins over `--no-ci`: with no PR there is no CI to wait on, so the combination is
+not a contradiction, just redundant.
 
 For each turn (1 to max_turns):
 
@@ -126,13 +228,58 @@ Wait for the player to complete. Extract the PLAYER REPORT from the result.
 **Concerns:** [any remaining concerns from player report, or "none"]
 ```
 
+### Step 1.5: Commit the turn
+
+**Skip when `--no-pr` is set** — no branch was created, so there is nothing to commit onto.
+
+Commit the player's work onto the feature branch before verification runs.
+
+```bash
+git add -A
+git commit -m "<what this turn did>" || true
+```
+
+Use `git add -A` rather than the file list from the player report: players routinely create
+files they forget to mention, and an untracked new file that never gets committed is
+invisible to `--scope=branch` verification. You own this branch, so there is nothing else
+in the tree that could be swept up by accident.
+
+Tolerate the empty commit. A turn where the player changed nothing is disappointing but not
+fatal here — verification still needs to run so the loop can decide what to do about it.
+
+**Do not push.** Push happens exactly once, at PR creation. On a repo with push-triggered
+CI, pushing every turn fires a fresh hour-long pipeline per turn, burning the exact resource
+this loop is built to conserve.
+
+One commit per turn is deliberate. A loop that runs for hours and lands as a single
+commit tells the reviewer nothing; a branch where turn 1 is the implementation, turn 2 is
+the fixes verification asked for, and turn 3 is the fixes after that tells the whole story
+at a glance. That history is the main artifact for reviewing how the loop performed.
+
+It also makes `--scope=branch` verification work at all. Verify computes the branch diff as
+`git merge-base HEAD <trunk>` against `HEAD` — with the work sitting uncommitted, those two
+are the same commit and the diff is empty. Committing each turn is what gives the verifiers
+something to look at.
+
+Write the message to describe **what the code now does differently** — not the loop.
+Never reference `VI-N`, `CI-N`, "review feedback", or turn numbers: those identifiers are
+ephemeral to this session and are dangling references the moment the loop ends. "Handle
+empty result sets in the export query" is right; "Fix VI-3 from turn 2" is not.
+
+If the player made no changes at all this turn, there is nothing to commit — say so and
+carry on to verification rather than forcing an empty commit.
+
 ### Step 2: Run Verification
 
 Invoke the report-only verification pipeline via the Skill tool:
 
 ```
-/verify --mode=report-only --scope=branch
+/verify --mode=report-only --scope=branch --plan-file={plan_file_path}
 ```
+
+Passing `--plan-file` explicitly matters: without it, verify's plan-completeness check has
+to discover the plan from conversation history, which works when a human is watching the
+same session but is unreliable inside a subagent that never saw the plan being written.
 
 **CRITICAL: Always use `--scope=branch`.** This ensures every turn verifies the FULL set of changes from the entire plan — not just the latest fix. Without this, later turns only scope to the most recent unstaged changes, causing verifiers to lose the bigger picture (architecture, coherence, cross-cutting concerns). The verifiers need to see everything.
 
@@ -182,7 +329,7 @@ Look at the verification report's Skill Results Summary table for the `exerciser
    ## Turn N/M — EXERCISER MISSING
    The exerciser did not run this turn. Re-running verification.
    ```
-   Re-invoke `/verify --mode=report-only --scope=branch`. This does not increment the turn counter.
+   Re-invoke `/verify --mode=report-only --scope=branch --plan-file={plan_file_path}`. This does not increment the turn counter.
 
 2. **`exerciser` status is FAILED:** The feature does not work end-to-end. This blocks approval regardless of severity threshold — treat it as a severity 10 issue. Add the exerciser's failure description to feedback and continue to next turn.
 
@@ -212,10 +359,17 @@ Look at the verification report's Skill Results Summary for `codex-reviewer`. Th
 
 1. **`codex-reviewer` status is COMPLETED:** Proceed to the APPROVED/FEEDBACK decision below.
 
-2. **`codex-reviewer` status is BLOCKED:** The independent second-model review did not run. Use `AskUserQuestion` to ask:
+2. **`codex-reviewer` status is BLOCKED:** The independent second-model review did not run.
+
+   **Interactive:** Use `AskUserQuestion` to ask:
    > "Codex review was BLOCKED ({reason from report}). The independent second-model review did not run. Continue without Codex review, or stop to resolve?"
    - If user says continue → proceed to APPROVED/FEEDBACK decision
    - If user says stop → halt the loop and output current state
+
+   **Headless:** There is nobody to ask, so apply `--on-codex-blocked` instead — `continue`
+   (the default) proceeds to the APPROVED/FEEDBACK decision, `stop` halts the loop. Either
+   way, record that Codex was blocked and why in the final report, so the caller knows this
+   run got one fewer independent reviewer than usual and can weigh the result accordingly.
 
 3. **`codex-reviewer` status is SKIPPED_UNSUPPORTED_SCOPE:** Expected for `--scope=all`. Proceed to APPROVED/FEEDBACK decision.
 
@@ -259,6 +413,16 @@ Set feedback = the issues list above, append to feedback_history (prefixed with 
 
 This phase runs after verification passes (APPROVED) when `pr_enabled` is true (the default). Set `phase = "ci"`.
 
+**With `--no-ci`, this phase stops after the PR is created** (Step 1) and the loop returns.
+Steps 2 and 3 — polling CI and fixing failures — belong to the caller instead.
+
+That split exists because CI can run for an hour on a well-instrumented project, and this
+loop holds the local development environment the whole time it is alive: ports, memory, the
+working tree. Waiting out CI while holding all of that blocks every other piece of work an
+orchestrator could be doing. Polling a PR costs nothing by comparison, so the caller keeps
+the cheap part and gets the expensive resource back immediately. Under `--no-ci`, go to
+Phase 2 as soon as the PR exists and report the PR URL as the result.
+
 ### Step 1: Write context file and create the PR
 
 Before invoking the create-pr skill, write the accumulated loop state to a temp file so the skill can produce a rich, context-aware PR description with a human testing plan. The human wasn't present during implementation — this is their primary way to understand what happened.
@@ -266,7 +430,8 @@ Before invoking the create-pr skill, write the accumulated loop state to a temp 
 **Write the context file:**
 
 ```bash
-cat > /tmp/pc-pr-context.md << 'CONTEXT'
+PC_CONTEXT=$(mktemp -t pc-pr-context.XXXXXX.md)   # not a fixed path — parallel loops would clobber each other
+cat > "$PC_CONTEXT" << 'CONTEXT'
 ## Plan Summary
 {Synthesize the plan's goals in 2-4 sentences. Write for someone who was NOT
 involved in planning. Include the problem being solved.}
@@ -307,10 +472,17 @@ CONTEXT
 **Invoke the create-pr skill with the context:**
 
 ```
-/create-pr --context=/tmp/pc-pr-context.md --no-comments
+/create-pr --context=$PC_CONTEXT --no-comments --base={TARGET_BRANCH} --plan-file={plan_file_path}
 ```
 
-The skill creates the feature branch, commits, pushes, and opens the PR with a rich description including a human testing plan. Extract the PR URL from the output and store it as `pr_url`.
+The branch already exists and already carries one commit per turn, so `create-pr` reuses it
+rather than cutting a new one. Passing `--base` is what keeps the PR pointed at trunk — the
+loop has been sitting on the feature branch since Phase 0, so `create-pr` cannot infer the
+target from the current branch.
+
+The skill commits anything still uncommitted, pushes, and opens the PR with a rich description including a human testing plan. Extract the PR URL from the output and store it as `pr_url`.
+
+**With `--no-ci`, stop here.** Output the PR URL and go to Phase 2.
 
 **If a PR already exists:** The skill detects this and updates the description instead.
 
@@ -401,7 +573,7 @@ Wait for the player to complete. Output the player report.
 After the player fixes CI issues, stage only the files the player modified (from the player report), commit with a descriptive message based on what was fixed, and push:
 
 ```bash
-git add <files from player report>
+git add -A
 git commit -m "<descriptive message based on CI failures fixed>"
 git push
 ```
@@ -413,6 +585,35 @@ If the commit fails (e.g., no changes were made — the player couldn't fix the 
 Go back to Step 2.
 
 ## Phase 2: Completion
+
+### Always end with a status block
+
+Whatever the outcome, the **last thing you output** is this block. A human skims it; an
+orchestrator parses it. Every other template below is prose around it.
+
+```
+STATUS: <one of the values below>
+PR_URL: <url, or "none">
+BRANCH: <branch> -> <target>, or "none">
+TURNS_USED: <n> of <m>
+CODEX: completed | blocked (<reason>)
+```
+
+| STATUS | Meaning |
+|---|---|
+| `APPROVED_MERGED` | Verification clean, PR created, CI green (full loop) |
+| `APPROVED_PR_OPEN` | Verification clean, PR created, CI handed back (`--no-ci`) |
+| `APPROVED_NO_PR` | Verification clean, no PR requested (`--no-pr`) |
+| `TURN_LIMIT_VERIFY` | Ran out of turns with issues still at/above threshold |
+| `TURN_LIMIT_CI` | Verification passed, CI never went green within budget |
+| `FAILED_NO_PLAN` | No plan file could be located |
+| `FAILED_CREATE_PR` | Verification passed but the PR could not be created |
+| `FAILED_CODEX_BLOCKED` | Codex gate blocked and policy was `stop` |
+
+Without this, a caller has to infer the outcome from prose, and the failure paths are
+exactly where prose is least consistent — note that the `--no-pr` summary has no PR field
+at all, so a `create-pr` failure that falls back to it would otherwise lose the branch name
+along with the reason.
 
 ### If approved (with PR+CI):
 
@@ -439,6 +640,40 @@ Go back to Step 2.
 [Brief list: sticky issues, unresolved player concerns, CI failures that needed fixing.
 Point the user to the PR description for full details.]
 ```
+
+### If approved (PR created, CI handed back — `--no-ci` mode):
+
+The caller needs a result it can act on without reading any of the above, so lead with the
+structured facts and keep the prose short.
+
+```markdown
+# Player-Coach Complete (--no-ci)
+
+## Result: APPROVED — PR created, CI not checked
+## Issue: {issue id, if one was supplied}
+## PR: {pr_url}
+## Branch: {branch} → {TARGET_BRANCH}
+## Turns used: N of M
+## Severity threshold: {severity}
+## Codex: completed / blocked ({reason})
+
+## Files Changed
+[List from the final player report]
+
+[If sticky_issues, player_concerns, or below-threshold issues exist:]
+## Friction Summary
+[Sticky issues, unresolved player concerns, below-threshold issues.]
+
+[If anything was noticed that falls outside this ticket's scope:]
+## Discoveries
+- [What was found, where, and why it isn't part of this ticket]
+```
+
+The Discoveries section is for things genuinely **outside** this ticket — a bug in a module
+you only called into, a missing test suite, a blocker nobody planned for. Problems inside
+the code this ticket touched are not discoveries; they were either fixed or they are already
+in the friction summary. An orchestrator uses this section to decide what follow-up work to
+propose, so a section padded with in-scope nits makes that decision worse, not better.
 
 ### If approved (without PR — `--no-pr` mode):
 
@@ -514,6 +749,7 @@ You can re-run with `--max-turns=N` to continue fixing CI.
 ## Important Notes
 
 - **Don't write code.** The player does that.
+- **You own the git history, the player doesn't.** You create the branch in Phase 0 and commit after each turn; the player only edits files.
 - **Don't run verification yourself.** `/verify --mode=report-only` does that.
 - **Don't fix issues.** The player fixes them on the next turn.
 - **Pass the plan file path, not the plan content.** The player reads the plan itself.

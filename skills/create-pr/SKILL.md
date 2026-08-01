@@ -9,7 +9,7 @@ description: >
   descriptions than a manual `gh pr create`. Accepts optional context from callers
   like player-coach for even richer descriptions with implementation journey and
   friction logs.
-argument-hint: "[PR title] [--context=path] [--no-comments]"
+argument-hint: "[PR title] [--context=path] [--no-comments] [--base=<branch>] [--plan-file=<path>]"
 ---
 
 # Create Pull Request
@@ -20,16 +20,25 @@ Parse `$ARGUMENTS` for:
 - Optional PR title (quoted string)
 - `--context=path` — path to a context file with additional structured data (from player-coach or similar)
 - `--no-comments` — skip inline review comments
+- `--base=<branch>` — the branch this PR should target
+- `--plan-file=<path>` — explicit plan path (see step 3 of Phase 2)
 
 ## Phase 1: Git Mechanics
 
-### 1. Store original branch
+### 1. Determine the target branch
 
 ```bash
+ORIGINAL_BRANCH=<--base if given>
+# else:
+ORIGINAL_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null)
+# else:
 ORIGINAL_BRANCH=$(git branch --show-current)
 ```
 
-This becomes the PR target branch. All PRs go back to whatever branch you started from.
+Prefer `--base` when given, then the repo's default branch, and only fall back to the
+current branch. That order matters because a caller may have already put you **on** the
+feature branch — a loop that commits as it goes has been sitting on it for hours. Reading
+the current branch in that situation would target the PR at itself.
 
 ### 2. Check for existing PR/MR
 
@@ -60,7 +69,22 @@ Verify the CLI tool is installed (`which gh` / `which glab`). If not installed, 
 
 ### 4. Create feature branch
 
-Generate a branch name from the PR title (if provided) or from analysis of the changes:
+**First check whether you are already on one.** If the current branch is not
+`ORIGINAL_BRANCH` and has commits ahead of it:
+
+```bash
+git rev-parse --abbrev-ref HEAD
+git log --oneline origin/$ORIGINAL_BRANCH..HEAD
+```
+
+then this branch already *is* the feature branch — a caller prepared it and committed to it.
+**Skip the rest of this step and step 5 entirely** and go to step 6 to push it.
+
+Cutting a new branch here would be quietly wrong in two ways: the new branch would be based
+on the feature branch rather than trunk, and the "add a timestamp suffix if the branch
+exists" rule below would hide the collision instead of surfacing it.
+
+Otherwise, generate a branch name from the PR title (if provided) or from analysis of the changes:
 - New feature → `feature/brief-description`
 - Bug fix → `fix/issue-description`
 - Docs → `docs/update-description`
@@ -123,9 +147,15 @@ Read the context file. It contains structured data from the caller (e.g., player
 
 Also read the diff for code-level understanding:
 ```bash
-git diff $ORIGINAL_BRANCH..HEAD
-git diff --stat $ORIGINAL_BRANCH..HEAD
+git diff origin/$ORIGINAL_BRANCH...HEAD
+git diff --stat origin/$ORIGINAL_BRANCH...HEAD
 ```
+
+Three dots, not two, and against `origin/`. Two-dot `git diff` compares the two branch tips,
+so anything that merged into trunk since you branched shows up in your PR description as
+**deletions you didn't make**. Three dots diffs from the merge base, which is what the PR
+itself will show. This produces a plausible-looking but wrong description otherwise, which
+is the worst kind of wrong.
 
 If the context file includes a `## Testing Plan Hints` section, use those hints (user-facing flows, known edge cases, exerciser results) as a starting point for the Testing Plan.
 
@@ -135,21 +165,25 @@ Gather context yourself:
 
 1. **Read the diff:**
    ```bash
-   git diff $ORIGINAL_BRANCH..HEAD --stat
-   git diff $ORIGINAL_BRANCH..HEAD
+   git diff origin/$ORIGINAL_BRANCH...HEAD --stat
+   git diff origin/$ORIGINAL_BRANCH...HEAD
    ```
+   Three dots and `origin/` — see the note in Path A for why two-dot diffs misreport.
    For large diffs (20+ files), use `--stat` first and selectively read key files.
 
 2. **Read the commit log:**
    ```bash
-   git log $ORIGINAL_BRANCH..HEAD --format='%s%n%n%b---'
+   git log origin/$ORIGINAL_BRANCH..HEAD --format='%s%n%n%b---'
    ```
+   Two dots is correct here — for `git log` it already means "commits on this branch only".
 
 3. **Check for a plan file:**
+   If `--plan-file=<path>` was passed, read that. Otherwise look for one:
    ```bash
    ls .claude/plans/*.md 2>/dev/null
    ```
-   If found, read it — it explains the "why" behind the change.
+   If found, read it — it explains the "why" behind the change. A caller that runs many
+   loops keeps its plans outside the repository, which is why the explicit path exists.
 
 4. **Check for issue references:**
    Scan commit messages for `#NNN` patterns. Fetch context:
@@ -352,7 +386,8 @@ Scan the diff for:
 Write comments to a temp JSON file, then post as a review:
 
 ```bash
-cat > /tmp/pr-review-comments.json << 'EOF'
+PR_COMMENTS_JSON=$(mktemp -t pr-review-comments.XXXXXX.json)
+cat > "$PR_COMMENTS_JSON" << 'EOF'
 {
   "body": "Self-review: areas flagged for reviewer attention",
   "event": "COMMENT",
@@ -369,7 +404,7 @@ EOF
 
 gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
   --method POST \
-  --input /tmp/pr-review-comments.json
+  --input "$PR_COMMENTS_JSON"
 ```
 
 The `line` parameter is the line number in the new version of the file. `side: "RIGHT"` means the new file (not the old). Use `gh api repos/{owner}/{repo}/pulls/{pr_number} --jq '.head.sha'` if you need the head SHA.
@@ -389,7 +424,8 @@ HEAD_SHA=$(echo "$DIFF_REFS" | jq -r '.head_sha')
 Then post each comment as a discussion. **You must send a JSON body with an explicit `Content-Type: application/json` header.** The form-encoded `-f "position[base_sha]=..."` style gets accepted by GitLab (HTTP 201) but silently drops the nested `position` object — your note lands as a top-level MR comment instead of an inline `DiffNote`. Write the payload to a temp JSON file and post via `--input`:
 
 ```bash
-cat > /tmp/mr-note.json <<EOF
+MR_NOTE_JSON=$(mktemp -t mr-note.XXXXXX.json)
+cat > "$MR_NOTE_JSON" <<EOF
 {
   "body": "This retry logic works but is a workaround...",
   "position": {
@@ -406,7 +442,7 @@ EOF
 glab api projects/{project_id}/merge_requests/{mr_iid}/discussions \
   --method POST \
   --header "Content-Type: application/json" \
-  --input /tmp/mr-note.json
+  --input "$MR_NOTE_JSON"
 ```
 
 If the comment body is composed from a multi-line string or contains quotes/newlines, build the JSON with `jq` rather than string interpolation to get the escaping right:
@@ -415,7 +451,7 @@ If the comment body is composed from a multi-line string or contains quotes/newl
 jq -n --arg body "$COMMENT_BODY" --arg path "$FILE_PATH" --argjson line "$LINE_NUM" \
   --arg base "$BASE_SHA" --arg start "$START_SHA" --arg head "$HEAD_SHA" \
   '{body: $body, position: {base_sha: $base, start_sha: $start, head_sha: $head, position_type: "text", new_path: $path, new_line: $line}}' \
-  > /tmp/mr-note.json
+  > "$MR_NOTE_JSON"
 ```
 
 **Verify the note posted as a true inline DiffNote:**

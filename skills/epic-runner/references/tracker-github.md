@@ -1,0 +1,91 @@
+# Binding: GitHub via `gh`
+
+The reference implementation. Verify `gh auth status` succeeds in Phase 0 — an
+unauthenticated `gh` fails every call in the same opaque way.
+
+## Resolving the epic reference
+
+GitHub has no first-class epic, so an epic is whichever grouping the user actually uses:
+
+| Reference looks like | Grouping | `list` |
+|---|---|---|
+| `"Q3 export"`, a milestone URL | Milestone | `gh issue list --milestone "{name}" --state open --json number,title,body --limit 100` |
+| `epic:export`, a label | Label | `gh issue list --label "{label}" --state open --json number,title,body --limit 100` |
+| `#412`, an issue URL | Tracking issue | Read #412, extract the task list (below) |
+| A project board URL | Project | `gh project item-list {n} --owner {owner} --format json` |
+
+Ambiguous references are normal — `export` could be a label or a milestone. Check both and
+ask in Phase 0 if more than one matches.
+
+**Tracking-issue task lists** are the most common shape and need parsing out of the body:
+
+```bash
+gh issue view {n} --json body -q .body | grep -oE '^\s*- \[[ x]\] .*#([0-9]+)'
+```
+
+Checked boxes are already done — exclude them. Indentation is a dependency signal: a nested
+item generally depends on its parent.
+
+## The five operations
+
+```bash
+# read
+gh issue view {id} --json number,title,body,labels,milestone
+
+# start
+gh issue edit {id} --add-label in-progress          # only if the label exists
+
+# comment
+gh issue comment {id} --body-file {file}
+
+# close — prefer automatic
+```
+
+**Don't close issues manually.** Put `Closes #{id}` in the PR body and GitHub closes the
+issue when the PR merges, atomically and with the linkage recorded. A manual `gh issue
+close` can drift from reality if the merge fails. Pass the issue id to the issue-agent so it
+lands in the PR body.
+
+Before using `start`, confirm the label exists — `gh label list --json name -q '.[].name'`.
+Creating labels in someone's repo is not your call.
+
+## Dependencies
+
+```bash
+gh issue view {id} --json body -q .body | grep -iE 'blocked by|depends on|after #'
+```
+
+GitHub's typed relationships are not exposed by `gh` in older versions, so body text and
+task-list nesting carry most of the signal in practice.
+
+## Ground checks
+
+```bash
+# Branch protection — needs repo admin; treat a failure as "unknown", not "unprotected"
+gh api repos/{owner}/{repo}/rulesets 2>/dev/null
+gh api repos/{owner}/{repo}/branches/{branch}/protection 2>/dev/null
+
+# Merge methods the repo allows
+gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed
+
+# Default branch
+gh repo view --json defaultBranchRef -q .defaultBranchRef.name
+```
+
+If `reviewDecision` on a PR comes back `REVIEW_REQUIRED`, merges will not happen. Report it;
+never self-approve or push to the target to route around it.
+
+## The green test
+
+```bash
+gh pr view {n} --json statusCheckRollup,mergeable,mergeStateStatus,reviewDecision
+```
+
+Merge only when every required check has a terminal conclusion, all of them succeeded
+(`SKIPPED`/`NEUTRAL` acceptable only for non-required checks), and `mergeable` is `MERGEABLE`.
+`mergeStateStatus` of `BLOCKED` usually means a required check hasn't reported yet — that is
+a wait, not a failure.
+
+```bash
+gh pr merge {n} --squash --delete-branch      # match the repo's allowed method
+```
