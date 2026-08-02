@@ -91,6 +91,7 @@ If any of these occur, do not fail the overall verify run. Report a non-fatal bl
 - `CODEX_SANDBOX_BLOCKED`
 - `CODEX_REVIEW_FAILED`
 - `CODEX_STILL_RUNNING`
+- `CODEX_USAGE_LIMIT`
 - `PATCH_CONSTRUCTION_FAILED`
 - `SKIPPED_UNSUPPORTED_SCOPE`
 
@@ -101,6 +102,11 @@ historical defect in this skill was declaring failure while Codex was still runn
 Common signals:
 - command not found -> `CODEX_NOT_INSTALLED`
 - login/authentication error -> `CODEX_AUTH_MISSING`
+- a `turn.failed` event whose message contains "You've hit your usage limit" -> `CODEX_USAGE_LIMIT`.
+  This is a **quota** condition, not auth, not network, and not a review failure. Report it as
+  itself and say when the limit resets if Codex states it. Measured: all 10 quota failures in the
+  historical corpus were mislabelled — 4 as `CODEX_AUTH_MISSING`, 3 as `CODEX_REVIEW_FAILED`,
+  2 as `CODEX_NETWORK_BLOCKED` — which made one recurring condition look like three unrelated bugs.
 - websocket/DNS/permission denied network errors -> `CODEX_NETWORK_BLOCKED`
 - inability to create/use temp workspace or run required git commands -> `PATCH_CONSTRUCTION_FAILED`
 - budget expired and `codex.exit` never appeared -> `CODEX_STILL_RUNNING` (see step 3b). Leave the temp workspace in place.
@@ -128,10 +134,20 @@ If any prerequisite is missing, stop and report blocked status.
 
 Use Git commands that preserve the requested scope exactly.
 
-Suggested approach:
 ```bash
 TMP_REVIEW_DIR=$(mktemp -d /tmp/codex-reviewer.XXXXXX)
 ```
+
+> **Read the printed path, then hardcode that literal path into every later Bash call.**
+> Shell state does not survive between Bash calls — `TMP_REVIEW_DIR` is unset in the next one.
+> All three validation runs hit this and each had to improvise.
+>
+> **Do not stash the path in a shared file** (`/tmp/codex-reviewer.current` or similar). Verify
+> runs this skill concurrently with other agents, and a fixed filename is racy: one validation run
+> had its path file clobbered mid-run by a sibling invocation and was silently redirected at
+> another agent's half-built workspace, which it noticed only by hitting that repo's `index.lock`.
+> A wrong-but-plausible workspace is worse than a missing variable — it reviews the wrong diff and
+> reports `COMPLETED`. The literal path is the only safe carrier.
 
 Then create a reviewable repo state matching `SCOPE_METADATA` exactly:
 - for `staged`, create a clean checkout at `HEAD` and apply only the staged patch from `SCOPE_METADATA.diff_command`
@@ -140,6 +156,19 @@ Then create a reviewable repo state matching `SCOPE_METADATA` exactly:
 - for `files` or `module`, apply the exact `SCOPE_METADATA.path_filter`
 
 Never substitute a simpler baseline if reconstruction is ambiguous.
+
+**Mark newly-added files with `git add -N` before running Codex.** Applying a patch and resetting
+leaves files the scope *adds* as untracked, and the step-3 prompt tells Codex to ignore untracked
+files — so an entire new file is silently dropped from the review while the run still reports
+`COMPLETED`. Intent-to-add makes them visible to `git diff` without staging content:
+
+```bash
+git -C "$TMP_REVIEW_DIR/repo" add -N .
+```
+
+Verify the reconstruction before launching: `git -C "$TMP_REVIEW_DIR/repo" diff --stat` must match
+the file count and +/- totals of `SCOPE_METADATA.diff_command`. If it does not, report
+`PATCH_CONSTRUCTION_FAILED` rather than reviewing a partial diff.
 
 The temp workspace must contain ONLY the intended review diff.
 
@@ -199,22 +228,50 @@ Codex takes **~5.5 min median, ~17 min p90**. You will not observe it finish by 
 >
 > A growing `codex-events.jsonl`, a `Monitor` acknowledgement, a completion-shaped sentence in
 > your own previous message, elapsed time, and an empty `ps` are **NOT** completion signals.
+>
+> **Nor is the background-task notification for the step-3 launch itself.** Step 3 backgrounds
+> the `codex exec` call, so the harness *will* deliver a `task-notification` for it. That
+> notification is the single most convincing false signal available to you: it is real, it names
+> your command, and it can arrive mid-wait. It tells you the Bash call ended — not that the
+> review finished, and not that findings are parseable. **Only the marker file counts.**
+>
 > **If you have not observed the marker, you have not observed a failure.**
 
-To wait, issue a second `run_in_background: true` Bash call that exits when the marker appears:
+To wait, issue a **foreground (blocking)** Bash call that returns only once the marker appears:
 
 ```bash
-until [ -f "$TMP_REVIEW_DIR/codex.exit" ]; do sleep 5; done
+timeout 540 bash -c 'until [ -f "/tmp/codex-reviewer.XXXXXX/codex.exit" ]; do sleep 5; done'; echo "waited: $?"
 ```
 
-This yields exactly one completion notification. If you are re-invoked and the marker is still
-absent, re-issue the same wait. Overall budget is `CODEX_REVIEW_TIMEOUT` ms, **default `1800000`
-(30 min)**.
+> **Substitute the literal path — `$TMP_REVIEW_DIR` is NOT set in this shell.** Every Bash call
+> gets a fresh shell, so the variable you assigned in step 3 is gone. Copied verbatim, the command
+> above waits on `/codex.exit`, which never appears: it burns the full budget and then reports a
+> false `CODEX_STILL_RUNNING` on a review that actually succeeded. Paste the real `mktemp` path
+> from step 3 into every later snippet that names `$TMP_REVIEW_DIR`.
 
-**Then stop.** Issue that wait and end your turn. Do not hand-roll `sleep 60 && ls …` polling
-loops alongside it — Codex takes minutes, the notification will arrive, and each impatient poll
-burns a turn without moving the review forward. Checking `pgrep -f codex` once to confirm the
-process is alive is fine; a polling ladder is not.
+Pass the Bash tool a `timeout` of `570000` so the tool cannot cut the shell off first. Exit `0`
+means the marker appeared; exit `124` means this slice elapsed without it.
+
+**On exit `124`, immediately issue the same blocking call again.** One slice is ~9 min because
+the Bash tool caps a foreground call at 600s, while Codex runs ~5.5 min median and ~17 min p90 —
+so a p90 review needs two or three consecutive slices. Keep re-issuing until the marker appears
+or the cumulative wait reaches `CODEX_REVIEW_TIMEOUT` ms, **default `1800000` (30 min)**, which
+is roughly three slices.
+
+> **The launch is backgrounded; the wait is not.** Step 3 starts `codex exec` with
+> `run_in_background: true` — that stays. What must never be backgrounded is *this wait*.
+> Never issue the wait with `run_in_background: true`, and never use the `Monitor` tool for it.
+> This skill runs with `context: fork`. Ending your turn hands control back to the parent, so a
+> backgrounded wait's completion notification has nowhere to arrive — the fork is already gone
+> and the review is abandoned mid-flight. Measured across 315 real runs: 112 (36%) ended exactly
+> this way, **not one** ever observed `codex.exit`, median lifetime 2.1 min against Codex's
+> 5.5 min median — and the parent recorded each abandoned review as a success. Runs that used
+> `Monitor` succeeded 13% of the time; runs that used a blocking wait succeeded 76%.
+> **The wait must block inside your own turn.**
+
+Do not hand-roll `sleep 60 && ls …` polling ladders alongside the blocking wait — each impatient
+poll burns a turn without moving the review forward. Checking `pgrep -f codex` once to confirm
+the process is alive is fine; a polling ladder is not.
 
 **Checking liveness:** use `pgrep -f codex`. Never `ps aux | grep codex | grep -v grep` — `grep`
 is shadowed by a `ugrep` shell function from `~/.claude/shell-snapshots/`, so that idiom reports
