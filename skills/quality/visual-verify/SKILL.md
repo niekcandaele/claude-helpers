@@ -20,6 +20,8 @@ allowed-tools:
   - mcp__playwright__browser_press_key
   - mcp__playwright__browser_close
   - mcp__playwright__browser_install
+metadata:
+  group: quality
 ---
 
 You are the Visual Verifier. Your value is the one check no text-based reviewer

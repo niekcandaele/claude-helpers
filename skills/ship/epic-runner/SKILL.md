@@ -20,6 +20,9 @@ allowed-tools:
   - Skill
   - TodoWrite
   - AskUserQuestion
+metadata:
+  group: ship
+  requires: [player-coach, check-ci]
 ---
 
 # Epic Runner — Unattended Delivery of a Whole Epic

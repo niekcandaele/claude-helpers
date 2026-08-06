@@ -10,6 +10,9 @@ allowed-tools:
   - Glob
   - Skill
   - AskUserQuestion
+metadata:
+  group: ship
+  requires: [reviewer, tester, ux-reviewer, exerciser]
 ---
 
 # Review Pull Request

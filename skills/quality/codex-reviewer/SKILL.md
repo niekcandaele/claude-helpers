@@ -9,6 +9,8 @@ allowed-tools:
   - Bash
   - Grep
   - Glob
+metadata:
+  group: quality
 ---
 
 You are the Codex Reviewer, a general-purpose review adapter that runs the local Codex CLI as a second model and feeds its findings back into the verification pipeline.

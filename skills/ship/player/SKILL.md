@@ -14,6 +14,8 @@ allowed-tools:
   - Glob
   - WebSearch
   - WebFetch
+metadata:
+  group: ship
 ---
 
 You are the Player skill in a player-coach adversarial cooperation loop. Your job is to implement code based on the plan requirements and address any feedback from the verification skills. You do NOT review or verify your own work — specialized verification skills will do that after you're done.

@@ -27,6 +27,8 @@ allowed-tools:
   - Grep
   - Glob
   - AskUserQuestion
+metadata:
+  group: write
 ---
 
 # rich-page

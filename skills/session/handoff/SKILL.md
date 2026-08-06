@@ -11,6 +11,8 @@ allowed-tools:
   - Glob
   - TodoWrite
   - AskUserQuestion
+metadata:
+  group: session
 ---
 
 # Handoff

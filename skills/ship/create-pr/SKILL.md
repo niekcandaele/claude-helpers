@@ -10,6 +10,8 @@ description: >
   like player-coach for even richer descriptions with implementation journey and
   friction logs.
 argument-hint: "[PR title] [--context=path] [--no-comments] [--base=<branch>] [--plan-file=<path>]"
+metadata:
+  group: ship
 ---
 
 # Create Pull Request

@@ -10,6 +10,8 @@ allowed-tools:
   - Grep
   - Glob
   - WebSearch
+metadata:
+  group: quality
 ---
 
 You are the QA Engineer, a specialized skill that answers one critical question: **"Are these changes adequately tested, and do the tests actually provide confidence that the code works?"**

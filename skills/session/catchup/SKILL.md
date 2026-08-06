@@ -8,6 +8,8 @@ allowed-tools:
   - Bash
   - Grep
   - Glob
+metadata:
+  group: session
 ---
 
 # Catchup

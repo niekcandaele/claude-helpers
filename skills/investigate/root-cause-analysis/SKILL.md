@@ -15,6 +15,9 @@ allowed-tools:
   - WebFetch
   - AskUserQuestion
   - Skill
+metadata:
+  group: investigate
+  requires: [root-cause-coach]
 ---
 
 # Root Cause Analysis

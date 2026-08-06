@@ -27,6 +27,9 @@ allowed-tools:
   - Skill
   - Write
   - AskUserQuestion
+metadata:
+  group: investigate
+  optional: [rich-page]
 ---
 
 # research

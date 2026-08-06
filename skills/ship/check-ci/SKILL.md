@@ -8,6 +8,9 @@ allowed-tools:
   - Grep
   - Glob
   - Skill
+metadata:
+  group: ship
+  requires: [debugger]
 ---
 
 # Check CI Status and Investigate Failures

@@ -18,6 +18,9 @@ allowed-tools:
   - TodoWrite
   - AskUserQuestion
   - Skill
+metadata:
+  group: ship
+  requires: [player, verify, create-pr, check-ci]
 ---
 
 # Player-Coach: Adversarial Cooperation Loop

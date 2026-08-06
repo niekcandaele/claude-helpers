@@ -10,6 +10,8 @@ description: >
   to communicate changes to users, stakeholders, or customers — even if they
   just say "write up what changed" or "summarize the release."
 argument-hint: "[v1.2.0..v1.3.0 | #42 #43 #44 | main..release/1.3 | raw change description]"
+metadata:
+  group: write
 ---
 
 # Release Notes Generator

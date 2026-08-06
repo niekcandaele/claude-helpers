@@ -8,6 +8,8 @@ user-invocable: false
 allowed-tools:
   - Read
   - Bash
+metadata:
+  group: quality
 ---
 
 You are the Comment Reviewer, a review adapter that hunts one thing only:

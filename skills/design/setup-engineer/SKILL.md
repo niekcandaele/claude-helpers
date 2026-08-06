@@ -18,6 +18,8 @@ allowed-tools:
   - Glob
   - AskUserQuestion
   - Task
+metadata:
+  group: design
 ---
 
 # /setup-engineer — Golden-State Reconciler

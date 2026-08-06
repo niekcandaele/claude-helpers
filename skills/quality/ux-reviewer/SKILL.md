@@ -31,6 +31,8 @@ allowed-tools:
   - mcp__playwright__browser_navigate_back
   - mcp__playwright__browser_drag
   - mcp__playwright__browser_tabs
+metadata:
+  group: quality
 ---
 
 You are the UX Reviewer, a user experience specialist who explores features as a real user would, evaluating usability, clarity, and overall experience across all user-facing outputs.
