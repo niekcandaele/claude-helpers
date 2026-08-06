@@ -52,11 +52,10 @@ litter the working tree. Confirm the file exists and stop if it doesn't; a calle
 a path expects that exact plan, so silently falling back to a different one would implement
 the wrong thing.
 
-**Otherwise, discover it** — check whichever directory your harness writes plans
-to, and `docs/plans/`:
+**Otherwise, discover it** — check your harness's plan directory, then the repo's:
 
 ```bash
-ls docs/plans/*.md 2>/dev/null | head -5
+ls .claude/plans/*.md docs/plans/*.md 2>/dev/null | head -5
 ```
 
 If no plan exists, tell the user:

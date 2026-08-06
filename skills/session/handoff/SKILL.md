@@ -23,6 +23,11 @@ Auto-generate a comprehensive handoff document that captures current work state,
 
 The document is written to the repository root by default, so it is next to the work it describes and you can commit it if you want to. Pass a path to put it anywhere else.
 
+Because it lands in the working tree, it will show as untracked — which means a
+subsequent `/verify` may pull it into review scope and `/create-pr` may stage it.
+If you do not want to commit handoffs, add `handoff-*.md` to the repo's
+`.gitignore`, or pass a path outside the repository.
+
 ## Input
 
 - `$ARGUMENTS` (optional): Custom filename or path, without extension
@@ -312,18 +317,28 @@ Determine filename:
 
 ```bash
 OUTPUT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+TARGET="${ARGUMENTS%.md}"
 
-if [ -z "$ARGUMENTS" ]; then
-  TIMESTAMP=$(date +%Y-%m-%d-%H%M)
-  FILENAME="$OUTPUT_DIR/handoff-$TIMESTAMP.md"
-elif [ "$ARGUMENTS" != "${ARGUMENTS#*/}" ] || [ "$ARGUMENTS" != "${ARGUMENTS#\~}" ]; then
-  # Argument looks like a path — honour it as given
-  FILENAME="${ARGUMENTS%.md}.md"
+if [ -z "$TARGET" ]; then
+  FILENAME="$OUTPUT_DIR/handoff-$(date +%Y-%m-%d-%H%M).md"
+elif [ "$TARGET" != "${TARGET#*/}" ] || [ "$TARGET" != "${TARGET#\~}" ]; then
+  # Looks like a path. Expand a leading ~ ourselves — parameter expansion never
+  # tilde-expands, so quoting the result would otherwise create a literal ~ dir.
+  case "$TARGET" in
+    "~"|"~/"*) TARGET="$HOME${TARGET#\~}" ;;
+  esac
+  case "$TARGET" in
+    /*) FILENAME="$TARGET.md" ;;
+    *)  FILENAME="$OUTPUT_DIR/$TARGET.md" ;;   # relative paths anchor to the repo
+  esac
 else
-  # Bare name: sanitize and place it in the repo root
-  CLEAN_NAME=$(echo "$ARGUMENTS" | tr ' ' '-' | tr -cd 'a-zA-Z0-9-_')
+  # Bare name: sanitize, but never sanitize it down to nothing
+  CLEAN_NAME=$(echo "$TARGET" | tr ' ' '-' | tr -cd 'a-zA-Z0-9-_')
+  [ -z "$CLEAN_NAME" ] && CLEAN_NAME="handoff-$(date +%Y-%m-%d-%H%M)"
   FILENAME="$OUTPUT_DIR/$CLEAN_NAME.md"
 fi
+
+mkdir -p "$(dirname "$FILENAME")"
 ```
 
 Write the handoff document to the file using the Write tool.
@@ -476,3 +491,7 @@ Preserve ephemeral context:
 7. **Fast**: Generate in under 10 seconds for typical branches
 
 The goal is making it effortless to pause complex work and resume later with full context intact.
+
+---
+
+*Originally derived from [mattpocock/skills](https://github.com/mattpocock/skills), MIT © 2026 Matt Pocock. Keep this line if you copy this file.*

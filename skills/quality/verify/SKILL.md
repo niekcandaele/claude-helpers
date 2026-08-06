@@ -139,18 +139,28 @@ SCOPE_METADATA:
 ## Phase 2: Load Engineer Skill
 
 Many repositories carry an **engineer skill** — a `<repo>-engineer` skill that
-documents how to build, test, and run that specific repository. Your harness has
-already loaded the skills available in this session; look for one whose name ends
-in `-engineer`.
+documents how to build, test, and run that specific repository. Find it two ways,
+in this order:
+
+1. Look among the skills available in this session for one whose name ends in
+   `-engineer`. This is the reliable check for whether one exists.
+2. Locate its directory on disk, because later phases must hand sub-agents a real
+   path — a sub-agent cannot resolve a skill by name, and most harnesses expose
+   names rather than paths:
+
+```bash
+ls -d .*/skills/*-engineer/ */skills/*-engineer/ 2>/dev/null | grep -v '^\.\./'
+```
 
 **If one is available:**
 - Read its SKILL.md
 - Read key reference files it points to (TESTING.md, architecture docs, etc.)
 - Extract: test commands, build commands, linter commands, architecture notes
 - Store as `ENGINEER_CONTEXT` — this is pre-verified knowledge from `/setup-engineer`
-- Resolve the directory it lives in and store it as `ENGINEER_SKILL_DIR`. Later
-  phases hand that path to sub-agents so they can read the reference files
-  directly; a sub-agent cannot resolve the skill by name the way you can.
+- Store the directory from step 2 as `ENGINEER_SKILL_DIR`. If the skill is loaded
+  but the glob found nothing (it lives outside the repository), say so in the
+  report and leave `ENGINEER_SKILL_DIR` empty — sub-agents then fall back to the
+  summary in `ENGINEER_CONTEXT` instead of reading the files themselves.
 - Check for `VERIFICATION.md` in the same skill directory — if it exists, read it and store as `CUSTOM_GATES`
   - Extract **Exerciser Gates** → will be passed to exerciser in Phase 7c
   - Extract **Review Gates** → will be passed to review agents in Phase 5/6
@@ -407,8 +417,8 @@ exists before reporting it, and close the report with the net-lines metric.
 **codex-reviewer:**
 ```
 Run the local Codex CLI as an independent second-opinion reviewer.
-Use `codex review` via Bash — the point is a second engine's opinion, not your own analysis again.
-`codex review` is long-running: run it as a detached background command (no short Bash timeout) and poll for completion, honoring `CODEX_REVIEW_TIMEOUT` (default 30 min), so larger changes are not killed mid-review.
+Shell out to the local Codex CLI — the point is a second engine's opinion, not your own analysis again.
+Follow the codex-reviewer skill's own execution procedure exactly; it owns the invocation, the completion detection, and the timeout. Do not substitute your own — this prompt is scope and context, not a runbook.
 Use `SCOPE_METADATA` as the source of truth for scope reconstruction.
 Adapt the verify scope into a temporary diff-only workspace under /tmp so Codex reviews only the intended changes.
 Do NOT infer staged vs unstaged vs branch vs path-filtered scope from assigned files or prose if `SCOPE_METADATA` says otherwise.

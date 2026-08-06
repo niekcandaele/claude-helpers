@@ -7,12 +7,28 @@ driving a ticket to a merged PR, chasing down a root cause, arguing with a plan
 before writing any of it.
 
 ```bash
-npx skills add niekcandaele/skills
+npx skills add niekcandaele/skills --list   # see what's here
+npx skills add niekcandaele/skills          # pick what you want
 ```
 
-That lists everything and lets you pick. Take one skill, take the lot, or copy
-the files straight into your own repo and edit them — that last one is
-encouraged. This is shared, not published-and-defended.
+Take one skill, take the lot, or copy the files straight into your own repo and
+edit them — that last one is encouraged. This is shared, not published-and-defended.
+
+## What using one looks like
+
+Skills are invoked by name. Once installed, ask for one directly:
+
+```
+/verify --scope=branch
+```
+
+`verify` then works out what changed, hands each reviewer the files it cares
+about, runs them, and hands back one deduplicated report with severities — rather
+than eight separate opinions you have to reconcile yourself. Most skills are that
+shape: one command, a lot of machinery behind it, one answer.
+
+Others are conversational. `/grill-me` interrogates a plan until it stops being
+vague. `/wait-what` just tells you the last thing you said didn't land.
 
 ## What's in here
 
@@ -35,18 +51,29 @@ encouraged. This is shared, not published-and-defended.
 **Write** — turning work into something a human wants to read.
 `technical-writer` `writing-for-agents` `release-notes` `rich-page` `wizard`
 
-## These are opinionated, and some of them are coupled
+## Some of these only work together
 
-The groups above are for browsing. They are **not** install bundles.
+The groups above are for browsing. They are **not** install bundles — coupling
+crosses group boundaries.
 
-Plenty of these stand alone — `reviewer`, `debugger`, `technical-writer` and
-`wizard` need nothing else. But several are deliberately built to work together:
-`verify` fans out to nine reviewer skills, and `player-coach` drives `player`,
-`verify`, `create-pr` and `check-ci` in a loop. Installing one half of that gets
-you a skill that calls something that isn't there.
+Seven skills call others and will not work alone:
 
-Every skill that depends on another declares it in its frontmatter, so you can
-check before installing:
+| Skill | Needs |
+|---|---|
+| `verify` | `reviewer` `codex-reviewer` `comment-review` `qa` `tester` `ux-reviewer` `visual-verify` `static-analysis` `exerciser` `debugger` |
+| `player-coach` | `player` `verify` `create-pr` `check-ci` (and everything `verify` needs) |
+| `review-pr` | `reviewer` `tester` `ux-reviewer` `exerciser` |
+| `epic-runner` | `player-coach` `check-ci` (and everything they need) |
+| `check-ci` | `debugger` |
+| `root-cause-analysis` | `root-cause-coach` |
+| `research` | `rich-page`, but only in `--deep` mode |
+
+Note `check-ci` — it looks self-contained sitting in the Ship list, and it isn't.
+Everything not in that table stands alone: `reviewer`, `debugger`,
+`technical-writer`, `wizard`, `catchup` and the rest need nothing else.
+
+Each of these declares its dependencies in frontmatter, so you can check any skill
+before installing it:
 
 ```yaml
 metadata:
@@ -54,30 +81,37 @@ metadata:
   requires: [player, verify, create-pr, check-ci]
 ```
 
-They also encode a particular way of working — adversarial review, evidence
-before conclusions, a real end-to-end exercise before calling something done. If
-that doesn't match how you work, edit them. They're prompts.
+They also encode a particular way of working — adversarial review, evidence before
+conclusions, a real end-to-end exercise before calling something done. If that
+doesn't match how you work, edit them. They're prompts.
 
 ## Harnesses
 
-Nothing here assumes a specific agent runtime. Where a skill needs a real
-capability — spawning sub-agents, running background commands — it says so and
-names a concrete binding as an example.
+The prose in these skills assumes no specific agent runtime. Where a skill needs a
+real capability — spawning sub-agents, running background commands — it says so
+and names a concrete binding as an example rather than depending on it.
 
-Some skills ask more of a harness than others. `verify` and `epic-runner` are
-much faster somewhere that runs sub-agents in parallel, though both document
-what to do when that isn't available. `codex-reviewer` shells out to the Codex
-CLI and needs it installed. The rest are files and shell commands.
+Frontmatter is a different matter: keys like `allowed-tools`, `context` and
+`argument-hint` are each harness's own interface, and the tool names inside them
+are specific. Harnesses ignore keys they don't recognize, so this costs you
+nothing, but it does mean the files aren't runtime-agnostic all the way down.
+
+Some skills also ask more than others. `verify` and `epic-runner` are much faster
+where sub-agents run in parallel, though both document what to do when they can't.
+`codex-reviewer` shells out to the Codex CLI and needs it installed.
 
 ## Development
 
 ```bash
 just validate    # layout, frontmatter, groupings, declared dependencies
 just structure   # show the tree
-just test        # local testing instructions
+just try --list  # install from this checkout to try it
 ```
+
+`just validate` needs `python3` with `pyyaml`, plus `jq`. It runs in CI on every
+pull request.
 
 See [AGENTS.md](./AGENTS.md) for the house rules, [CONTEXT.md](./CONTEXT.md) for
 what the words mean, and [NOTICE.md](./NOTICE.md) for what came from where.
 
-MIT licensed.
+[MIT licensed](./LICENSE) — including the parts that came from elsewhere.

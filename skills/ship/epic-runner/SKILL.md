@@ -22,7 +22,7 @@ allowed-tools:
   - AskUserQuestion
 metadata:
   group: ship
-  requires: [player-coach, check-ci]
+  requires: [player-coach, check-ci, verify]
 ---
 
 # Epic Runner — Unattended Delivery of a Whole Epic

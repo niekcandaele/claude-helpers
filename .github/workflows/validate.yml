@@ -1,0 +1,35 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install pyyaml
+
+      - name: Validate the skills tree
+        run: python3 scripts/validate.py
+
+      # The real contract is what an installing user gets. A skill whose
+      # frontmatter cannot be parsed is skipped silently, so a clean install
+      # must produce no warnings at all.
+      - name: Install as a consumer would
+        run: |
+          set -euo pipefail
+          output=$(npx -y skills@latest add . --list 2>&1)
+          echo "$output"
+          if echo "$output" | grep -qiE '⚠|skipped'; then
+            echo "::error::the skills CLI reported a warning — a skill is being skipped"
+            exit 1
+          fi
+          echo "$output" | grep -q "Found 32 skills"

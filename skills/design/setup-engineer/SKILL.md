@@ -80,7 +80,7 @@ ls scripts/ 2>/dev/null
 # Existing command surface
 ls justfile Justfile Makefile 2>/dev/null
 # Existing engineer skill — check wherever this repo keeps skills
-ls -d .agents/skills/*-engineer/ .*/skills/*-engineer/ 2>/dev/null
+ls -d */skills/*-engineer/ .*/skills/*-engineer/ 2>/dev/null | grep -v '^\.\./'
 # CI
 ls .github/workflows/ .gitlab-ci.yml 2>/dev/null
 ```

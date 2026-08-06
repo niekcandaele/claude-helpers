@@ -1,8 +1,14 @@
 # The Per-Repo Engineer Skill
 
-Every golden repo carries a `<repo>-engineer` skill. Write it to
-`.agents/skills/<repo>-engineer/` — the harness-neutral location — unless the repo
-already keeps skills somewhere else, in which case follow what is already there.
+Every golden repo carries a `<repo>-engineer` skill. Write it **where this repo's
+harness already looks for skills** — that is the only location that makes it
+loadable, and a skill nothing loads helps nobody:
+
+1. If the repo already has a skills directory (`.claude/skills/`, `.agents/skills/`,
+   `.codex/skills/`, …), use it. This is the common case and needs no decision.
+2. If it has none, default to `.agents/skills/<repo>-engineer/` and **tell the user
+   which directory their harness reads**, so they can symlink or move it if the
+   default is not it. Do not silently write somewhere nothing loads from.
 Its job is **orientation**, not command storage. Now that commands live in the CLI and `just`, the
 skill gets thinner and sharper: it explains *why* the repo is shaped the way it is and *where*
 the sharp edges are, then points at the executable surface for the *how*.

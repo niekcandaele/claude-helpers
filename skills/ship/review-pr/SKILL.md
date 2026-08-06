@@ -187,7 +187,7 @@ Exception: You MAY flag issues in old code IF:
 [Skill-specific instructions follow...]
 ```
 
-Use the same agent invocation patterns as `/verify` — see `skills/verify/SKILL.md` for the detailed prompt templates per agent.
+Use the same agent invocation patterns as `/verify` — see `skills/quality/verify/SKILL.md` for the detailed prompt templates per agent.
 
 ### 9. Generate Combined Report
 

@@ -123,3 +123,7 @@ So after presenting findings (standard) or handing off the artifacts (deep): don
 ## Reference files
 
 - `references/methodology.md` — source-quality hierarchy, verification practices, citation format, red flags, and the report structure. Read it before researching; point every sub-agent at it in deep mode.
+
+---
+
+*Originally derived from [mattpocock/skills](https://github.com/mattpocock/skills), MIT © 2026 Matt Pocock. Keep this line if you copy this file.*

@@ -30,8 +30,11 @@ _Avoid_: project skill, repo skill, local skill
 
 ## Relationships
 
-- A **Suite** contains two or more **Skills**; a **Skill** belongs to at most one **Suite**
-- A **Skill** that is not in a **Suite** is **Standalone**
+- A **Suite** contains two or more **Skills**; a **Skill** may belong to several
+  (`tester` is required by both the verify and review-pr suites)
+- A **Skill** required by no other **Skill**, and requiring none, is **Standalone**
+- A **Suite** may itself be a member of another **Suite** (`verify` is a suite, and
+  `player-coach` requires it)
 - Several **Skills** read the **Engineer skill** of the repository they run against
 - A **Skill** is **Harness-neutral** or it names the **Harness** it requires
 
