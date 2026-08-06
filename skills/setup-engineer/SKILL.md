@@ -1,6 +1,13 @@
 ---
 name: setup-engineer
-description: Reconcile this repository toward the opinionated "golden state" for agentic local development — a per-repo dev CLI, a thin justfile surface, a generated port-offset env contract, a four-file engineer skill, thin CI, and a doctor invariant-enforcer. Run /setup-engineer whenever you want to set up, audit, or repair a repo's local-dev tooling: a fresh repo with nothing, a half-built repo with organic scripts that needs consolidating, or a finished repo you just want to verify still conforms.
+description: >-
+  Reconcile this repository toward the opinionated "golden state" for agentic
+  local development — a per-repo dev CLI, a thin justfile surface, a generated
+  port-offset env contract, a four-file engineer skill, thin CI, and a doctor
+  invariant-enforcer. Run /setup-engineer whenever you want to set up, audit, or
+  repair a repo's local-dev tooling: a fresh repo with nothing, a half-built repo
+  with organic scripts that needs consolidating, or a finished repo you just want
+  to verify still conforms.
 disable-model-invocation: true
 allowed-tools:
   - Read
