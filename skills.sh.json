@@ -1,0 +1,71 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Quality",
+      "description": "Reviewing code and proving it works. The verify pipeline and every reviewer it fans out to.",
+      "skills": [
+        "verify",
+        "reviewer",
+        "codex-reviewer",
+        "comment-review",
+        "qa",
+        "ux-reviewer",
+        "visual-verify",
+        "static-analysis",
+        "tester",
+        "exerciser"
+      ]
+    },
+    {
+      "title": "Ship",
+      "description": "Getting work from a ticket to a merged pull request.",
+      "skills": [
+        "epic-runner",
+        "player-coach",
+        "player",
+        "create-pr",
+        "review-pr",
+        "check-ci"
+      ]
+    },
+    {
+      "title": "Investigate",
+      "description": "Finding out what is actually going on, before changing anything.",
+      "skills": [
+        "debugger",
+        "root-cause-analysis",
+        "root-cause-coach",
+        "research",
+        "wait-what"
+      ]
+    },
+    {
+      "title": "Design",
+      "description": "Sharpening a plan, a domain language, or a repository's shape before code gets written.",
+      "skills": [
+        "grill-me",
+        "ubiquitous-language",
+        "improve-codebase-architecture",
+        "setup-engineer"
+      ]
+    },
+    {
+      "title": "Session",
+      "description": "Carrying context between sessions and between agents.",
+      "skills": ["catchup", "handoff"]
+    },
+    {
+      "title": "Write",
+      "description": "Turning work into something a human wants to read.",
+      "skills": [
+        "technical-writer",
+        "writing-for-agents",
+        "release-notes",
+        "rich-page",
+        "wizard"
+      ]
+    }
+  ]
+}
