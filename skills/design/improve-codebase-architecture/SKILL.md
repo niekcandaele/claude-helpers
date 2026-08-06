@@ -41,7 +41,7 @@ Read existing documentation first:
 
 If any of these files don't exist, proceed silently — don't flag their absence or suggest creating them upfront.
 
-Then use the Agent tool with `subagent_type=Explore` to walk the codebase. Don't follow rigid heuristics — explore organically and note where you experience friction:
+Then send a read-only exploration sub-agent to walk the codebase (on Claude Code, the `Explore` agent type). Don't follow rigid heuristics — explore organically and note where you experience friction:
 
 - Where does understanding one concept require bouncing between many small modules?
 - Where are modules **shallow** — interface nearly as complex as the implementation?

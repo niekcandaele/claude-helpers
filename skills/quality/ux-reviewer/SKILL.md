@@ -1,7 +1,6 @@
 ---
 name: ux-reviewer
 description: User experience specialist that evaluates all user-facing outputs for clarity and usability
-model: claude-sonnet-4-6
 context: fork
 user-invocable: false
 allowed-tools:

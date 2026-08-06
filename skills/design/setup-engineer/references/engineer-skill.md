@@ -1,7 +1,9 @@
 # The Per-Repo Engineer Skill
 
-Every golden repo carries a `<repo>-engineer` skill at `.claude/skills/<repo>-engineer/`. Its
-job is **orientation**, not command storage. Now that commands live in the CLI and `just`, the
+Every golden repo carries a `<repo>-engineer` skill. Write it to
+`.agents/skills/<repo>-engineer/` — the harness-neutral location — unless the repo
+already keeps skills somewhere else, in which case follow what is already there.
+Its job is **orientation**, not command storage. Now that commands live in the CLI and `just`, the
 skill gets thinner and sharper: it explains *why* the repo is shaped the way it is and *where*
 the sharp edges are, then points at the executable surface for the *how*.
 
@@ -14,7 +16,7 @@ Every repo gets at least these four. A repo may add detail files (e.g. a `MODULE
 drop below the floor.
 
 ```
-.claude/skills/<repo>-engineer/
+.agents/skills/<repo>-engineer/
   SKILL.md         entry: what this repo is (1 paragraph) · the verb surface (→ `just --list`)
                    · golden-state invariants summary · the two behavioral laws
                    · a quick-reference table linking to the detail docs

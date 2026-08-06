@@ -77,12 +77,12 @@ Skip the pause only if the user already said "just go" / "don't ask" / "deep res
 
 ### Phase 2 — Parallel fan-out
 
-Spawn **one sub-agent per branch, capped at 5** (if recon produced more than 5 branches, merge the closest ones first). Launch them **in a single message** (multiple Agent calls in one block) so they run concurrently.
+Spawn **one sub-agent per branch, capped at 5** (if recon produced more than 5 branches, merge the closest ones first). Launch them concurrently if your harness allows it — on Claude Code, multiple Agent calls in a single message. If it does not, run them in sequence; the research is just as good, it only takes longer.
 
-Use `subagent_type: general-purpose` (it has WebSearch/WebFetch and can read the methodology file). Each agent's prompt must contain:
+Each sub-agent needs web search and web fetch (on Claude Code, `subagent_type: general-purpose`). Each agent's prompt must contain:
 
 - **The branch question** and a one-line scope boundary ("only cover X; another agent handles Y").
-- **This instruction, verbatim:** *"Read `/home/catalysm/code/skills/skills/research/references/methodology.md` and follow its source-quality, verification, and citation standards. Return a branch mini-report in the report structure it defines."* (Adjust the path if the skill lives elsewhere — resolve it from this file's location.)
+- **This instruction, with the path resolved:** *"Read `references/methodology.md` from this skill's directory and follow its source-quality, verification, and citation standards. Return a branch mini-report in the report structure it defines."* Substitute the real absolute path before sending — a sub-agent has no way to resolve a path relative to a skill it was not given.
 - **The overall research question** for context, so the branch stays relevant to the user's actual goal.
 - **What to return:** the mini-report as its final message — cited findings, confidence levels, and an explicit note on anything it couldn't verify. Tell it not to implement anything or edit files; it only researches and reports.
 

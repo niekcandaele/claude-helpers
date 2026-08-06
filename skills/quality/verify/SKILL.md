@@ -37,7 +37,7 @@ Parse `$ARGUMENTS` for:
 
 **Other Options:**
 - `--skip-ux`: Skip UX review for pure backend changes
-- `--skip-visual`: Skip visual review for changes the human has already eyeballed (e.g. copy-only). Visual review is also auto-skipped when `visual-verify` is not present in the available skills (defensive — it ships as a global skill; a project can override it with its own `.claude/skills/visual-verify/`).
+- `--skip-visual`: Skip visual review for changes the human has already eyeballed (e.g. copy-only). Visual review is also auto-skipped when `visual-verify` is not among the available skills (defensive — it is normally installed globally, and a project may shadow it with its own copy to customize capture conventions).
 - `--auto-fix-threshold=N`: Minimum severity for auto-fix mode (default: 3)
 - `--plan-file=<path>`: Explicit path to a plan file for completeness checking. If not provided, discover the plan from context — check if a plan is visible in conversation history (e.g., invoked from player-coach which read a plan, or a plan was created/discussed earlier in this session). If a plan is found from either source, resolve its contents for the plan completeness check in Phase 6.
 
@@ -138,30 +138,34 @@ SCOPE_METADATA:
 
 ## Phase 2: Load Engineer Skill
 
-Check if the project has a pre-configured engineer skill:
+Many repositories carry an **engineer skill** — a `<repo>-engineer` skill that
+documents how to build, test, and run that specific repository. Your harness has
+already loaded the skills available in this session; look for one whose name ends
+in `-engineer`.
 
-```bash
-ls .claude/skills/*-engineer/SKILL.md 2>/dev/null
-```
-
-**If found:**
-- Read the engineer SKILL.md
+**If one is available:**
+- Read its SKILL.md
 - Read key reference files it points to (TESTING.md, architecture docs, etc.)
 - Extract: test commands, build commands, linter commands, architecture notes
 - Store as `ENGINEER_CONTEXT` — this is pre-verified knowledge from `/setup-engineer`
+- Resolve the directory it lives in and store it as `ENGINEER_SKILL_DIR`. Later
+  phases hand that path to sub-agents so they can read the reference files
+  directly; a sub-agent cannot resolve the skill by name the way you can.
 - Check for `VERIFICATION.md` in the same skill directory — if it exists, read it and store as `CUSTOM_GATES`
   - Extract **Exerciser Gates** → will be passed to exerciser in Phase 7c
   - Extract **Review Gates** → will be passed to review agents in Phase 5/6
 - The discovery phase (Phase 3) will validate these commands and only discover what's missing
 
-**If not found:**
+**If there is no engineer skill:**
 - `ENGINEER_CONTEXT` is empty
 - `CUSTOM_GATES` is empty
+- `ENGINEER_SKILL_DIR` is empty
 - The discovery phase will do full discovery from scratch
 
 ## Phase 3: Discovery & Triage
 
-Launch ONE `Explore` agent (fast, read-only) with two jobs in a single prompt:
+Launch ONE fast, read-only exploration sub-agent with two jobs in a single prompt.
+(On Claude Code that is the `Explore` agent type; any read-only sub-agent will do.)
 
 ### Job A: Discover Project Toolchain
 
@@ -259,13 +263,13 @@ Output a JSON-like mapping:
 - `--skip-ux` → `ux-reviewer` is skipped.
 - `--skip-visual` → `visual-verify` is skipped. Use this when you have already eyeballed the rendered change in a browser and want to suppress the duplicate review. Visual review is the design-quality gate, not just a bug check — it asks "would a designer ship this?"
 
-`visual-verify` is also skipped if it is not present in the available skills list (defensive — it ships as a global skill and is normally always present; a project may shadow it with its own `.claude/skills/visual-verify/` to customize capture conventions).
+`visual-verify` is also skipped if it is not among the available skills (defensive — it is normally installed globally and always present; a project may shadow it with its own copy to customize capture conventions).
 
 **Output:** Store the skill assignments and gating decisions as `TRIAGE_RESULT` and toolchain commands as `TOOLCHAIN`.
 
 ## Phase 4: Static Analysis
 
-Invoke `static-analysis` (haiku model) with:
+Invoke `static-analysis` (a fast, cheap model is enough — it runs commands and reports output) with:
 - The scoped file list from Phase 1
 - The linter/type-checker commands discovered in Phase 3
 
@@ -297,7 +301,7 @@ SCOPE METADATA:
 
 ENGINEER SKILL SUMMARY:
 {Brief summary from ENGINEER_CONTEXT, or "No engineer skill found — toolchain discovered via exploration"}
-{If engineer skill exists: "Reference files available at .claude/skills/{name}/ — read TESTING.md, ARCHITECTURE.md etc. for your domain"}
+{If engineer skill exists: "Reference files available at {ENGINEER_SKILL_DIR} — read TESTING.md, ARCHITECTURE.md etc. for your domain"}
 
 STATIC ANALYSIS SUMMARY:
 {STATIC_SUMMARY from Phase 4 — just the findings table, not raw output}
@@ -320,16 +324,29 @@ DIFF STAT:
 
 ## Phase 6: Launch Review Skills (Parallel)
 
-Invoke the applicable review skills **in parallel** — a single message with multiple Skill tool calls.
+Invoke the applicable review skills **in parallel** — on Claude Code, a single
+message with multiple Skill tool calls.
+
+**If your harness cannot run skills concurrently**, run them one at a time in the
+order listed below and concatenate their reports before Phase 7. The pipeline is
+correct either way; it is only slower. Do not drop skills to save time — the
+report's value comes from the combination.
 
 **Always run, every time:** `reviewer`, `codex-reviewer`, `comment-review`, `qa`, `tester`. Triage focuses these with file assignments but never suppresses them — for correctness-facing review, a missed regression costs more than an extra skill run.
 
 **Run if triage says they apply:** `ux-reviewer`, `visual-verify` (see Phase 3 Job B gating). `--skip-ux` / `--skip-visual` override triage and force a skip.
 
-**Model routing is handled by skill frontmatter (models are pinned to explicit versions so they don't silently upgrade):**
-- claude-opus-4-8: reviewer (comprehensive review: design, architecture, coherence, hardening, security, over-engineering)
-- claude-sonnet-4-6: codex-reviewer, comment-review, qa, ux-reviewer, exerciser, visual-verify
-- claude-haiku-4-5: tester, static-analysis
+**Model routing is the harness's call.** No skill pins a model — the right one
+depends on how gnarly the change is, and only the orchestrator knows that. What
+each skill needs, as a rough cost signal:
+
+- **Most capable model** — `reviewer`. Comprehensive review across design,
+  architecture, coherence, hardening, security, and over-engineering. This is the
+  one that benefits most from raw capability.
+- **General-purpose model** — `codex-reviewer`, `comment-review`, `qa`,
+  `ux-reviewer`, `exerciser`, `visual-verify`. Judgment calls, but bounded ones.
+- **Fast, cheap model** — `tester`, `static-analysis`. These run commands and
+  report what came back; they are not asked to reason about the result.
 
 **Each skill prompt includes:**
 1. The `CONTEXT_BUNDLE` from Phase 5
@@ -355,7 +372,7 @@ RELEVANT STATIC FINDINGS:
 
 {If engineer skill exists:}
 ENGINEER SKILL REFERENCE:
-Reference files are available at .claude/skills/{engineer-skill-name}/
+Reference files are available at {ENGINEER_SKILL_DIR}
 Read files relevant to your domain (e.g., TESTING.md for tester, architecture docs for reviewer).
 
 {Skill-specific instructions...}
@@ -390,7 +407,7 @@ exists before reporting it, and close the report with the net-lines metric.
 **codex-reviewer:**
 ```
 Run the local Codex CLI as an independent second-opinion reviewer.
-Use `codex review` via Bash, not Claude's native analysis alone.
+Use `codex review` via Bash — the point is a second engine's opinion, not your own analysis again.
 `codex review` is long-running: run it as a detached background command (no short Bash timeout) and poll for completion, honoring `CODEX_REVIEW_TIMEOUT` (default 30 min), so larger changes are not killed mid-review.
 Use `SCOPE_METADATA` as the source of truth for scope reconstruction.
 Adapt the verify scope into a temporary diff-only workspace under /tmp so Codex reviews only the intended changes.
@@ -456,7 +473,7 @@ This check runs in parallel with the review skills above. It has no dependency o
 
 **If a plan was resolved** (via `--plan-file` flag or discovered from conversation context):
 
-Invoke a general-purpose agent (sonnet) with:
+Invoke a general-purpose agent with:
 
 ```
 PLAN FILE:
@@ -539,12 +556,12 @@ If failures are unrelated to scope, note that explicitly.
 
 Runs **after** the Phase 6 reviews, not in parallel with them — it needs the collected issue list as input.
 
-Invoke `exerciser` (sonnet) with:
+Invoke `exerciser` with:
 ```
 {CONTEXT_BUNDLE}
 
 Exercise the changes end-to-end:
-1. Read the engineer skill (.claude/skills/*-engineer/) if it exists — follow its instructions for starting the environment, authenticating, and interacting with services
+1. Read the engineer skill at {ENGINEER_SKILL_DIR} if one was found — follow its instructions for starting the environment, authenticating, and interacting with services
 2. Start the full local environment (app + all backing services)
 3. Determine exercise strategy based on change type:
    - Frontend/UI changes → use Playwright to navigate and interact

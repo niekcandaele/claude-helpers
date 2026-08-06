@@ -1,7 +1,6 @@
 ---
 name: reviewer
 description: Comprehensive code reviewer combining design review, architecture, coherence, hardening, and security analysis
-model: claude-opus-4-8
 context: fork
 user-invocable: false
 allowed-tools:
@@ -62,7 +61,7 @@ Detection checklist:
 | Test suite integrity | `.skip`, `.only`, `xit`, commented-out assertions, `expect(true).toBe(true)`, empty catch in tests |
 | Dependency hygiene | Added but unused deps, removed features still have deps, dev deps in prod, "just in case" deps |
 | Legacy/dead code | Replaced functions not deleted, commented-out blocks, orphaned imports/configs/tests, stale TODOs now resolvable |
-| Documentation sync | README, CLAUDE.md, API docs, `.claude/agents/*.md`, `.claude/commands/*.md` match current behavior |
+| Documentation sync | README, AGENTS.md / CLAUDE.md, API docs, and any agent instruction files match current behavior |
 | AI slop — code | Generic names (`result`, `data`, `temp`, `handler`, `manager`), obvious comments, over-defensive null checks, verbose trace logging, copy-paste tutorial code |
 | AI slop — docs | **Bold bullet epidemic** (`- **Term:** description`), overused phrases (Furthermore/Moreover/Leverage/Utilize/Seamless/Robust/Comprehensive), rigid section templates |
 
@@ -154,7 +153,7 @@ Detection checklist:
 | Reinvented wheels | Helper functions that already exist elsewhere, custom implementations when a library is already used, duplicate validation/formatting/transformation logic |
 | Pattern violations | Different error handling, different logging approach, different API call patterns, different test structure than the rest of the codebase |
 | Convention mismatches | Different naming style, file organization, import/export patterns, comment styles than similar code |
-| Stale AI tooling | Agent descriptions describing outdated behavior, skill definitions referencing removed features, CLAUDE.md conventions not followed in code |
+| Stale AI tooling | Agent descriptions describing outdated behavior, skill definitions referencing removed features, documented agent conventions not followed in code |
 | Documentation drift | README setup steps that don't work, ADRs that describe reversed decisions, API docs with wrong parameters |
 | Placeholder artifacts | `// TODO:` left behind, empty function bodies, unimplemented method throws in production paths, stub implementations |
 | Dead/orphaned code | New files not imported anywhere, functions never called, exports nothing imports, unreachable code after return/throw |
@@ -267,7 +266,7 @@ Do this once before evaluating changes. Consolidate discovery.
 ```bash
 # Project layout and layers
 find . -maxdepth 3 -type d | grep -v node_modules | grep -v .git | grep -v __pycache__ | sort
-find . -name "CLAUDE.md" -o -name "README.md" -o -name "ARCHITECTURE*" 2>/dev/null | grep -v node_modules | xargs cat 2>/dev/null | head -150
+find . \( -name "AGENTS.md" -o -name "CLAUDE.md" -o -name "README.md" -o -name "ARCHITECTURE*" \) 2>/dev/null | grep -v node_modules | xargs cat 2>/dev/null | head -150
 
 # Module structure — handlers, services, repos, utils
 find . \( -name "*handler*" -o -name "*controller*" -o -name "*service*" -o -name "*repository*" -o -name "*util*" -o -name "*helper*" \) 2>/dev/null | grep -v node_modules | grep -v .git | head -40
@@ -294,7 +293,7 @@ grep -r "validate\|sanitize\|zod\|joi\|yup" --include="*.ts" --include="*.js" . 
 find . -path "*/docs/design/*/design.md" 2>/dev/null | head -5 | xargs cat 2>/dev/null
 
 # AI tooling definitions
-find .claude -name "*.md" 2>/dev/null | head -30
+find . -maxdepth 2 \( -name "AGENTS.md" -o -name "CLAUDE.md" \) 2>/dev/null | head -30
 
 # Existing utilities (coherence — reinvented wheels check)
 find . \( -name "*util*" -o -name "*helper*" -o -name "*common*" \) 2>/dev/null | grep -v node_modules | head -20

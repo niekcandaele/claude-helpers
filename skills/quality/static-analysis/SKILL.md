@@ -1,7 +1,6 @@
 ---
 name: static-analysis
 description: Static analysis runner that executes pre-discovered linter and type-checker commands on scoped files and reports findings
-model: claude-haiku-4-5
 context: fork
 user-invocable: false
 allowed-tools:

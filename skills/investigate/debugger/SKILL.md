@@ -7,7 +7,6 @@ allowed-tools:
   - Read
   - Write
   - Edit
-  - MultiEdit
   - Bash
   - Grep
   - Glob

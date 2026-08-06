@@ -476,4 +476,6 @@ code {
 - [ ] Every centerpiece visual carries a real conceptual claim, not decoration.
 - [ ] Every image is base64-inlined; no external `<img src="…">` references.
 - [ ] Copy doesn't contain placeholder phrases or empty marketing verbs.
-- [ ] Page renders identically after `cp page.html /tmp/copy.html && xdg-open /tmp/copy.html`.
+- [ ] Page renders identically after copying it to a scratch directory and opening
+      it there (`xdg-open` on Linux, `open` on macOS, `start` on Windows) — this
+      catches any dependency on the original file's location.

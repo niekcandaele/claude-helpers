@@ -7,7 +7,6 @@ allowed-tools:
   - Read
   - Write
   - Edit
-  - MultiEdit
   - Bash
   - Grep
   - Glob
@@ -188,8 +187,8 @@ Before investigating, discover what evidence sources are available:
 
 1. If a `--context` skill or file was provided, read it to learn how to access evidence
 2. Discover available evidence sources:
-   - Check for project skills (`find .claude/skills -name "SKILL.md" 2>/dev/null`)
-   - Check for CLAUDE.md with access instructions
+   - Check the skills available in this session for a `<repo>-engineer` skill
+   - Check `AGENTS.md` / `CLAUDE.md` for access instructions
    - Check what MCP tools are available
    - Check for observability access (can you reach log/metric/trace APIs?)
    - Check for source code access (are the relevant repos available?)

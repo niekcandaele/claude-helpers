@@ -1,14 +1,12 @@
 ---
 name: player
 description: Implementation skill for player-coach. Reads the plan, writes code and tests, and addresses verification feedback.
-model: claude-sonnet-4-6
 context: fork
 user-invocable: false
 allowed-tools:
   - Read
   - Write
   - Edit
-  - MultiEdit
   - Bash
   - Grep
   - Glob
@@ -31,7 +29,7 @@ You receive a fresh context each turn. You must re-orient yourself every time.
 Check if the repository has any skills that describe how to work with this codebase:
 
 ```bash
-find .claude/skills -name "SKILL.md" 2>/dev/null
+# check the skills available in this session for a <repo>-engineer skill
 ```
 
 If any exist, read them. They contain important context: testing patterns, architecture conventions, build commands, linting rules, etc. Follow what they say.
@@ -43,7 +41,7 @@ The plan file path is provided in your prompt. Read it in full. This is your req
 ### 3. Understand the codebase (especially turn 1)
 
 On turn 1, orient yourself:
-- Read `CLAUDE.md` if it exists (project conventions)
+- Read `AGENTS.md` / `CLAUDE.md` if either exists (project conventions)
 - List the project structure (`ls`, key directories)
 - Understand the tech stack, build system, test framework
 

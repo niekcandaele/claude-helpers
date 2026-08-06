@@ -21,14 +21,15 @@ metadata:
 
 Auto-generate a comprehensive handoff document that captures current work state, progress, and context. This supports the "Document & Clear" workflow for complex tasks - create a handoff document, `/clear` the session, then later resume by reading the handoff.
 
-The document is saved to `/tmp` for easy copy/paste to wherever you need it (notes app, issue tracker, email, etc.).
+The document is written to the repository root by default, so it is next to the work it describes and you can commit it if you want to. Pass a path to put it anywhere else.
 
 ## Input
 
-- `$ARGUMENTS` (optional): Custom filename without extension
-  - Default: `handoff-{timestamp}.md`
-  - Example: `/handoff` → `/tmp/handoff-2024-01-15-1430.md`
-  - Example: `/handoff auth-feature` → `/tmp/auth-feature.md`
+- `$ARGUMENTS` (optional): Custom filename or path, without extension
+  - Default: `handoff-{timestamp}.md` in the repository root
+  - Example: `/handoff` → `./handoff-2024-01-15-1430.md`
+  - Example: `/handoff auth-feature` → `./auth-feature.md`
+  - Example: `/handoff ~/notes/auth-feature` → `~/notes/auth-feature.md`
 
 ## Process
 
@@ -84,7 +85,7 @@ GIT_EMAIL=$(git config user.email)
 
 ### 3. Check for Existing TODO List
 
-If TodoWrite has been used in the session, the current TODO state should be included:
+If a task list has been used in the session, its current state should be included:
 
 - Check if there's an active TODO list
 - Categorize tasks by status (completed, in_progress, pending)
@@ -310,13 +311,18 @@ No known blockers documented.
 Determine filename:
 
 ```bash
+OUTPUT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
 if [ -z "$ARGUMENTS" ]; then
   TIMESTAMP=$(date +%Y-%m-%d-%H%M)
-  FILENAME="/tmp/handoff-$TIMESTAMP.md"
+  FILENAME="$OUTPUT_DIR/handoff-$TIMESTAMP.md"
+elif [ "$ARGUMENTS" != "${ARGUMENTS#*/}" ] || [ "$ARGUMENTS" != "${ARGUMENTS#\~}" ]; then
+  # Argument looks like a path — honour it as given
+  FILENAME="${ARGUMENTS%.md}.md"
 else
-  # Sanitize filename (remove spaces, special chars)
+  # Bare name: sanitize and place it in the repo root
   CLEAN_NAME=$(echo "$ARGUMENTS" | tr ' ' '-' | tr -cd 'a-zA-Z0-9-_')
-  FILENAME="/tmp/$CLEAN_NAME.md"
+  FILENAME="$OUTPUT_DIR/$CLEAN_NAME.md"
 fi
 ```
 
@@ -382,7 +388,7 @@ Including state snapshot in handoff...
 ❌ Error: Could not write to {FILENAME}
 
 Possible issues:
-- /tmp directory not writable
+- Target directory not writable
 - Disk full
 - Permission issues
 
@@ -414,7 +420,7 @@ Try specifying a different location:
 /handoff feature-x-for-alice
 
 # After /handoff, typical workflow:
-# 1. Copy content from /tmp/handoff-*.md to your notes
+# 1. Copy content from the generated handoff-*.md to your notes
 # 2. Run /clear to reset session
 # 3. Later: Read your notes, run /catchup, resume work
 ```
@@ -431,7 +437,7 @@ This command works well with:
 
 ### Smart TODO Integration
 
-If TodoWrite has been active:
+If a task list has been active:
 - Include all tasks with their status
 - Highlight next pending task as "start here"
 - Note if any tasks are blocked
@@ -466,7 +472,7 @@ Preserve ephemeral context:
 3. **Be Complete**: Better to include extra context than miss critical info
 4. **Standard Format**: Consistent structure makes handoffs easy to read
 5. **Actionable**: Always include clear "next steps" and "resumption guide"
-6. **Portable**: Save to /tmp, user decides where to preserve it
+6. **Portable**: Default to the repo root; the user decides where it ends up
 7. **Fast**: Generate in under 10 seconds for typical branches
 
 The goal is making it effortless to pause complex work and resume later with full context intact.

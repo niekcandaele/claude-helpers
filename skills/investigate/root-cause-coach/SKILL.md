@@ -1,7 +1,6 @@
 ---
 name: root-cause-coach
 description: Adversarial review coach for root cause analysis. Reviews reports with fresh eyes, runs verification commands to spot-check evidence claims, pushes hard on depth and rigor.
-model: claude-opus-4-8
 context: fork
 user-invocable: false
 allowed-tools:

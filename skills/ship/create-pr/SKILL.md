@@ -180,9 +180,10 @@ Gather context yourself:
    Two dots is correct here — for `git log` it already means "commits on this branch only".
 
 3. **Check for a plan file:**
-   If `--plan-file=<path>` was passed, read that. Otherwise look for one:
+   If `--plan-file=<path>` was passed, read that. Otherwise look for one in
+   whichever directory your harness writes plans to, and in `docs/plans/`:
    ```bash
-   ls .claude/plans/*.md 2>/dev/null
+   ls docs/plans/*.md 2>/dev/null
    ```
    If found, read it — it explains the "why" behind the change. A caller that runs many
    loops keeps its plans outside the repository, which is why the explicit path exists.
@@ -194,7 +195,7 @@ Gather context yourself:
 
 5. **Check for engineer skill:**
    ```bash
-   ls .claude/skills/*-engineer/SKILL.md 2>/dev/null
+   # look for a <repo>-engineer skill among the skills available to you
    ```
    If found, read for architecture context.
 

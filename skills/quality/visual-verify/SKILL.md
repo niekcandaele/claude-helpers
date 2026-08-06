@@ -1,7 +1,6 @@
 ---
 name: visual-verify
 description: Vision-based visual QA reviewer — captures rendered output (live web pages, static HTML artifacts, PDFs) as screenshots, inspects them with a designer's eye for layout defects a human catches instantly, and normalizes findings into the verify pipeline format
-model: claude-sonnet-4-6
 context: fork
 user-invocable: false
 allowed-tools:
@@ -116,8 +115,8 @@ Save all screenshots to a `mktemp -d` directory with descriptive names:
 
 **Find or start the app** (condensed from the exerciser's discovery):
 
-1. Read `.claude/skills/*-engineer/SKILL.md` if present — it is the source of
-   truth for startup verbs and dev URLs. Check for a `VISUAL.md` alongside it
+1. Read the repository's engineer skill if one is available — a `<repo>-engineer`
+   skill is the source of truth for startup verbs and dev URLs. Check for a `VISUAL.md` alongside it
    (screenshot wrapper commands, dev URLs, viewport conventions); read it if it
    exists, but do not require it.
 2. Check if the app is already running: `docker compose ps`, then

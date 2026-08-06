@@ -1,7 +1,6 @@
 ---
 name: exerciser
 description: Manual E2E tester that starts the app and exercises new features end-to-end
-model: claude-sonnet-4-6
 context: fork
 user-invocable: false
 allowed-tools:
@@ -84,13 +83,12 @@ The scope specifies:
 
 ### 1. Load Repository Knowledge
 
-Before doing anything else, find and read the repository's engineer skill:
+Before doing anything else, read the repository's **engineer skill** — a
+`<repo>-engineer` skill documenting how this repo is built, run, and tested. Look
+for one whose name ends in `-engineer` among the skills available to you, or at
+the path the caller passed you.
 
-```bash
-ls .claude/skills/*-engineer/SKILL.md 2>/dev/null
-```
-
-**If found:**
+**If one is available:**
 - Read the SKILL.md and its referenced sub-files (API.md, DATABASE.md, TESTING.md, etc.)
 - Extract: how to start the environment, how to authenticate, key API endpoints, database access, service URLs
 - This is your primary source of truth for HOW to exercise in this specific repo — follow its instructions
@@ -101,11 +99,8 @@ ls .claude/skills/*-engineer/SKILL.md 2>/dev/null
 
 ### 1b. Load Custom Verification Gates
 
-After reading the engineer skill, check for custom verification gates:
-
-```bash
-ls .claude/skills/*-engineer/VERIFICATION.md 2>/dev/null
-```
+After reading the engineer skill, check for a `VERIFICATION.md` alongside it —
+same directory as the engineer skill's SKILL.md.
 
 **If found:**
 - Read VERIFICATION.md

@@ -52,14 +52,15 @@ litter the working tree. Confirm the file exists and stop if it doesn't; a calle
 a path expects that exact plan, so silently falling back to a different one would implement
 the wrong thing.
 
-**Otherwise, discover it:**
+**Otherwise, discover it** — check whichever directory your harness writes plans
+to, and `docs/plans/`:
 
 ```bash
-ls .claude/plans/*.md 2>/dev/null | head -5
+ls docs/plans/*.md 2>/dev/null | head -5
 ```
 
 If no plan exists, tell the user:
-> "The player-coach loop needs a plan to work from. Create one first with `/plan` or enter plan mode. The plan should describe what you want implemented — requirements, constraints, tech stack, expected behavior."
+> "The player-coach loop needs a plan to work from. Create one first — enter your harness's planning mode, or write the plan to a file yourself. The plan should describe what you want implemented — requirements, constraints, tech stack, expected behavior."
 
 Then STOP.
 
@@ -302,7 +303,7 @@ Immediately after verify returns, before any summary markdown, run this bash com
 echo "VERIFY RETURNED (turn {turn}/{max_turns}, phase=verify). NEXT ACTION: apply severity threshold {severity}. If any issues >= threshold → call Skill(player) for turn {turn+1} with feedback. If zero issues at/above threshold → check exerciser/custom/codex gates then proceed to Phase 1.5 (PR). DO NOT stop here. The loop continues until PR+CI green, --no-pr approval, or turn limit."
 ```
 
-This step exists because Opus 4.7 treats verify's polished report as a natural end and tends to hand control back. The echo places the continuation instruction adjacent to the verify result in context — without it, the model reads the report as done and stops. Do not skip this, even if it feels redundant with the CRITICAL note below.
+This step exists because a capable model treats verify's polished report as a natural end and tends to hand control back. The echo places the continuation instruction adjacent to the verify result in context — without it, the model reads the report as done and stops. Do not skip this, even if it feels redundant with the CRITICAL note below.
 
 **Output to the user (after Step 2.5):**
 ```markdown
@@ -517,7 +518,7 @@ Immediately after check-ci returns, before any summary markdown, run this bash c
 echo "CHECK-CI RETURNED (turn {turn}/{max_turns}, phase=ci). NEXT ACTION: if any checks failed → Step 3 (format CI feedback, spawn player for turn {turn+1}, commit+push, re-check). If all passed or no checks configured → proceed to Phase 2 (Completion). DO NOT stop here. The loop continues until CI green or turn limit."
 ```
 
-Same rationale as Phase 1 Step 2.5 — check-ci also returns a polished summary that Opus 4.7 can treat as a stop point.
+Same rationale as Phase 1 Step 2.5 — check-ci also returns a polished summary that reads as a stop point.
 
 Three possible outcomes:
 

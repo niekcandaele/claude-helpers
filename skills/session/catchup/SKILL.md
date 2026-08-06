@@ -166,12 +166,12 @@ Example:
 ## Next Steps
 
 To see detailed changes in a specific file:
-- Use Read tool: `Read path/to/file.py`
+- Read the file directly
 - Or git diff: `git diff {BASE_BRANCH}...HEAD -- path/to/file.py`
 
 To resume work:
 - Review uncommitted changes if any
-- Check TODO list with TodoWrite
+- Review any outstanding task list
 - Continue implementation
 ```
 
@@ -254,4 +254,4 @@ This command works well with:
 2. If diff is huge (>50 files), show summary stats only
 3. Focus on commits and high-level changes, not line-by-line diffs
 4. Make it easy to quickly understand branch state in under 30 seconds
-5. Provide file paths in a format that can be easily copied for Read tool
+5. Provide file paths in a form that can be copied straight into a file read

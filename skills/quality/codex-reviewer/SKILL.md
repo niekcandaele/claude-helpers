@@ -1,7 +1,6 @@
 ---
 name: codex-reviewer
 description: Independent second-opinion reviewer that shells out to the local Codex CLI for a broad code review, then normalizes findings into the verify pipeline format
-model: claude-sonnet-4-6
 context: fork
 user-invocable: false
 allowed-tools:
@@ -276,7 +275,7 @@ poll burns a turn without moving the review forward. Checking `pgrep -f codex` o
 the process is alive is fine; a polling ladder is not.
 
 **Checking liveness:** use `pgrep -f codex`. Never `ps aux | grep codex | grep -v grep` — `grep`
-is shadowed by a `ugrep` shell function from `~/.claude/shell-snapshots/`, so that idiom reports
+may be shadowed by a `ugrep` shell function in some shell setups, so that idiom reports
 live processes as dead. Verified: `ps aux | grep 'sleep 300' | grep -v grep` returns nothing
 while `pgrep -f 'sleep 300'` returns the live PIDs. An empty `ps` has caused real reviews to be
 declared failed mid-flight.

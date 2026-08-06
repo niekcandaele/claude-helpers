@@ -1,7 +1,6 @@
 ---
 name: comment-review
 description: Comment-hygiene-only reviewer — flags ephemeral review-ID references, historical change-narration, stale comments, reviewer-appeasement, and redundant restating in the scoped diff, and normalizes findings into the verify pipeline format
-model: claude-sonnet-4-6
 effort: low
 context: fork
 user-invocable: false

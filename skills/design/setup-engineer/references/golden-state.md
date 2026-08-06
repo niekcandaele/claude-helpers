@@ -46,7 +46,8 @@ so the rule is both written down and mechanically enforced.
 
 ## D. Four-file engineer skill
 
-- [ ] `.claude/skills/<repo>-engineer/` exists with the four-file floor: `SKILL.md`,
+- [ ] `.agents/skills/<repo>-engineer/` exists (or the repo's established skills
+      directory) with the four-file floor: `SKILL.md`,
       `ARCHITECTURE.md`, `TESTING.md`, `GOTCHAS.md`.
 - [ ] No command lists in the skill — it points at `just --list` / the CLI `--help`.
 - [ ] No domain glossary in the skill — it links to `CONTEXT.md`.
