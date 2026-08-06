@@ -1,6 +1,6 @@
 ---
 name: ubiquitous-language
-description: Extract a DDD-style ubiquitous language glossary from the current conversation, flagging ambiguities and proposing canonical terms. Saves to UBIQUITOUS_LANGUAGE.md. Use when user wants to define domain terms, build a glossary, harden terminology, create a ubiquitous language, or mentions "domain model" or "DDD".
+description: Extract a DDD-style ubiquitous language glossary from the current conversation, flagging ambiguities and proposing canonical terms. Saves to CONTEXT.md. Use when user wants to define domain terms, build a glossary, harden terminology, create a ubiquitous language, or mentions "domain model" or "DDD".
 disable-model-invocation: true
 ---
 
@@ -16,29 +16,35 @@ Extract and formalize domain terminology from the current conversation into a co
    - Different words used for the same concept (synonyms)
    - Vague or overloaded terms
 3. **Propose a canonical glossary** with opinionated term choices
-4. **Write to `UBIQUITOUS_LANGUAGE.md`** in the working directory using the format below
+4. **Write to `CONTEXT.md`** in the working directory using the format below
 5. **Output a summary** inline in the conversation
 
 ## Output Format
 
-Write a `UBIQUITOUS_LANGUAGE.md` file with this structure:
+`CONTEXT.md` is shared with the `grill-me` skill, so it uses that skill's structure. Write it like this:
 
 ```md
-# Ubiquitous Language
+# {Context Name}
 
-## Order lifecycle
+{One or two sentence description of what this context is and why it exists.}
 
-| Term        | Definition                                              | Aliases to avoid      |
-| ----------- | ------------------------------------------------------- | --------------------- |
-| **Order**   | A customer's request to purchase one or more items      | Purchase, transaction |
-| **Invoice** | A request for payment sent to a customer after delivery | Bill, payment request |
+## Language
 
-## People
+**Order**:
+A customer's request to purchase one or more items.
+_Avoid_: Purchase, transaction
 
-| Term         | Definition                                  | Aliases to avoid       |
-| ------------ | ------------------------------------------- | ---------------------- |
-| **Customer** | A person or organization that places orders | Client, buyer, account |
-| **User**     | An authentication identity in the system    | Login, account         |
+**Invoice**:
+A request for payment sent to a customer after delivery.
+_Avoid_: Bill, payment request
+
+**Customer**:
+A person or organization that places orders.
+_Avoid_: Client, buyer, account
+
+**User**:
+An authentication identity in the system.
+_Avoid_: Login, account
 
 ## Relationships
 
@@ -65,7 +71,8 @@ Write a `UBIQUITOUS_LANGUAGE.md` file with this structure:
 - **Keep definitions tight.** One sentence max. Define what it IS, not what it does.
 - **Show relationships.** Use bold term names and express cardinality where obvious.
 - **Only include domain terms.** Skip generic programming concepts (array, function, endpoint) unless they have domain-specific meaning.
-- **Group terms into multiple tables** when natural clusters emerge (e.g. by subdomain, lifecycle, or actor). Each group gets its own heading and table. If all terms belong to a single cohesive domain, one table is fine — don't force groupings.
+- **Group terms under subheadings** when natural clusters emerge (e.g. by subdomain, lifecycle, or actor). If all terms belong to a single cohesive domain, a flat list under `## Language` is fine — don't force groupings.
+- **Keep `CONTEXT.md` a glossary and nothing else.** No implementation details, no specs, no scratch notes.
 - **Write an example dialogue.** A short conversation (3-5 exchanges) between a dev and a domain expert that demonstrates how the terms interact naturally. The dialogue should clarify boundaries between related concepts and show terms being used precisely.
 
 <example>
@@ -84,9 +91,11 @@ Write a `UBIQUITOUS_LANGUAGE.md` file with this structure:
 
 ## Re-running
 
+`CONTEXT.md` may already exist — written by an earlier run, or by `grill-me` during a grilling session. Extend it in place; never overwrite what's already there.
+
 When invoked again in the same conversation:
 
-1. Read the existing `UBIQUITOUS_LANGUAGE.md`
+1. Read the existing `CONTEXT.md`
 2. Incorporate any new terms from subsequent discussion
 3. Update definitions if understanding has evolved
 4. Re-flag any new ambiguities
