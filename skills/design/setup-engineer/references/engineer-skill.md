@@ -7,8 +7,8 @@ Its job is **orientation**, not command storage. Now that commands live in the C
 skill gets thinner and sharper: it explains *why* the repo is shaped the way it is and *where*
 the sharp edges are, then points at the executable surface for the *how*.
 
-This is the shape akari (one 33 KB monolith) and takaro (eleven files + helper scripts) are both
-migrated toward.
+This is the shape both a single-monolith skill (one oversized SKILL.md) and a
+sprawling one (a dozen files plus helper scripts) should be migrated toward.
 
 ## The four-file floor
 
@@ -33,8 +33,8 @@ drop below the floor.
 2. **Domain language stays out.** The repo already has a `CONTEXT.md` glossary (the
    ubiquitous-language doc). The engineer skill is *operational*; it links to `CONTEXT.md` for
    *what the words mean* and never duplicates it.
-3. **Zero scripts ship in the skill dir.** takaro's old skill bundled `psql-debug.sh`,
-   `find-test.sh`, `ci-logs.sh` — those are redundant with `just db`, `just test-file`, and the
+3. **Zero scripts ship in the skill dir.** A skill that bundles its own `psql-debug.sh`,
+   `find-test.sh`, `ci-logs.sh` is duplicating `just db`, `just test-file`, and the
    CLI. Everything executable lives in the repo's CLI/justfile so there's one place to maintain.
 
 ## The two behavioral laws (installed into SKILL.md)

@@ -47,7 +47,7 @@ step, but the CLI is not where linting lives.
 
 ## What makes it a "deep module"
 
-The takaro e2e harness is the model: a verb like `up` hides "generate env → start containers in
+A good e2e harness is the model: a verb like `up` hides "generate env → start containers in
 dependency order → poll each healthcheck → run migrations → return only when truly ready." The
 caller says `just up` and waits. All the ordering, retries, and health logic is *inside*. A
 shallow version that just runs `docker compose up -d` and returns is wrong — the value is in the
@@ -86,7 +86,7 @@ the urge to put a loop or a conditional in the justfile, that logic belongs in t
 - **Greenfield:** generate the CLI skeleton with every verb stubbed, wire `doctor` first (so you
   have a target to verify against), then fill verbs in dependency order: `env` → `up`/`down` →
   `seed` → `test*`.
-- **Partial (akari/takaro):** the loose scripts already contain the logic. Stand up the CLI
+- **Partial:** the loose scripts already contain the logic. Stand up the CLI
   skeleton so each verb initially *delegates to the existing script*, then pull the logic inside
   one verb at a time, deleting each script only once its verb is green under `just doctor` +
   `just test`. The repo keeps working the whole way.

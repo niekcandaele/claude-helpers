@@ -5,8 +5,8 @@ you cannot add a service and forget the offset, and you cannot wipe an instance 
 behind, because the slot table and `nuke` are the single sources of truth and `doctor` checks
 them.
 
-Both reference repos (akari, takaro) independently converged on this shape. The canonical form
-below is the cleaned-up version they should both be migrated toward.
+Independent repos keep converging on this shape once they run more than one instance
+at a time. The canonical form below is the cleaned-up version worth migrating toward.
 
 ## The two input variables
 
@@ -23,8 +23,9 @@ Everything else is derived from these two.
 host_port = BASE + INDEX*100 + slot
 ```
 
-- **`BASE`** — a per-repo constant (akari 25000, takaro 13000). Pick a band unlikely to collide
-  with other repos you run.
+- **`BASE`** — a per-repo constant, picked once and never changed. Choose a band well
+  clear of the ephemeral port range and of whatever else you run locally; five-figure
+  bases spaced thousands apart work well.
 - **Stride is 100, with a hard slot ceiling of 100.** `doctor` fails any slot ≥ 100 and any two
   slots that collide. 100 ports per instance is plenty; a wider stride just wastes the port
   space and makes bands harder to reason about.
@@ -94,8 +95,9 @@ The localhost-vs-remote quirks become a single switch keyed off `DEV_HOST`. When
   (e.g. Keycloak `SSL_REQUIRED=none`, `KC_HOSTNAME_STRICT=false`);
 - adds the `extra_hosts` gateway mappings so containers can reach the public hostname.
 
-The dev stack is plain HTTP on loopback/LAN — no self-signed certs. The headless-box pain you
-used to hit by hand is now a consequence of one variable, enforced consistently.
+The dev stack is plain HTTP on loopback/LAN — no self-signed certs. Reaching a stack
+running on a remote box, which is fiddly to arrange by hand, becomes a consequence of
+one variable, enforced consistently.
 
 ## Why this kills the motivating bug
 

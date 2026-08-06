@@ -95,8 +95,8 @@ Put the repo in exactly one bucket. This decides how aggressive you are.
 
 - **Greenfield** — no CLI, no `just`, no env tooling, no engineer skill. → Scaffold the whole
   golden state from the per-language template. Low risk; little to break.
-- **Partial** — has organic scripts and/or a monolith engineer skill (this is the akari/takaro
-  case). → **Migrate**, phase by phase, verifying after each. Highest risk; never big-bang.
+- **Partial** — has organic scripts and/or a monolith engineer skill (the most common
+  starting point). → **Migrate**, phase by phase, verifying after each. Highest risk; never big-bang.
 - **Golden** — already conforms. → Run `just doctor`, report green, stop. Don't churn a repo
   that's already correct.
 
@@ -159,8 +159,8 @@ and rationale in [references/engineer-skill.md](references/engineer-skill.md).
 
 - **Lifecycle hygiene** — *you brought the environment up, you tear it down when finished.*
   `just down` is the cheap reflex (keeps data, frees RAM so more instances run in parallel).
-  This matters because the repo owner runs many headless instances at once; stale environments
-  eating RAM is the failure mode.
+  This matters most when several agent instances run at once; stale environments eating
+  RAM is the failure mode.
 - **Self-improvement (executable-encoding-first)** — when an agent fights through friction, the
   fix is routed to the most permanent layer that can hold it: a new `just`/CLI verb > a new
   `doctor` check > a `GOTCHAS.md` note. Prose is the fallback, not the default. This includes
