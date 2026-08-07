@@ -13,7 +13,7 @@ Engineers" — which is MIT licensed, Copyright (c) 2026 Matt Pocock.
 | `resolving-merge-conflicts` | Upstream content, plus one line on the engineer skill |
 | `to-spec` | Derived, rewired to this repo's tracker convention |
 | `to-tickets` | Derived, rewired to this repo's tracker convention |
-| `wayfinder` | Derived, rewired to this repo's tracker convention and skill names |
+| `wayfinder` | Derived, rewired to this repo's tracker convention and skill names, plus a locally-written Ultra mode |
 | `improve-codebase-architecture` | Derived, modified |
 | `codebase-design` | Derived, restructured |
 | `grill-me` | Derived, restructured |
