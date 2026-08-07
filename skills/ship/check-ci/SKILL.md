@@ -1,0 +1,301 @@
+---
+name: check-ci
+description: Monitor CI/CD pipeline status after pushes and investigate failures.
+argument-hint: '[optional: commit-sha or branch] [--once]'
+allowed-tools:
+  - Read
+  - Bash
+  - Grep
+  - Glob
+  - Skill
+metadata:
+  group: ship
+  requires: [debugger]
+---
+
+# Check CI Status and Investigate Failures
+
+## Goal
+
+Monitor CI/CD pipeline status after pushing commits. When failures occur, delegate to the `debugger` skill for systematic investigation and evidence-based root cause analysis.
+
+## Input
+
+Optional commit reference: $ARGUMENTS (e.g., `HEAD`, `abc1234`, `feature-branch`)
+- Defaults to the latest commit on the current branch if not specified
+- `--once` — take a single reading and return immediately, without waiting
+
+## `--once`: single-reading mode
+
+Take one reading of CI status, report it, and return. Do not watch, do not sleep, do not
+poll. Output exactly one of:
+
+```
+CI: PENDING  — <n> running, <n> queued, <n> completed
+CI: PASSED   — <n> checks
+CI: FAILED   — <failing check names>
+CI: NONE     — no CI configuration detected for this commit
+```
+
+`PENDING` is a normal, expected answer — return it and stop. Do **not** launch `debugger`
+on a pending pipeline; investigation is only for a terminal `FAILED`.
+
+This mode exists for callers that are managing several pieces of work at once. Watching a
+pipeline means holding the session hostage for as long as CI takes, which on a thoroughly
+instrumented project can be an hour — time the caller could spend on other work. A caller
+that owns its own scheduling wants a cheap reading it can take whenever it likes, not a
+blocking wait. Everything below this section describes the default watching mode.
+
+## Process
+
+1. **Identify Recent Commits:** Get the latest commit(s) to check CI status for
+2. **Detect CI Platform:** Identify which CI/CD system is in use
+3. **Monitor CI Status:** Poll for CI pipeline completion with real-time updates
+4. **Handle Results:**
+   - If success → Present success summary
+   - If failure → Launch `debugger` to investigate
+ 5. **Present Report:** Show the skill's investigation findings or success status
+
+## CI Platform Detection
+
+The command automatically detects the CI/CD platform by examining configuration files:
+
+### Detection Priority
+
+1. **GitHub Actions**
+   - Check for `.github/workflows/*.yml` or `.github/workflows/*.yaml`
+   - Use `gh` CLI for API access
+   - Parse workflow runs and job logs
+
+2. **GitLab CI**
+   - Check for `.gitlab-ci.yml`
+   - Use `glab` CLI for API access
+   - Parse pipeline and job logs
+
+3. **CircleCI**
+   - Check for `.circleci/config.yml`
+   - Use CircleCI API with detected tokens
+
+4. **Jenkins**
+   - Check for `Jenkinsfile` or `.jenkins`
+   - Use Jenkins API if URL is configured
+
+5. **Travis CI**
+   - Check for `.travis.yml`
+   - Use Travis API with authentication
+
+6. **Azure DevOps**
+   - Check for `azure-pipelines.yml`
+   - Use Azure CLI if available
+
+## Monitoring Workflow
+
+### 1. Initial Status Check
+
+```bash
+# Get latest commit
+git rev-parse HEAD
+
+# Get commit details
+git log -1 --format="%H %s"
+
+# Check push status
+git log origin/[branch]..HEAD
+```
+
+### 2. CI Status Polling
+
+**For GitHub Actions:**
+```bash
+# List workflow runs for commit
+gh run list --commit [SHA]
+
+# Get run details
+gh run view [RUN_ID]
+
+# Watch run status
+gh run watch [RUN_ID]
+```
+
+**For GitLab CI:**
+```bash
+# Get pipeline for commit
+glab ci list --per-page 1
+
+# View pipeline details
+glab ci view [PIPELINE_ID]
+
+# Get job logs
+glab ci trace [JOB_ID]
+```
+
+### 3. Real-time Updates
+
+Display status updates every 5-10 seconds:
+```
+⏳ CI Status: In Progress
+  ✓ Build: Success
+  ⏳ Tests: Running... (2m 15s)
+  ⏳ Lint: Queued
+  - Deploy: Pending
+```
+
+## Failure Investigation
+
+When CI fails, delegate investigation to the `debugger` skill:
+
+### Skill Invocation
+
+Use the Skill tool to invoke `debugger` with:
+- CI job/pipeline ID
+- Failed job names
+- Relevant log excerpts
+- Commit information
+
+Example prompt:
+```
+Investigate CI failure for commit [SHA]:
+- Failed jobs: [job names]
+- CI platform: [GitHub Actions/GitLab CI/etc]
+- Job logs available via: [command to fetch logs]
+
+Please gather evidence about:
+1. What specifically failed (tests, build, lint, etc.)
+2. Exact error messages and stack traces
+3. Which files/changes are involved
+4. Root cause based on evidence
+
+Provide a complete investigation report.
+```
+
+### What the Skill Will Do
+
+The `debugger` skill will:
+1. Fetch complete CI logs for failed jobs
+2. Identify exact error messages and locations
+3. Trace the failure through execution flow
+4. Gather evidence about environment and context
+5. Present findings without proposing fixes
+
+## Output Format
+
+### Success Case
+
+```
+✅ CI Status: All checks passed!
+
+📊 Summary:
+  ✓ Build: Success (1m 23s)
+  ✓ Tests: 156 passed (2m 45s)
+  ✓ Lint: No issues (0m 15s)
+  ✓ Security: No vulnerabilities (0m 38s)
+
+🎉 Your code is ready to merge!
+```
+
+### Failure Case
+
+```
+❌ CI Status: Failed
+
+📊 Summary:
+  ✓ Build: Success (1m 23s)
+  ❌ Tests: 2 failed, 154 passed (2m 45s)
+  ⚠️ Lint: 3 warnings (0m 15s)
+  ✓ Security: No vulnerabilities (0m 38s)
+
+🔍 Launching `debugger` to investigate...
+```
+
+**Then present the skill's complete investigation report, which will include:**
+- Problem Investigation Report
+- Evidence Gathered (logs, errors, stack traces)
+- Root Cause Analysis (based on facts)
+- Affected Components
+- Recommendations for Resolution
+
+The skill's report provides evidence-based findings without implementing fixes.
+
+## Error Handling
+
+- **No CI Configuration:** Inform user that no CI configuration was detected
+- **Authentication Required:** Guide user to authenticate with CI platform
+- **API Rate Limits:** Handle rate limiting with appropriate delays
+- **Network Issues:** Retry with exponential backoff
+- **Long-running CI:** Keep waiting. Extensive CI is a feature, not a fault — see "Patience" below
+- **Partial Logs:** Attempt to work with available information
+
+## Patience
+
+A pipeline that has been running for an hour is not a stalled pipeline. On projects where
+CI is trusted enough to gate a merge, the suite is extensive on purpose — and when several
+branches land at once, shared runners queue, so a job can sit in `Queued` for a long while
+before it even starts. Both are normal.
+
+So: never conclude from elapsed time alone that CI is stuck, broken, or worth abandoning.
+Do not suggest skipping it, re-running it to "unstick" it, or merging without it. The only
+things that end the wait are a terminal result, an explicit `CI_CHECK_TIMEOUT`, or the user
+telling you to stop. If it's taking a while, say what it's still waiting on and keep going.
+
+## Platform-Specific Features
+
+### GitHub Actions
+
+- Support for matrix builds (multiple job variations)
+- Artifact download for detailed logs
+- Re-run failed jobs command
+- Workflow dispatch triggers
+
+### GitLab CI
+
+- Pipeline stage analysis
+- Manual job triggers
+- Merge request pipeline support
+- Child pipeline detection
+
+## Configuration Options
+
+Users can customize behavior via environment variables:
+
+- `CI_CHECK_TIMEOUT`: Maximum time to wait for CI completion (default: unset — wait indefinitely)
+- `CI_POLL_INTERVAL`: How often to check status (default: 10s)
+
+## Final Instructions
+
+### Core Workflow
+1. Always start by checking the latest commit unless specified otherwise
+2. Detect CI platform automatically - don't assume GitHub Actions
+3. Monitor CI status continuously without requiring user input
+4. When CI completes:
+   - **Success** → Present success summary with timing details
+   - **Failure** → Launch `debugger` immediately
+
+### Skill Delegation
+5. When launching `debugger`:
+   - Provide commit SHA and job details
+   - Include command to fetch relevant logs
+   - Specify which jobs failed
+    - Let the skill conduct systematic investigation
+
+### Reporting
+6. Present the skill's complete investigation report
+7. The skill's report will be evidence-based, not solution-based
+8. Never modify code or implement fixes automatically
+9. Wait for human decision on next steps after presenting findings
+
+### Error Handling
+10. Handle multiple CI platforms if repository uses several
+11. If CI is still running, keep waiting and reporting progress — a long pipeline is not a stalled one
+
+## Usage Examples
+
+```bash
+# Check CI for latest commit
+/check-ci
+
+# Check CI for specific commit
+/check-ci abc1234
+
+# Check CI for a branch
+/check-ci feature/new-api
+```

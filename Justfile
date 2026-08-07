@@ -1,37 +1,33 @@
-# Claude Code Skills - Development Commands
+# Agent Skills - Development Commands
 
 # Show available commands
 default:
     @just --list
 
-# Validate skill structure
+# Validate the skills tree — layout, frontmatter, groupings, dependencies
 validate:
-    @echo "Validating skill structure..."
-    @test -d skills || (echo "Missing skills/ directory" && exit 1)
-    @test -n "$(find skills -mindepth 1 -maxdepth 1 -type d)" || (echo "No skill directories found" && exit 1)
-    @missing="$(find skills -mindepth 1 -maxdepth 1 -type d ! -exec test -f '{}/SKILL.md' ';' -print)"; \
-      test -z "${missing}" || (echo "Missing SKILL.md in:" && printf '%s\n' "${missing}" && exit 1)
-    @bad_frontmatter="$(find skills -name SKILL.md -exec sh -c 'for file do grep -q "^---$" "$file" && grep -q "^description:" "$file" || echo "$file"; done' sh {} +)"; \
-      test -z "${bad_frontmatter}" || (echo "Invalid or incomplete frontmatter:" && printf '%s\n' "${bad_frontmatter}" && exit 1)
-    @legacy="$(rg -n '/plugin|/cata-helpers:|\.claude-plugin|plugins/|cata-' README.md CLAUDE.md skills --glob '!.claude/settings.local.json' || true)"; \
-      test -z "${legacy}" || (echo "Legacy references found:" && printf '%s\n' "${legacy}" && exit 1)
-    @echo "✓ Found $(find skills -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ') skills"
-    @echo "✓ Every skill directory has SKILL.md"
-    @echo "✓ Frontmatter sanity checks passed"
-    @echo "✓ No plugin-era references in tracked skill/docs files"
-    @echo "\n✓ Skill validation passed!"
+    @python3 scripts/validate.py
 
 # Show skill structure
 structure:
-    @tree -I '.git|.claude' skills && printf '\nREADME.md\nCLAUDE.md\nJustfile\n' || (find skills -type f | sort && printf '\nREADME.md\nCLAUDE.md\nJustfile\n')
+    @tree -I '.git|.claude' skills || find skills -type f | sort
+    @printf '\nREADME.md\nAGENTS.md\nCONTEXT.md\nNOTICE.md\nLICENSE\nskills.sh.json\nJustfile\n'
+
+# Install these skills into the current directory to try them
+try *ARGS:
+    @npx -y skills@latest add . {{ ARGS }}
 
 # Show local testing instructions
 test:
-    @echo "This repository is a source repo for skills."
+    @echo "This repo has no test suite — the skills are prompts, not code."
+    @echo "Its correctness harness is 'just validate'. Run that before committing."
     @echo ""
-    @echo "  1. Sync or copy skills/* into a Claude skills directory:"
-    @echo "     ~/.claude/skills/      or      .claude/skills/"
+    @echo "To try the skills from this checkout, install them somewhere else:"
+    @echo "    cd /tmp/scratch && npx skills add /home/catalysm/code/skills --list"
     @echo ""
-    @echo "  2. Then start Claude Code in a repo where those skills should be available."
+    @echo "Or from this directory, into this directory:"
+    @echo "    just try --list          # see what is on offer"
+    @echo "    just try --skill verify  # install one"
     @echo ""
-    @echo "  3. Run just validate before committing changes here."
+    @echo "Installed skills land where your harness looks for them; the CLI"
+    @echo "picks the directory and prints the path it used."

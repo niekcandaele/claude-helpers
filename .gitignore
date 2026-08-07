@@ -1,0 +1,13 @@
+# Local harness settings — these carry absolute paths from whoever wrote them
+.claude/settings.local.json
+.codex/settings.local.json
+
+# Handoff documents default to the repo root
+handoff-*.md
+
+# Installed skills, if you try this repo on itself
+.agents/skills/
+skills-lock.json
+
+__pycache__/
+.DS_Store
