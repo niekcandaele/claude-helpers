@@ -22,14 +22,31 @@ jobs:
 
       # The real contract is what an installing user gets. A skill whose
       # frontmatter cannot be parsed is skipped silently, so a clean install
-      # must produce no warnings at all.
+      # must produce no warnings and must find every skill in the tree.
       - name: Install as a consumer would
+        env:
+          NO_COLOR: "1"
         run: |
           set -euo pipefail
-          output=$(npx -y skills@latest add . --list 2>&1)
-          echo "$output"
-          if echo "$output" | grep -qiE '⚠|skipped'; then
-            echo "::error::the skills CLI reported a warning — a skill is being skipped"
+
+          expected=$(find skills -mindepth 2 -maxdepth 2 -type d | wc -l)
+          raw=$(npx -y skills@latest add . --list 2>&1)
+          echo "$raw"
+
+          # The CLI colorizes its output, which puts escape sequences in the
+          # middle of the very strings we assert on. Strip them before matching.
+          clean=$(printf '%s' "$raw" | sed -e 's/\x1b\[[0-9;]*[a-zA-Z]//g')
+
+          if printf '%s' "$clean" | grep -q '⚠'; then
+            echo "::error::the skills CLI emitted a warning — a skill is being skipped on install"
+            printf '%s' "$clean" | grep '⚠'
             exit 1
           fi
-          echo "$output" | grep -q "Found 32 skills"
+
+          if ! printf '%s' "$clean" | grep -qE "Found +${expected} +skills"; then
+            echo "::error::expected ${expected} skills (one per directory), but the CLI reported otherwise"
+            printf '%s' "$clean" | grep -iE 'found .* skills' || true
+            exit 1
+          fi
+
+          echo "✓ all ${expected} skills discovered, no warnings"
