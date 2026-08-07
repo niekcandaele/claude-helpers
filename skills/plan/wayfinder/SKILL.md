@@ -28,10 +28,10 @@ The map is an **index**, not a store. It lists the decisions made and points at 
 
 **Where the map, its child tickets, blocking, and frontier queries physically live is tracker-specific.** Read `TRACKER.md` beside the repo's engineer skill — its "Wayfinding operations" section says how _this_ repo expresses child issues, blocking edges, and the frontier query. If there is no `TRACKER.md`, resolve the tracker for this run from what the user gave you, the git remote, and whichever CLI is installed *and* authenticated — and default to the local-markdown tracker when nothing resolves.
 
-The engineer skill's directory varies by harness, so find it by glob:
+The engineer skill's directory varies by harness, so locate it by search (a shell glob is not portable here — zsh aborts the whole command when any pattern fails to match, silently finding nothing):
 
 ```bash
-ls skills/*-engineer/TRACKER.md */skills/*-engineer/TRACKER.md .*/skills/*-engineer/TRACKER.md 2>/dev/null
+find . -maxdepth 4 -path '*/skills/*-engineer/TRACKER.md' -not -path './node_modules/*' 2>/dev/null
 ```
 
 ### The map body

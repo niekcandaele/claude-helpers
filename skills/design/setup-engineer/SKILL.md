@@ -84,9 +84,9 @@ ls scripts/ 2>/dev/null
 # Existing command surface
 ls justfile Justfile Makefile 2>/dev/null
 # Existing engineer skill — check wherever this repo keeps skills
-ls -d */skills/*-engineer/ .*/skills/*-engineer/ 2>/dev/null | grep -v '^\.\./'
+find . -maxdepth 3 -type d -path '*/skills/*-engineer' -not -path './node_modules/*' 2>/dev/null
 # Tracker — a binding beside the engineer skill, and evidence of what to bind to
-ls */skills/*-engineer/TRACKER.md .*/skills/*-engineer/TRACKER.md 2>/dev/null
+find . -maxdepth 4 -path '*/skills/*-engineer/TRACKER.md' -not -path './node_modules/*' 2>/dev/null
 git remote -v; command -v gh glab jira 2>/dev/null
 # CI
 ls .github/workflows/ .gitlab-ci.yml 2>/dev/null

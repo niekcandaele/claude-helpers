@@ -4,7 +4,7 @@
 harness, so glob for it:
 
 ```bash
-ls */skills/*-engineer/TRACKER.md .*/skills/*-engineer/TRACKER.md 2>/dev/null
+find . -maxdepth 4 -path '*/skills/*-engineer/TRACKER.md' -not -path './node_modules/*' 2>/dev/null
 ```
 
 If one exists it already holds the resolved binding — the commands, the label vocabulary — and

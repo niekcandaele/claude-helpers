@@ -149,7 +149,7 @@ in this order:
    names rather than paths:
 
 ```bash
-ls -d .*/skills/*-engineer/ */skills/*-engineer/ 2>/dev/null | grep -v '^\.\./'
+find . -maxdepth 3 -type d -path '*/skills/*-engineer' -not -path './node_modules/*' 2>/dev/null
 ```
 
 **If one is available:**

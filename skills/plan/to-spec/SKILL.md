@@ -11,10 +11,10 @@ This skill takes the current conversation context and codebase understanding and
 
 **The tracker.** Read `TRACKER.md` beside the repo's engineer skill — it names the tracker, gives its commands, and maps meanings to this repo's label strings. If there is none, resolve the tracker for this run from what the user gave you, the git remote, and whichever CLI is installed *and* authenticated; default to a directory of local markdown files when nothing resolves.
 
-The engineer skill's directory varies by harness, so find it by glob:
+The engineer skill's directory varies by harness, so locate it by search (a shell glob is not portable here — zsh aborts the whole command when any pattern fails to match, silently finding nothing):
 
 ```bash
-ls */skills/*-engineer/TRACKER.md .*/skills/*-engineer/TRACKER.md 2>/dev/null
+find . -maxdepth 4 -path '*/skills/*-engineer/TRACKER.md' -not -path './node_modules/*' 2>/dev/null
 ```
 
 ## Process
