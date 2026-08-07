@@ -74,6 +74,8 @@ Each ticket is a **child issue** of the map; the tracker's issue id is its ident
 
 Each ticket carries a `wayfinder:<type>` label — one of `research`, `prototype`, `grilling`, `task` (see [Ticket Types](#ticket-types)).
 
+The label fixes the HITL/AFK axis for three of those types: `research` is always AFK, `prototype` and `grilling` always HITL. **`task` is the exception** — it goes either way, so a `task` ticket states its axis on a `**HITL**` or `**AFK**` line under the question. Without it the axis is unrecoverable from the tracker, and a later session can't tell whether the ticket needs a human.
+
 A session **claims** a ticket by assigning it to the dev driving the map, **first**, before any work, so concurrent sessions skip it. That assignee _is_ the claim: an open, unassigned ticket is unclaimed.
 
 Blocking uses the tracker's **native** dependency relationship — essential because it renders the frontier _visually_ in the tracker's own UI, so the human sees what's takeable without opening the map. Only a tracker that lacks native blocking falls back to a body convention. A ticket is **unblocked** when every ticket blocking it is closed; the **frontier** is the open, unblocked, unclaimed children — the edge of the known.
@@ -116,7 +118,7 @@ Three modes. In *Chart the map* and *Work through the map*, **never resolve more
 
 ### Offer the frontier
 
-Charting and working both reach a moment where more than one ticket is workable. When they do, **stop and offer** — never pick for the human, and never start work they didn't ask for.
+Charting and working both reach a moment where the frontier is workable. **Stop and offer** — never pick for the human.
 
 List every frontier ticket by **name**, each with its type and whether it's HITL or AFK, and ask which to take. Their answer sets the batch: all of them, a named few, a count. Attention and resources are finite, that limit isn't visible from here, and so it is theirs to set rather than yours to guess.
 
@@ -137,14 +139,15 @@ User invokes with a loose idea.
 
 ### Work through the map
 
-User invokes with a map (URL or number). A ticket is **optional** — without one, you pick the next decision, not the user.
+User invokes with a map (URL or number). A ticket is **optional** — without one you work out what's next from the frontier rather than being handed it.
 
 1. Load the **map** — the low-res view, not every ticket body.
-2. Choose the ticket. If the user named one, use it. Otherwise compute the frontier: one workable ticket, take it; more than one, **offer the frontier** (above) and let them choose. **Claim it**: assign it to yourself before any work.
-3. Resolve it — **zoom as needed**: fetch the full body of any related or closed ticket on demand; invoke the skills the `## Notes` block names. If in doubt, use `grill-me`.
-4. Record the resolution: post the answer as a **resolution comment**, **close** the issue, and **append a context pointer** to the map's Decisions-so-far.
-5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals a ticket — this one or another — sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
-6. If clearing that fog **widened the frontier**, offer it (above) before the session ends. A resolution that graduates three patches at once is the commonest way a frontier goes from one ticket to several, and the human decides what happens to them — including whether to fan them out.
+2. **Reconcile first.** Any child ticket closed without a pointer in Decisions-so-far was resolved by a dispatched session, which is barred from writing the map (see *Ultra wayfinder*). Fold each one's resolution comment into the index, and act on any fog graduation or out-of-scope ruling it proposed. The map is the index; an unreconciled map has stopped indexing.
+3. Choose the ticket. If the user named one, use it. Otherwise compute the frontier: one workable ticket, take it; more than one, **offer the frontier** (above). If they choose several HITL tickets, that's *Ultra wayfinder* and it claims per session — go there instead of continuing here. Otherwise **claim** the single ticket: assign it to yourself before any work.
+4. Resolve it — **zoom as needed**: fetch the full body of any related or closed ticket on demand; invoke the skills the `## Notes` block names. If in doubt, use `grill-me`.
+5. Record the resolution: post the answer as a **resolution comment**, **close** the issue, and **append a context pointer** to the map's Decisions-so-far. **Dispatched sessions stop at the comment** — see *Ultra wayfinder*.
+6. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals a ticket — this one or another — sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets. A dispatched session **proposes** all of this in its resolution comment instead.
+7. If clearing that fog **widened the frontier**, offer it (above) before the session ends.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.
 
@@ -154,7 +157,7 @@ Once the way is clear, the map is done. Tell the user to run `to-tickets` next �
 
 **Capability required:** a harness that can dispatch **peer sessions** — sibling agent sessions the human attaches to and converses with directly. Sub-agents are not a substitute, for the reason below. Where the harness has none, Ultra is unavailable: say so plainly and work the frontier serially.
 
-The user invokes it with **"ultra wayfinder"** (or "ultrawayfinder") plus a map, and optionally a subset of tickets — that explicit invocation defaults to the whole frontier. Reaching it through *Offer the frontier* instead means the batch is whatever the human chose there.
+The user invokes it with **"ultra wayfinder"** (or "ultrawayfinder") plus a map, and optionally the tickets to take. Named tickets are the batch. **Unnamed, it still offers the frontier first** — invoking Ultra says how the work should run, not that you may pick how much of it. Reaching Ultra through *Offer the frontier* means the batch is already whatever the human chose there.
 
 **Peer sessions, not sub-agents.** A sub-agent cannot do a HITL ticket: grilling and prototype tickets resolve only through live exchange with the human, and a sub-agent has no way to reach them — so it ends up answering its own questions and posting a resolution with none of the human's judgement in it. A dispatched peer session parks awaiting input and the human attaches to each in turn. That buys parallel *state* — every ticket's context loaded and warm — against serial human *attention*, which is the scarce thing.
 
@@ -163,25 +166,33 @@ The user invokes it with **"ultra wayfinder"** (or "ultrawayfinder") plus a map,
 - **HITL** (`grilling`, `prototype`, `task` marked HITL) → one peer session each.
 - **AFK** (`research`, `task` the agent drives alone) → a sub-agent in *this* session. There's no human to attach to, so a peer session would buy nothing and cost a context switch.
 
-1. Load the map and compute the frontier: open children, no open blockers, no assignee.
+1. Load the map and compute the frontier.
 2. Take the human's chosen set. Never fan out wider than they asked for.
-3. Dispatch each HITL ticket to a peer session. The brief says: invoke `wayfinder` with this map and this ticket; **claim the ticket first, before any work**; work up to the first question that genuinely needs the human, then stop and wait.
+3. Dispatch each HITL ticket to a peer session, carrying the brief below.
 4. Run each AFK ticket as a sub-agent here, and record its resolution on the map yourself.
-5. Report the dispatched set by **name**, then stop. Do not also work a HITL ticket in this session.
+5. Confirm every dispatched session **claimed** its ticket. A session that died before its first write leaves the ticket unclaimed and back on the frontier while the human has been told it's in flight — claiming is the only concurrency guard, so it's the claim you verify, not the session. Re-dispatch or report any that didn't land.
+6. Report the dispatched set by **name**, then stop.
+
+#### The brief
+
+Every dispatched session gets these four things, and the first is what makes the rest safe:
+
+1. **You are a dispatched session.** Say it in those words. The session lands in *Work through the map* and will otherwise follow step 5 verbatim and write the map — which is exactly what must not happen.
+2. **Invoke wayfinder explicitly, by its command form.** This skill sets `disable-model-invocation`, so a session merely *told* to use wayfinder loads none of it — including claim-first. The failure is invisible: the session starts, parks, and looks correct. (`epic-runner` handles its own dispatch the same way.)
+3. **Claim the ticket first, before any work.** If it is already assigned, someone got there first — stop and report back rather than working it.
+4. **The map and the ticket**, and: work up to the first question that genuinely needs the human, then stop and wait.
+
+**Dispatched sessions must not edit the map body.** They post their resolution comment and close their issue as normal, but appending to Decisions-so-far is a read-modify-write on one shared document with no locking, and concurrent sessions silently clobber each other. So they **propose** — resolutions, fog graduations, out-of-scope rulings all land in the resolution comment, and the next session to work the map folds them in at its reconcile step.
+
+AFK sub-agents are the exception, and it's the locking that makes them one: they run *inside* the dispatching session, so there is exactly one writer and you record their resolutions normally.
 
 Example binding — Claude Code:
 
 ```bash
-claude --bg -n "wf-<number>-<short-slug>" "<brief>"
+claude --bg -n "wf-<number>-<short-slug>" "/wayfinder <map> <ticket> — you are a dispatched session; <rest of brief>"
 ```
 
-Pass `-n` always: without it the session's row is titled with the raw prompt text and the list becomes unreadable. Verify the rows landed with `claude agents --json`. Dispatched sessions park in **"Needs input"** in Agent View (`←` on an empty prompt, or `claude agents`), and the human attaches with `→`.
-
-**Dispatched peer sessions must not edit the map body.** They post their resolution comment and close their issue as normal, but appending to Decisions-so-far is a read-modify-write on one shared document with no locking, and concurrent sessions silently clobber each other. This overrides step 4 of *Work through the map* for dispatched sessions only: the Decisions-so-far pointers are reconciled afterwards by a single session, from the closed tickets' resolution comments. Same reasoning for graduating fog and ruling things out of scope — a dispatched session **proposes** those in its resolution comment rather than editing **Not yet specified** or **Out of scope** directly.
-
-AFK sub-agents are the exception, and it's the locking that makes them one: they run *inside* the dispatching session, so there is exactly one writer and you record their resolutions on the map normally.
-
-Claiming is what keeps two sessions off one ticket, so it stays the first write every dispatched session makes.
+Pass `-n` always: without it the session's row is titled with the raw prompt text and the list becomes unreadable. Verify with `claude agents --json`. Dispatched sessions park in **"Needs input"** in Agent View (`←` on an empty prompt, or `claude agents`), and the human attaches with `→`.
 
 ---
 
