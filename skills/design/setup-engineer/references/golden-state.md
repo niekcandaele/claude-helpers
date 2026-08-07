@@ -67,6 +67,19 @@ so the rule is both written down and mechanically enforced.
 - [ ] `just doctor --fix` auto-repairs the cheap, safe subset (regenerate `.env`, re-derive
       boundary URLs) without a human round-trip.
 
+## G. Tracker binding
+
+Optional — a repo with no issue tracker worth binding is still golden. When one exists:
+
+- [ ] `TRACKER.md` sits beside the engineer skill's `SKILL.md`.
+- [ ] It names the tracker and gives `list` and `read` as runnable commands (the two required
+      operations); write operations are recorded where they exist and their absence is stated
+      where they don't.
+- [ ] Every command in it has been run once and returned real data — a resolved-but-
+      unauthenticated CLI is the failure mode this catches.
+- [ ] Its label table maps *meanings* to this repo's actual label strings, with no invented
+      labels for meanings the repo doesn't use.
+
 ## The infra-change law (why several invariants above exist together)
 
 When a service is added or changed, four things must move together or the local environment

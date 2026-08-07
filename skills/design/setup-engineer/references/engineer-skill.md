@@ -31,6 +31,18 @@ drop below the floor.
   GOTCHAS.md       hard-won failure modes + debugging recipes (db queries → `just db`)
 ```
 
+**Detail files sit beside those four**, and this directory is where skills across the suite
+look for repo-specific context they need. The ones already in use:
+
+| File | Read by |
+|---|---|
+| `TRACKER.md` | `epic-runner`, `wayfinder`, `to-spec`, `to-tickets` — the tracker binding ([tracker.md](tracker.md)) |
+| `VERIFICATION.md` | `verify` — repo-defined review and exerciser gates |
+| `VISUAL.md` | `visual-verify` — screenshot mechanics, dev URLs, viewport conventions |
+| `API.md`, `DATABASE.md` | `exerciser` — how to authenticate and inspect service state |
+
+Add one only when a skill actually reads it. An unread detail file is sediment.
+
 ## Three rules that keep it from rotting
 
 1. **Commands never live in the skill.** It points at `just --list` and the CLI `--help`. There

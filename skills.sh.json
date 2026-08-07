@@ -27,7 +27,8 @@
         "player",
         "create-pr",
         "review-pr",
-        "check-ci"
+        "check-ci",
+        "resolving-merge-conflicts"
       ]
     },
     {
@@ -47,9 +48,15 @@
       "skills": [
         "grill-me",
         "ubiquitous-language",
+        "codebase-design",
         "improve-codebase-architecture",
         "setup-engineer"
       ]
+    },
+    {
+      "title": "Plan",
+      "description": "Turning a loose idea into decisions, a spec, and tickets an agent can pick up.",
+      "skills": ["wayfinder", "prototype", "to-spec", "to-tickets"]
     },
     {
       "title": "Session",
