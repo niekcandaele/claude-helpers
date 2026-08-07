@@ -38,12 +38,17 @@ vague. `/wait-what` just tells you the last thing you said didn't land.
 
 **Ship** — getting work from a ticket to a merged pull request.
 `epic-runner` `player-coach` `player` `create-pr` `review-pr` `check-ci`
+`resolving-merge-conflicts`
 
 **Investigate** — finding out what is actually going on, before changing anything.
 `debugger` `root-cause-analysis` `root-cause-coach` `research` `wait-what`
 
 **Design** — sharpening a plan, a domain language, or a repo's shape.
-`grill-me` `ubiquitous-language` `improve-codebase-architecture` `setup-engineer`
+`grill-me` `ubiquitous-language` `codebase-design` `improve-codebase-architecture`
+`setup-engineer`
+
+**Plan** — turning a loose idea into decisions, a spec, and tickets an agent can pick up.
+`wayfinder` `prototype` `to-spec` `to-tickets`
 
 **Session** — carrying context between sessions and between agents.
 `catchup` `handoff`
@@ -56,7 +61,7 @@ vague. `/wait-what` just tells you the last thing you said didn't land.
 The groups above are for browsing. They are **not** install bundles — coupling
 crosses group boundaries.
 
-Seven skills call others and will not work alone:
+Nine skills call others and will not work alone:
 
 | Skill | Needs |
 |---|---|
@@ -67,10 +72,22 @@ Seven skills call others and will not work alone:
 | `check-ci` | `debugger` |
 | `root-cause-analysis` | `root-cause-coach` |
 | `research` | `rich-page`, but only in `--deep` mode |
+| `improve-codebase-architecture` | `codebase-design`; `rich-page` and `grill-me` improve it |
+| `wayfinder` | `grill-me`; `research` and `prototype` improve it |
 
 Note `check-ci` — it looks self-contained sitting in the Ship list, and it isn't.
 Everything not in that table stands alone: `reviewer`, `debugger`,
-`technical-writer`, `wizard`, `catchup` and the rest need nothing else.
+`technical-writer`, `wizard`, `prototype`, `to-spec`, `to-tickets`, `catchup` and
+the rest need nothing else.
+
+They form a flow all the same, even where nothing is declared: `wayfinder` charts a
+big effort, `to-spec` writes up what was decided, `to-tickets` cuts it into slices
+and leaves you one handle, and `epic-runner` takes that handle and works them. Each
+step is yours to invoke — none of them fires the next.
+
+Four skills also read a `TRACKER.md` beside the repo's engineer skill — `wayfinder`,
+`to-spec`, `to-tickets`, `epic-runner`. `setup-engineer` writes it. None of them
+require it: without one they resolve the tracker themselves for that run.
 
 Each of these declares its dependencies in frontmatter, so you can check any skill
 before installing it:
