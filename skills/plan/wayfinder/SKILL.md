@@ -124,7 +124,7 @@ List every frontier ticket by **name**, each with its type and whether it's HITL
 
 **Nothing runs until they answer** — research included. Firing research unasked is cheap and usually the obvious call, which is exactly what makes it surprising the one time it isn't.
 
-If the answer takes in several HITL tickets at once, that's [Ultra wayfinder](#ultra-wayfinder--work-the-frontier-in-parallel).
+Any answer wider than a single HITL ticket — several tickets, or any AFK ticket at all — is [Ultra wayfinder](#ultra-wayfinder--work-the-frontier-in-parallel).
 
 ### Chart the map
 
@@ -134,7 +134,7 @@ User invokes with a loose idea.
 2. **Map the frontier.** Grill again, **breadth-first** this time: fan out across the whole space rather than deep on any one thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no fog** — the way to the destination is already clear, the whole journey small enough for one session — you don't need a map. Stop and ask the user how they'd like to proceed.
 3. **Create the map** (label `wayfinder:map`): Destination and Notes filled in, Decisions-so-far empty, the fog sketched into **Not yet specified**.
 4. **Create the tickets you can specify now** as child issues of the map — then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog — the **Not yet specified** section.
-5. **Offer the frontier** (above) rather than firing anything yourself. Act on the answer: AFK tickets run as sub-agents here — `research` ones via the `research` skill, capturing findings on a throwaway `research/<name>` branch with a context pointer from the ticket — and HITL tickets go out as peer sessions per *Ultra wayfinder*.
+5. **Offer the frontier** (above) rather than firing anything yourself. Act on the answer: AFK tickets run as sub-agents here — `research` ones via the `research` skill, capturing findings on a throwaway `research/<name>` branch with a context pointer from the ticket — and HITL tickets go out as peer sessions per *Ultra wayfinder*. Where the harness has no peer sessions Ultra is unavailable, and charting still resolves no HITL ticket of its own: hand the chosen ones back to the human to work in their own sessions.
 6. Stop — charting is one session's work; it hand-resolves no HITL ticket of its own.
 
 ### Work through the map
@@ -142,8 +142,8 @@ User invokes with a loose idea.
 User invokes with a map (URL or number). A ticket is **optional** — without one you work out what's next from the frontier rather than being handed it.
 
 1. Load the **map** — the low-res view, not every ticket body.
-2. **Reconcile first.** Any child ticket closed without a pointer in Decisions-so-far was resolved by a dispatched session, which is barred from writing the map (see *Ultra wayfinder*). Fold each one's resolution comment into the index, and act on any fog graduation or out-of-scope ruling it proposed. The map is the index; an unreconciled map has stopped indexing.
-3. Choose the ticket. If the user named one, use it. Otherwise compute the frontier: one workable ticket, take it; more than one, **offer the frontier** (above). If they choose several HITL tickets, that's *Ultra wayfinder* and it claims per session — go there instead of continuing here. Otherwise **claim** the single ticket: assign it to yourself before any work.
+2. **Reconcile, then claim.** A child ticket that is closed, carries a resolution comment, and has no pointer in Decisions-so-far was resolved by a dispatched session, which is barred from writing the map (see *Ultra wayfinder*). Fold its resolution into the index and act on any fog graduation or out-of-scope ruling it proposed. Two things this must not sweep up: a ticket already listed in **Out of scope** was closed as a scoping act, not resolved — it belongs out of Decisions-so-far and stays there. And only the session that is about to claim reconciles, so two readers don't fold the same comments in twice. Re-read the map immediately before writing it: the gap between read and write is where concurrent sessions clobber each other.
+3. Choose the work. If the user named a ticket, use it. Otherwise **offer the frontier** (above) — always, including when only one ticket is workable. Then act on the shape of the answer: **a single HITL ticket** you work here, so **claim it** before anything else. **Anything wider** — several tickets, or any AFK ticket at all — is *Ultra wayfinder*, which claims per session and runs AFK work as sub-agents. Go there rather than continuing here.
 4. Resolve it — **zoom as needed**: fetch the full body of any related or closed ticket on demand; invoke the skills the `## Notes` block names. If in doubt, use `grill-me`.
 5. Record the resolution: post the answer as a **resolution comment**, **close** the issue, and **append a context pointer** to the map's Decisions-so-far. **Dispatched sessions stop at the comment** — see *Ultra wayfinder*.
 6. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals a ticket — this one or another — sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets. A dispatched session **proposes** all of this in its resolution comment instead.
@@ -193,6 +193,8 @@ claude --bg -n "wf-<number>-<short-slug>" "/wayfinder <map> <ticket> — you are
 ```
 
 Pass `-n` always: without it the session's row is titled with the raw prompt text and the list becomes unreadable. Verify with `claude agents --json`. Dispatched sessions park in **"Needs input"** in Agent View (`←` on an empty prompt, or `claude agents`), and the human attaches with `→`.
+
+**Peer sessions share this working tree.** The map isn't the only thing they can clobber — a grilling ticket updates `CONTEXT.md`, a prototype ticket writes assets, and two siblings doing that at once collide in the filesystem rather than on the tracker. Give each its own branch or worktree where the harness supports it; otherwise keep a batch to tickets whose work lands in different files.
 
 ---
 
