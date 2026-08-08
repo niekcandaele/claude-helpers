@@ -5,7 +5,7 @@ description: >
   Detects scope, discovers toolchain, triages files to relevant skills, runs static
   analysis, invokes review skills in parallel, exercises the app, and produces a
   unified report. Supports interactive, report-only, and auto-fix modes.
-argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--files=file1,file2] [--module=path] [--skip-ux] [--skip-visual] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>] [--plan-file=<path>]"
+argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--base=<ref>] [--files=file1,file2] [--module=path] [--skip-ux] [--skip-visual] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>] [--plan-file=<path>]"
 metadata:
   group: quality
   requires: [reviewer, codex-reviewer, comment-review, qa, tester, ux-reviewer, visual-verify, static-analysis, exerciser, debugger]
@@ -34,6 +34,9 @@ Parse `$ARGUMENTS` for:
 - `--files="file1,file2"`: Verify specific files only
 - `--module=path`: Verify specific module/directory
 - Default (no scope arg): Auto-detect from git state
+- `--base=<ref>`: Exact baseline ref for `--scope=branch`, for example
+  `origin/release`. Reject it with every other scope. Callers that know the PR target must
+  pass it; do not replace it with a default-branch guess.
 
 **Other Options:**
 - `--skip-ux`: Skip UX review for pure backend changes
@@ -54,6 +57,31 @@ Determine what files/changes to verify.
 - If specified, use that exact scope
 - Skip auto-detection
 
+For explicit branch scope, resolve the comparison before listing files:
+
+```bash
+HEAD_SHA=$(git rev-parse HEAD)
+BASE_REF="$exact_base_ref" # the parsed --base value, or the resolved default
+# Without --base, resolve origin/<provider default branch>; only then fall back to main/master.
+BASE_REMOTE=${BASE_REF%%/*}
+if git remote get-url "$BASE_REMOTE" >/dev/null 2>&1; then
+  BASE_BRANCH=${BASE_REF#*/}
+  git fetch "$BASE_REMOTE" \
+    "+refs/heads/$BASE_BRANCH:refs/remotes/$BASE_REMOTE/$BASE_BRANCH"
+fi
+git rev-parse --verify "$BASE_REF^{commit}"
+MERGE_BASE=$(git merge-base "$BASE_REF" "$HEAD_SHA")
+git diff --name-status "$MERGE_BASE" "$HEAD_SHA"
+git diff -U0 "$MERGE_BASE" "$HEAD_SHA" -- "$scoped_file"
+```
+
+Set task-specific `exact_base_ref` and `scoped_file` values before running the snippet.
+
+Never compare branch scope to a stale local branch when its `origin/` ref exists. Preserve
+`BASE_REF` exactly as supplied in the report, while recording the resolved `MERGE_BASE`
+and `HEAD_SHA` separately. An unknown base ref or failed merge-base calculation is a
+verification error; silently choosing a different base would verify the wrong change.
+
 **2. Auto-Detect Scope (default behavior):**
 
 Priority order:
@@ -72,13 +100,35 @@ git diff --cached --name-only
 git diff --name-only
 
 # Check for branch changes
-BASE=$(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null)
-git diff --name-only $BASE HEAD
+if git remote get-url origin >/dev/null 2>&1; then
+  git fetch origin
+fi
+BASE_REF=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
+if [ -z "$BASE_REF" ]; then
+  DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | sed -n 's/^[[:space:]]*HEAD branch: //p')
+  if [ -n "$DEFAULT_BRANCH" ] &&
+     git rev-parse --verify "origin/$DEFAULT_BRANCH^{commit}" >/dev/null 2>&1; then
+    BASE_REF="origin/$DEFAULT_BRANCH"
+  elif git rev-parse --verify 'origin/main^{commit}' >/dev/null 2>&1; then
+    BASE_REF=origin/main
+  elif git rev-parse --verify 'origin/master^{commit}' >/dev/null 2>&1; then
+    BASE_REF=origin/master
+  elif git rev-parse --verify 'main^{commit}' >/dev/null 2>&1; then
+    BASE_REF=main
+  elif git rev-parse --verify 'master^{commit}' >/dev/null 2>&1; then
+    BASE_REF=master
+  else
+    echo 'No provider default, origin/main, origin/master, main, or master base exists' >&2
+    exit 1
+  fi
+fi
+MERGE_BASE=$(git merge-base "$BASE_REF" HEAD)
+git diff --name-only "$MERGE_BASE" HEAD
 
 # Get line ranges for changed files
-git diff --cached -U0 -- <file>  # staged
-git diff -U0 -- <file>           # unstaged
-git diff -U0 $BASE HEAD -- <file> # branch
+git diff --cached -U0 -- "$scoped_file"  # staged
+git diff -U0 -- "$scoped_file"           # unstaged
+git diff -U0 "$MERGE_BASE" HEAD -- "$scoped_file" # branch
 ```
 
 **3. Build Scope Context:**
@@ -97,6 +147,11 @@ Also build a machine-usable `SCOPE_METADATA` block for agents that need exact di
 - `path_filter`: exact scoped paths, or `ALL_SCOPED_FILES`
 - `diff_command`: exact git diff command used to define the scope
 - `merge_base`: exact merge-base hash for branch scope, otherwise empty
+- `head_sha`: full `git rev-parse HEAD` SHA for branch scope, otherwise the full HEAD SHA
+  observed when verification began
+- `included_files`: ordered file/status records admitted to the scope
+- `excluded_files`: ordered path/reason records explicitly excluded; use
+  `ALL_OTHER_FILES (outside selected scope)` when paths were not enumerated
 
 `SCOPE_METADATA` is the source of truth for any skill that needs to reconstruct the selected diff.
 
@@ -134,6 +189,9 @@ SCOPE_METADATA:
 - path_filter: src/auth/login.ts,src/auth/middleware.ts
 - diff_command: git diff -- src/auth/login.ts src/auth/middleware.ts
 - merge_base:
+- head_sha: 9d8f...full SHA
+- included_files: src/auth/login.ts,src/auth/middleware.ts
+- excluded_files: ALL_OTHER_FILES (outside selected scope)
 ```
 
 ## Phase 2: Load Engineer Skill
@@ -632,13 +690,16 @@ bias the floor exists to cancel.
 ## Scope
 
 **Mode:** [staged / unstaged / branch / all / files / module]
+**Base ref:** [exact `--base` value or resolved base; `null` outside branch scope]
+**Merge base:** [full SHA or `null` outside branch scope]
+**HEAD:** [full SHA observed when verification began]
 
 **Files Verified:**
 - src/auth/login.ts (modified, lines 45-67, 89-102)
 - src/auth/middleware.ts (modified, lines 12-34)
 - tests/auth/login.test.ts (added, entire file)
 
-**Files Excluded:** All other files in codebase (not in scope for this verification)
+**Files Excluded:** [ordered paths with reasons, or "All other files (outside selected scope)"]
 
 ---
 
@@ -715,71 +776,162 @@ A gated skip must always name its reason. A mis-gate is only correctable if it i
 
 ### 8c. JSON Output (`--format=json --output=<path>`)
 
-When both `--format=json` and `--output=<path>` are set, build and write a JSON report file **after** generating the internal report data (8a/8b still run to produce the deduplicated issue list).
-
-**Top-level schema:**
-
-```json
-{
-  "schemaVersion": 1,
-  "status": "ok | blocked | error",
-  "findings": [ ... ],
-  // ...plus all existing report fields preserved for backward compatibility
-}
-```
+When both flags are set, serialize the same deduplicated data used by the Markdown report.
+JSON v1 has a complete trace-facing shape while retaining the adversary contract:
+`schemaVersion`, `status`, and `findings` keep their existing names and meanings.
 
 **Step 1 — Determine `status`:**
 
 | Condition (checked in order) | `status` |
 |------------------------------|----------|
-| Verify itself crashed or could not execute at all (skill invocation failed, no files to analyze, internal error) | `"error"` |
-| Verify cannot produce meaningful analysis (entire codebase fails to parse, no toolchain discovered, no skills could run) | `"blocked"` |
-| Verify completed its pipeline (even if tests fail or build has errors) | `"ok"` |
+| Verify crashed or could not execute (skill invocation failure, invalid base, internal error) | `"error"` |
+| Verify could not produce meaningful analysis (for example no toolchain and no review skill could run) | `"blocked"` |
+| The pipeline completed, including when it found code/test failures | `"ok"` |
 
-**Important:** Build/typecheck errors and test failures are **not** terminal statuses. They are fixable problems that should be emitted as **findings** with severity 9-10, so that callers (e.g. the adversary loop) can pass them back to the implementer. `"blocked"` means verify itself cannot function, not that the code under test has problems.
+Build/typecheck errors and test failures are findings with severity 9–10, not terminal
+schema statuses. `blocked` means verification itself could not provide meaningful analysis.
 
-**Step 2 — Build `findings` array:**
+**Step 2 — Normalize locations once, then project both contracts:**
 
-For each deduplicated issue from Phase 8a, create a finding object:
+Parse a textual location into this structured issue location:
 
 ```json
 {
-  "title": "<issue title>",
-  "severity": <number 1-10>,
-  "description": "<issue description>",
-  "sources": ["<skill1>", "<skill2>"],
-  "location": { "path": "<file>", "line": <number> }
+  "path": "path/to/file.js",
+  "line": 27,
+  "endLine": 36
 }
 ```
 
-- `title`, `severity`, `description`, `sources` — copy directly from the issue
-- `location` — parse the string format `"path/to/file.js:27-36"`: split on the **last** `:`, use everything before as `path`, parse the first number after `:` as `line`. If the string has no `:` followed by a number, omit `location` entirely
-- `id` — drop, not included in findings
+Split a textual location on the last colon followed by a line or line range. Omit
+`endLine` for a single line. Project `issues[].location` from the full structured object.
+Project the stable adversary `findings[].location` as exactly `{"path": ..., "line": ...}`;
+never add `endLine` there. Omit `findings[].location` when none applies and set
+`issues[].location` to `null`. Never substitute an empty object or a prose location.
 
-**Step 3 — Assemble full JSON object:**
-
-Combine the adversary-required fields with existing report data:
+**Step 3 — Assemble exactly this shape:**
 
 ```json
 {
   "schemaVersion": 1,
-  "status": "<mapped status>",
-  "findings": [ <transformed findings> ],
-  "overall": { "result": "<pass|issues-found>", "mode": "<scope mode>" },
-  "scope": { "files": [...], "excluded": [...] },
-  "triage": { "skills_run": [...], "skills_skipped": [...] },
-  "skillResults": { ... },
-  "issues": [ <original issues with id, string location, etc.> ],
-  "exerciserVerification": [ ... ],
-  "customGates": { ... }
+  "status": "ok",
+  "error": null,
+  "findings": [
+    {
+      "title": "Issue title",
+      "severity": 8,
+      "description": "Why this matters",
+      "sources": ["reviewer", "tester"],
+      "location": {"path": "src/example.ts", "line": 27}
+    }
+  ],
+  "overall": {"result": "issues-found", "mode": "branch"},
+  "scope": {
+    "mode": "branch",
+    "baseRef": "origin/release",
+    "mergeBase": "0123456789abcdef0123456789abcdef01234567",
+    "headSha": "89abcdef0123456789abcdef0123456789abcdef",
+    "includedFiles": [
+      {"path": "src/example.ts", "status": "modified", "lines": ["27-36"]}
+    ],
+    "excludedFiles": [
+      {"path": "ALL_OTHER_FILES", "reason": "outside selected scope"}
+    ],
+    "files": [
+      {"path": "src/example.ts", "status": "modified", "lines": ["27-36"]}
+    ],
+    "excluded": [
+      {"path": "ALL_OTHER_FILES", "reason": "outside selected scope"}
+    ]
+  },
+  "triage": {
+    "skillsRun": [
+      {"skill": "reviewer", "reason": "code files require correctness review"},
+      {"skill": "tester", "reason": "test command discovered"},
+      {"skill": "exerciser", "reason": "user-visible flow changed"}
+    ],
+    "skillsSkipped": [
+      {"skill": "visual-verify", "reason": "no UI-rendering files in scope"}
+    ],
+    "skills_run": ["reviewer", "tester", "exerciser"],
+    "skills_skipped": ["visual-verify"]
+  },
+  "skillResults": [
+    {"skill": "reviewer", "status": "COMPLETED", "notes": "Found 1 item"},
+    {"skill": "exerciser", "status": "PASSED", "notes": "Flow completed"}
+  ],
+  "issues": [
+    {
+      "id": "VI-1",
+      "severity": 8,
+      "title": "Issue title",
+      "sources": ["reviewer", "tester"],
+      "location": {"path": "src/example.ts", "line": 27, "endLine": 36},
+      "description": "Why this matters"
+    }
+  ],
+  "exerciserVerification": [
+    {"issue": "VI-1", "status": "CONFIRMED", "evidence": "Observed during save"}
+  ],
+  "customGates": {
+    "exerciser": [
+      {"rule": "Saved records can be reloaded", "status": "PASS", "evidence": "Reloaded record 42", "checker": "exerciser"}
+    ],
+    "review": [
+      {"rule": "Tenant queries remain scoped", "status": "PASS", "evidence": "Reviewed query predicate", "checker": "reviewer"}
+    ]
+  }
 }
 ```
 
-The adversary reads only `schemaVersion`, `status`, and `findings`. All other fields are preserved for other consumers and debugging.
+Field rules:
 
-**Step 4 — Write file:**
+- `overall.result` is `error` when `status` is `error`, `blocked` when `status` is
+  `blocked`, `issues-found` when `status` is `ok` with one or more issues, and `pass` when
+  `status` is `ok` with no issues. These are its only values.
+- `error` is `null` for `ok`/`blocked`, and an object with stable `code` and factual
+  `message` for `status: error`.
+- `scope.mode` is the resolved scope mode. `baseRef` is a string only for branch scope and
+  `null` otherwise. `mergeBase` is the resolved full SHA for successful branch scope,
+  `null` outside branch scope, and also `null` when an invalid base prevents resolution.
+  `headSha` is always the full SHA observed at start.
+  `includedFiles` and `excludedFiles` are ordered and never omitted. Retain legacy aliases
+  `files` and `excluded` with the same ordered records.
+- `triage.skillsRun` lists every invoked skill in invocation order as `skill`/`reason`
+  objects. `triage.skillsSkipped` contains the same shape for every skipped or unavailable
+  skill. Every entry has a factual routing reason.
+  Retain `skills_run` and `skills_skipped` as ordered name-only aliases for consumers of the
+  earlier partial report.
+- `skillResults` is an array, including static analysis, plan completeness, conditional
+  debugger, and every run or skipped review skill. Each item has exactly `skill`, `status`,
+  and `notes`; `notes` may be an empty string. Normalize `status` to `COMPLETED`, `PASSED`,
+  `FAILED`, `BLOCKED`, `SKIPPED`, or `NOT_RUN`; put counts and provider-specific detail in
+  `notes`. Exerciser uses `PASSED`/`FAILED`/`BLOCKED`, and Codex uses
+  `COMPLETED`/`BLOCKED`/`SKIPPED`, so callers can apply gates by exact value.
+- `issues` retains the assigned VI ID and structured location. `findings` mirrors each
+  issue without its ID so existing adversary consumers continue to work unchanged.
+- `exerciserVerification` contains one entry per issue the exerciser evaluated. `issue`
+  is the VI ID, `status` is `CONFIRMED`, `NOT_REPRODUCED`, `NOT_APPLICABLE`, or `BLOCKED`,
+  and `evidence` is always present.
+- `customGates.exerciser` and `customGates.review` are always arrays, even when empty.
+  Every gate records its rule, status, evidence, and the skill or command in `checker`.
 
-Use the Write tool to write the JSON (pretty-printed with 2-space indent) to the `--output` path.
+The JSON-v1 compatibility boundary is deliberate: `schemaVersion`, `status`, and `findings`
+retain their prior meanings and shapes, as required by adversary consumers. The formerly
+placeholder-only `skillResults` and `issues.location` shapes are now the defined array and
+structured location contracts above; do not weaken those new contracts to imitate an
+undocumented placeholder object or prose location. The non-conflicting scope/triage aliases
+remain for migration convenience.
+
+Validate the assembled object as JSON, pretty-print it with two-space indentation, and
+write it to the exact `--output` path. Never reuse or overwrite a previous verification
+run's output file; callers supply a unique path for each invocation.
+
+When an invalid/missing base or merge-base failure produces `status: error`, still emit the
+complete v1 shape: preserve the requested `scope.baseRef`, set `scope.mergeBase` to `null`,
+use empty included/excluded arrays when file discovery never began, mark unrun skills
+`NOT_RUN` with reasons, and populate `error`. This makes the failure parseable without
+pretending a merge base exists.
 
 ## Phase 9: Mode-Specific Post-Report
 

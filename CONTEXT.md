@@ -28,6 +28,28 @@ _Avoid_: generic, portable, degrades gracefully
 A per-repository skill describing how to build, test, and run that repository, which other skills read for project-specific context.
 _Avoid_: project skill, repo skill, local skill
 
+**Run**:
+One complete player–coach invocation, from setup through one terminal status.
+_Avoid_: session, loop (the run contains loops)
+
+**Player turn**:
+One invocation of the player skill and its resulting semantic commit or explicit no-op.
+_Avoid_: iteration, attempt
+
+**Verification run**:
+One invocation of the verify skill, including a same-player-turn rerun.
+_Avoid_: coach turn, review pass
+
+**Run trace**:
+The ordered remote player-turn commits, immutable verification comments, and terminal PR
+state produced by a traced run.
+_Avoid_: log, transcript, PR history
+
+**Implementation journey**:
+The synthesized narrative in the final PR body that explains player turns, verification,
+friction, testing, and terminal state.
+_Avoid_: run trace (the trace is the underlying evidence), summary
+
 ## Relationships
 
 - A **Suite** contains two or more **Skills**; a **Skill** may belong to several
@@ -37,6 +59,9 @@ _Avoid_: project skill, repo skill, local skill
   `player-coach` requires it)
 - Several **Skills** read the **Engineer skill** of the repository they run against
 - A **Skill** is **Harness-neutral** or it names the **Harness** it requires
+- A player–coach **Run** contains one or more **Player turns** and **Verification runs**
+- A traced **Run** publishes a **Run trace**; its final PR body presents the
+  **Implementation journey** synthesized from that trace
 
 ## Example dialogue
 
