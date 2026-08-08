@@ -22,14 +22,15 @@ allowed-tools:
   - AskUserQuestion
 metadata:
   group: ship
-  requires: [player-coach, check-ci, verify]
+  requires: [player-coach, create-pr, check-ci, verify]
 ---
 
 # Epic Runner — Unattended Delivery of a Whole Epic
 
-You are the front office. `player-coach` runs a single game — one ticket, from plan to
-merged PR. You decide which games get played, in what order, with what left over at the
-end. You never write code, never review it, and never run a verification pipeline yourself.
+You are the front office. `player-coach` runs a single game — one ticket, from plan to an
+approved draft. You own its CI, ready transition, and authorized merge. You decide which
+games get played, in what order, with what left over at the end. You never write code,
+never review it, and never run a verification pipeline yourself.
 
 The person who starts you is going to walk away. They will come back in six hours to a
 terminal, and what they find there is the entire product of the run. Everything below
@@ -161,8 +162,15 @@ away information the user already gave you.
 
 ### 4. Check the ground
 
-Three cheap checks that each prevent a specific way the run wastes hours before failing:
+Four cheap checks that each prevent a specific way the run wastes hours before failing:
 
+- **Delivery binding.** Read `create-pr`'s disclosed forge-operations reference and resolve
+  authenticated inspection, ready, and exact-head merge operations for this provider.
+  Also preflight `check-ci`'s exact-head check enumeration, target required-policy reads,
+  target-tip/strict-policy proof, review requirements, and mergeability operations. Missing
+  lifecycle or CI-proof capability means the epic cannot deliver its promised merges;
+  disclose it in the confirmation and stop before implementation mutation unless the user
+  explicitly narrows the run to drafts only.
 - **Branch protection on the target.** If merges require a human approval, say so plainly:
   *"target branch requires 1 approval — PRs will be opened but not merged, so anything
   depending on them will strand."* Then continue if the user still wants to. **Never work
@@ -249,20 +257,44 @@ reports, or turn-by-turn narration — the orchestrator does not read them and c
 afford the context.
 ```
 
-`--no-ci` is what makes the schedule work: the loop returns as soon as the PR exists,
-handing back the dev stack instead of holding it through an hour of CI. You own CI from
-that point.
+`--no-ci` is what makes the schedule work: player-coach opens the draft early but returns
+only after its player/verification loop approves the head. It then hands back the dev stack
+instead of holding it through an hour of CI. You own CI from that approved handoff.
 
-Record the returned status, PR URL, branch, turns used, and any discoveries. That is all
-you keep.
+Parse the final block, including `STATUS`, `PR_URL`, `PR_STATE`, `BRANCH`, `HEAD_SHA`,
+`REMOTE_HEAD_SHA`, `TURNS_USED`, `VERIFY_RUNS`, `TRACE`, and `CODEX`. An approved result
+requires `REMOTE_HEAD_SHA` to equal `HEAD_SHA`. `APPROVED_DRAFT_OPEN` with `PR_STATE: draft` and
+`TRACE: complete` enters the CI queue. `APPROVED_READY_OPEN` with `PR_STATE: ready` and a
+complete trace re-enters the same queue after a ready-PR fix. A `--resume-ci` result of `READY_FOR_REVIEW` with
+`PR_STATE: ready` and `TRACE: complete` proceeds to the merge gate because that invocation
+already observed green CI. `FAILED_TRACE`, any other failure status, a missing field, or a
+claimed state that disagrees with `PR_STATE` fails the issue. Also record any discoveries.
+Require an approved result's parsed `HEAD_SHA` to be a full SHA, then treat it as the
+approved SHA for every subsequent CI, ready, and merge comparison. That compact state is
+all you keep.
 
 ### Polling CI
 
 Cheap, holds nothing, do it whenever you're between other things.
 
-```bash
-gh pr view {n} --json statusCheckRollup,mergeable,mergeStateStatus,reviewDecision
+```text
+/check-ci --pr={PR_URL} {full head SHA} --once
 ```
+
+Read `create-pr`'s disclosed `references/forge-operations.md` when building this delivery
+binding. Use its GitHub or GitLab inspection operations, or resolve exact equivalents from
+the authenticated provider capability exposed by the harness. Require `check-ci`'s
+`CI: PASSED`, `HEAD_SHA` equal to the approved SHA, `REQUIRED_CHECKS: complete`, every
+optional check terminal and non-failing, `UP_TO_DATE: yes|not-required`, and
+`MERGEABLE: yes`. `CI: NONE` and `CI: BLOCKED` are never green. If required-check,
+strict-policy, or mergeability state cannot be observed, keep waiting or fail the issue;
+never substitute a GitHub command on another forge.
+
+Schedule from the proof, not only the headline: running or queued checks stay in the cheap
+poll queue; `CI: FAILED`, a source conflict, or `STRICT_POLICY: required` with
+`UP_TO_DATE: no` re-enters player-coach's CI-fix flow. `CI: NONE`, `CI: BLOCKED`, an exact
+head mismatch, or unobservable policy evidence fails the issue. Pending human approval is
+recorded but does not block the later ready transition.
 
 **Green is an affirmative test, not the absence of red.** A PR is ready to merge only when
 *all* of these hold:
@@ -272,10 +304,45 @@ gh pr view {n} --json statusCheckRollup,mergeable,mergeStateStatus,reviewDecisio
    only for checks that are not required.)
 3. The PR is mergeable — no conflicts.
 
-Anything else means **keep waiting**. Testing for "nothing has failed" instead would call
-four different broken states green: a repo with no checks configured, checks still queued,
-required checks that haven't started reporting yet, and a path-filtered workflow that
-skipped everything.
+This suite intentionally treats `skipped` and `neutral` required checks as non-success,
+even on providers whose native merge rule might accept them. Anything else means **keep
+waiting**. Testing for "nothing has failed" instead would call four different broken states
+green: a repo with no checks configured, checks still queued, required checks that haven't
+started reporting yet, and a path-filtered workflow that skipped everything.
+
+### Publishing scheduler state
+
+The player-coach body describes its handoff, so epic-runner must keep the delivery state
+current afterward. For every ready, queued, merged, or scheduler-terminal failure state,
+write a mode-0600 context beginning `CONTEXT_KIND: delivery-state` with the exact PR state,
+approved head, complete `check-ci` proof, queue/merge evidence, and failure reason. Publish it
+through `create-pr`:
+
+```text
+/create-pr --context={delivery_context} --no-comments --no-push --pr={PR_URL}
+```
+
+`create-pr` preserves the existing journey/testing/friction body and replaces only its
+bounded generated Final State block. Require post-update inspection to preserve the exact
+head and intended PR state. On scheduler failure also append one immutable agent-attributed
+terminal comment through `--comment-file`; never edit a verification comment. A state update
+or terminal-comment failure is `FAILED_TRACE`, even if the provider already completed an
+irreversible merge. Persist the observed state and failed operation rather than reporting a
+false draft or rolling the change back.
+Parse `create-pr`'s failure block and carry its last factual `PR_URL`, `PR_STATE`, `HEAD_SHA`,
+`MERGE_QUEUE`, and `COMMENT_ID` into scheduler state; never replace them with the requested
+transition after a partial or irreversible provider operation. Store the failure block's
+`HEAD_SHA` as the observed remote head without overwriting player-coach's approved SHA.
+Sanitize both files with the same HMAC redaction construction under a scheduler-scoped
+random key stored mode-0600 outside the repository; never copy raw CI log secrets or
+personal data into delivery state.
+Every scheduler comment supplies `--head-sha={approved or last observed full remote head}`
+and requires create-pr's before/after head proof. Before rendering one, inspect and validate
+the accepted trace chain, then append a sanitized canonical `recordKind: delivery` envelope
+with a new trace ID, the immediately preceding trace ID/digest, the unchanged last
+verification counter, exact CI/queue/merge proof, and scheduler status. Apply the same
+multipart and payload-digest rules as player-coach; do not treat an incomplete delivery
+record as scheduler state.
 
 **Be patient.** An hour is normal. Extensive CI is precisely why this much autonomy is
 safe, and when several branches land at once the shared runners queue. A pipeline that has
@@ -287,7 +354,7 @@ CI is stuck, never suggest skipping it, never merge without it.
 **This takes the dev stack.** Investigate first, then delegate the fix:
 
 ```
-/check-ci --once            # to confirm the terminal failure
+/check-ci --pr={PR_URL} {stored HEAD_SHA} --once
 ```
 
 then spawn an agent in the PR's worktree:
@@ -295,26 +362,72 @@ then spawn an agent in the PR's worktree:
 ```
 Fix the CI failures on PR {url} for issue {id}.
 
-Invoke: /player-coach --headless --resume-ci --plan-file={state_dir}/plans/{id}.md
+Invoke: /player-coach --headless --resume-ci --no-ci --plan-file={state_dir}/plans/{id}.md
+        --pr={PR_URL} --approved-head={stored HEAD_SHA}
         --max-turns={remaining} --severity={severity}
 
 CI failure detail:
 {the failing checks and their errors — the error output and file references, not full logs}
 ```
 
-`--resume-ci` re-enters the existing branch and PR at the CI-fix step. It deliberately does
-not re-run the implement/verify loop: verification already passed, what failed is CI, and
-re-running the full pipeline would cost an hour to rediscover nothing.
+`--resume-ci --no-ci` re-enters the existing branch and PR at the CI-fix step without
+rechecking the unchanged starting SHA. If the player changes that SHA to fix CI,
+player-coach pushes it and runs the full verification/gate/comment sequence, then returns
+`APPROVED_DRAFT_OPEN` or `APPROVED_READY_OPEN` according to the preserved PR state so the
+epic can release the dev stack and resume cheap polling. The prior approval covers only the
+prior SHA.
 
 ### Merging
 
-Only when the affirmative green test passes. **Use whatever merge method the repository
-prefers** — do not override it. Squash is common and good here: the target branch gets one
-clean commit per issue, while the turn-by-turn history stays visible on the PR, which is
-where the human reviews how the loop actually performed.
+Only when the affirmative green test passes. If the PR is still draft, first invoke:
 
-After merging, mark the issue complete via the tracker binding (if write-back is on) and
-re-evaluate the graph — this merge may have unblocked dependents.
+```text
+/create-pr --ready --pr={PR_URL} --head-sha={approved full SHA}
+           --context={ready_delivery_context} --no-comments --base={target}
+           [--reviewer={resolved_distinct_handle}]
+```
+
+Resolve a reviewer only from explicit caller or repository ownership information; omit it
+when no distinct candidate is available. Require the returned observed `PR_STATE: ready`.
+A missing ready operation, failed update, or state mismatch is `FAILED_TRACE`: keep the
+draft open and do not merge. Reviewer assignment itself remains non-blocking.
+The delivery-state context deliberately preserves the complete current player-coach body,
+including resumed turns; epic-runner must not replace it with its older issue journal.
+If the PR was already ready, publish the same `ready` delivery state through the scheduler
+state procedure before the pre-merge reread. Thus both paths record the latest green proof
+without attempting a redundant ready transition.
+
+Immediately before every merge invocation, read
+`/check-ci --pr={PR_URL} {approved full SHA} --once` and require the complete affirmative
+green predicate plus `REVIEW_REQUIREMENTS: satisfied|not-required`. This closes the race
+where the target, checks, or review requirements changed after the earlier reading or ready
+transition. Pending human approval leaves the ready PR open for a human; any other
+non-green reread returns the issue to the appropriate poll/fix/failure queue. Neither falls
+through to merge.
+
+Honor contrary user instructions and branch protection even after CI turns green. When
+merge authority remains in force, use whatever merge method the repository prefers — do
+not override it. Squash is common and good here: the target branch gets one clean commit
+per issue, while the turn-by-turn history stays visible on the PR, which is where the human
+reviews how the loop performed.
+
+Invoke `/create-pr --merge --pr={PR_URL} --head-sha={approved full SHA}`. `create-pr`
+resolves the repository-preferred merge method through the preflighted delivery binding.
+Observed `PR_STATE: merged` completes delivery. `PR_STATE: queued` creates a persisted
+pending merge work item containing the PR URL, approved SHA, and queue identifier; poll it
+with `/create-pr --inspect --pr={PR_URL}`. Require every inspection's `HEAD_SHA` to equal
+the stored approved SHA, then delete its returned `TRACE_FILE` without reading it because
+queue polling needs state only. A mismatch is `FAILED_TRACE`; never bless or mark a different
+head complete. Continue until the approved head is observed merged or terminally rejected.
+Any other output is a merge failure: leave the issue open and do not unblock dependents.
+
+Immediately publish `queued` after queue acceptance and `merged` after observed merge using
+the scheduler-state procedure above. A queue rejection, CI/policy observation failure, turn
+exhaustion, or other scheduler terminal path with an existing PR uses the same procedure
+with its factual failed state and immutable terminal comment.
+
+Only after observed merge, mark the issue complete via the tracker binding (if write-back
+is on) and re-evaluate the graph — this merge may have unblocked dependents.
 
 ### When an issue fails
 
@@ -326,6 +439,7 @@ and what is the realistic chance a retry ends differently?
 | Failure | Retry? | Why |
 |---|---|---|
 | The agent died — crash, tool error, context exhaustion | Yes, once | Nothing was learned; it just fell over |
+| `FAILED_TRACE` — push, draft, comment, update, or ready failed | No | Retrying could duplicate immutable artifacts; preserve the branch/draft for a human |
 | Turn limit hit with issues still above threshold | No | The full budget is already spent; a fresh agent usually finds the same wall |
 | CI red and the fix agent couldn't resolve it | No | Same, plus CI minutes |
 | Blocked on something outside the epic — a schema change, a credential, a decision | Never | Retrying cannot supply what's missing |
@@ -453,7 +567,7 @@ Run state lives outside the repository, in `$XDG_STATE_HOME/epic-runner/{project
 plans/{id}.md          materialized implementation plans
 issues/{id}.md         per-issue journey logs written by issue-agents
 discoveries/{n}.md     drafted follow-up tickets
-run.json               issue statuses, PR urls, turn counts, inferred edges, failure reasons
+run.json               status blocks, verified HEAD SHA, verify-run count, trace, pending merge-queue work, inferred edges, failure reasons
 ```
 
 Never in the repository — a long epic would litter the working tree and pollute the diffs
@@ -462,8 +576,16 @@ drafted ticket.
 
 **The tracker is authoritative for what's done; the local file holds only what the tracker
 cannot express.** On resume, re-read the tracker and the open PRs *first*, and where the
-local file disagrees, the tracker wins. Otherwise you get the split-brain where the file
-says #5 is pending, its PR merged an hour ago, and you re-implement shipped work.
+local file disagrees about merged work, the tracker wins. An open PR's current head is not
+automatically verified: inspect its authenticated trace export, delete that temporary file
+after parsing, and recover the newest full SHA whose complete verification record says every
+threshold/gate decision produced `APPROVED` under its recorded policy (including an explicit
+Codex-blocked `continue` decision). Use that SHA as `--approved-head`; player-coach re-verifies a
+different observed head before it can regain approval. If no authenticated approving record
+exists, do not enqueue the PR for CI/merge—record `FAILED_TRACE` for human recovery. Never
+derive approval merely from the current PR head, tracker state, or a stale `run.json` entry.
+Otherwise you get the split-brain where the file says #5 is pending, its PR merged an hour
+ago, and you re-implement shipped work.
 
 **Resume rejoins; it does not restart.** An issue whose PR is open and mid-CI gets adopted
 into the in-flight set — not re-implemented on a second branch. This is why the issue id

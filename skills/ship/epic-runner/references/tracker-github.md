@@ -64,28 +64,13 @@ task-list nesting carry most of the signal in practice.
 # Branch protection — needs repo admin; treat a failure as "unknown", not "unprotected"
 gh api repos/{owner}/{repo}/rulesets 2>/dev/null
 gh api repos/{owner}/{repo}/branches/{branch}/protection 2>/dev/null
-
-# Merge methods the repo allows
-gh repo view --json squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed
-
-# Default branch
-gh repo view --json defaultBranchRef -q .defaultBranchRef.name
 ```
 
-If `reviewDecision` on a PR comes back `REVIEW_REQUIRED`, merges will not happen. Report it;
-never self-approve or push to the target to route around it.
+If protection requires human review, merges will not happen. Report it; never self-approve
+or push to the target to route around it.
 
-## The green test
+## PR delivery
 
-```bash
-gh pr view {n} --json statusCheckRollup,mergeable,mergeStateStatus,reviewDecision
-```
-
-Merge only when every required check has a terminal conclusion, all of them succeeded
-(`SKIPPED`/`NEUTRAL` acceptable only for non-required checks), and `mergeable` is `MERGEABLE`.
-`mergeStateStatus` of `BLOCKED` usually means a required check hasn't reported yet — that is
-a wait, not a failure.
-
-```bash
-gh pr merge {n} --squash --delete-branch      # match the repo's allowed method
-```
+PR inspection, required-check proof, readiness, and exact-head merge are delivery
+operations, not tracker operations. Use `check-ci` and `create-pr`; the latter's disclosed
+forge-operations reference is the single source of truth for concrete GitHub commands.
