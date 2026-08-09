@@ -546,7 +546,9 @@ NEEDS YOU    #46  turn limit — 15 turns, verify still flags {thing}. PR {url} 
              #49  plan agent refused — ticket doesn't specify {thing}.
 STRANDED     #52  blocked by #49
 
-FRICTION     {issues that took more than 3 turns, sticky findings, CI failures}
+FRICTION     {issues that took more than 3 turns, sticky findings, CI failures,
+             quarantined environment failures with their re-raise counts,
+             findings deferred to PR follow-up}
 PERFORMANCE  {turns per issue, first-turn approvals, which verify skills fired most}
 DISCOVERIES  {n} tickets drafted{, awaiting approval}{, + 1 combined cleanup ticket}
 ```
@@ -573,6 +575,12 @@ run.json               status blocks, verified HEAD SHA, verify-run count, trace
 Never in the repository — a long epic would litter the working tree and pollute the diffs
 being reviewed. Never in `/tmp` — a reboot mid-run would destroy the ledger and every
 drafted ticket.
+
+Each issue's player-coach run keeps its own **run ledger** under a sibling root,
+`$XDG_STATE_HOME/player-coach/{project}/{branch}/`, keyed by branch rather than by issue.
+That is the issue-agent's record, not yours — do not read it, for the same reason you do not
+read verification reports. It matters here only because a resumed issue must find it, which
+is another reason the issue id belongs in every branch name.
 
 **The tracker is authoritative for what's done; the local file holds only what the tracker
 cannot express.** On resume, re-read the tracker and the open PRs *first*, and where the
@@ -622,6 +630,15 @@ another harness, swap this section and leave everything else alone.
 | Give a sub-agent its own checkout | `isolation: "worktree"` on `Agent` |
 | Invoke another skill | `Skill` tool |
 | Choose a model per sub-agent | `model` on `Agent`, or the skill's frontmatter |
+| Concurrency budget for the whole agent tree | none encountered; where a harness has one, it is set on the launching invocation and children inherit it |
+
+**If the harness caps concurrent sub-agents, that cap is yours to get right**, because it
+is a property of the outermost invocation and this skill is the outermost invocation. It has
+to accommodate the deepest point of the tree, not the widest: `verify` fans out to nine
+sub-agents while three ancestors — this scheduler, the issue-agent, and player-coach — are
+still active. A cap sized for what any one layer wants leaves the bottom layer with nothing,
+and the symptom is not an error but a review pipeline that quietly runs one reviewer at a
+time.
 
 Use a high-capability model for all four sub-agent roles. The planning agent especially: a
 bad plan poisons every turn downstream of it, and it is the cheapest place in the whole

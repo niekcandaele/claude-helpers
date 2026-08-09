@@ -45,6 +45,21 @@ The ordered remote player-turn commits, immutable verification comments, and ter
 state produced by a traced run.
 _Avoid_: log, transcript, PR history
 
+**Run ledger**:
+The durable per-run record of every finding, its disposition, and every player turn and
+verification run, held outside the repository and re-read rather than remembered.
+_Avoid_: state file, memory, cache, history
+
+**Disposition**:
+What a run has decided about one finding: `open`, `fixed`, `accepted-below-threshold`,
+`deferred-out-of-scope`, or `quarantined`.
+_Avoid_: status, resolution, triage
+
+**Quarantine**:
+A once-diagnosed failure proved pre-existing and untouched by the change, recorded so no
+later verification run, gate, or player turn pays to rediscover it.
+_Avoid_: known issue, ignore list, allowlist
+
 **Implementation journey**:
 The synthesized narrative in the final PR body that explains player turns, verification,
 friction, testing, and terminal state.
@@ -62,6 +77,11 @@ _Avoid_: run trace (the trace is the underlying evidence), summary
 - A player–coach **Run** contains one or more **Player turns** and **Verification runs**
 - A traced **Run** publishes a **Run trace**; its final PR body presents the
   **Implementation journey** synthesized from that trace
+- A **Run** maintains exactly one **Run ledger**; a traced **Run** publishes that ledger
+  inside its **Run trace**, and on resume the trace is authoritative over the ledger
+- Every finding in a **Run ledger** carries one **Disposition**; a finding still `open`
+  after more than one **Verification run** is sticky
+- A **Quarantine** entry suppresses a finding at the verification gate only, never at CI
 
 ## Example dialogue
 
@@ -75,3 +95,4 @@ _Avoid_: run trace (the trace is the underlying evidence), summary
 
 - "agent" was used to mean both the **Harness** and a sub-agent it spawns — resolved: the **Harness** is the program; the things it spawns are sub-agents.
 - "degrade" was used for running on a less capable **Harness** — rejected as pejorative and inaccurate; the property is **Harness-neutral**, and a **Harness** either supports a feature or runs a documented fallback.
+- "state" was used for both the coach's in-context variables and its durable record — resolved: the **Run ledger** is the durable record, and the in-context values are working copies of it that are never authoritative.
