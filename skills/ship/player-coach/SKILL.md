@@ -167,9 +167,22 @@ remote_head_sha = inspected remote full SHA for traced runs, otherwise none
 ci_deadline = unset until first entry to Phase 3
 ```
 
+Every value above is a **working copy of the run ledger**, not the record itself. The
+ledger is a file on disk, described in `references/run-ledger.md`; read that before the
+first write. Create or, on resume, rebuild it now, then keep it current at the points
+that reference lists.
+
+The distinction matters because a long run does not keep its own early rounds in view.
+Whatever holds this conversation has a finite window, and when it fills, the summary that
+survives keeps the most recent and the most prominent — which is exactly the wrong subset
+for deciding whether finding VI-4 in round 7 is the same problem as VI-2 in round 2. The
+list above stops being trustworthy somewhere in the middle of a long run, silently, and
+the coach carries on as though it were complete. The file does not have that failure mode.
+
 Use a unique mode-0700 temporary directory for this run. Each verification report, trace
 export, comment part, and terminal context gets its own mode-0600 path inside it; parallel
-runs must never share fixed filenames. Delete it after terminal output.
+runs must never share fixed filenames. Delete it after terminal output. The ledger
+directory is **not** this directory and outlives the run.
 
 Tell the user the plan summary, branch and exact target, budget, threshold, and whether CI
 is owned here or by the caller.
@@ -189,12 +202,59 @@ Plan file: {plan_file}
 Severity threshold: {severity}
 
 {On turn 1: implement the plan from scratch.}
-{Later: address this verification feedback, including failed gates:}
-{feedback}
+{Later:}
+Feedback file: {ledger_dir}/feedback/turn-{turn}.md
+It holds {K} blocking items, numbered 1 to {K}, the failed gates, and a list of known
+environment failures you must not investigate. Read it in full. Address every numbered
+item, or say per item why you could not.
 ```
 
-Record the player report's changed files, build/tests/app result, and concerns. Show the
-report to the user immediately.
+From turn 2 the feedback is a **file rendered from the ledger**, not a passage composed
+from memory. Render it immediately before invoking the player, by query:
+
+```text
+blocking = ledger findings where disposition == "open"
+                            and severity >= threshold
+                            and no active quarantine entry matches
+gates    = the failed gate rows from this verification run
+known    = the active quarantine entries
+deferred = findings with disposition "deferred-out-of-scope" from this run
+```
+
+```markdown
+# Feedback for turn {n}
+Verification run {v} · HEAD {sha} · threshold {t}
+
+TOTAL BLOCKING ITEMS: {K}
+
+## Blocking items
+### 1. [F-3, sev 8, correctness, seen 3×] {title}
+Location: src/redis/client.ts:27
+Root cause: {rootCause}
+Evidence: {evidence}
+Previous attempts: turn 2 (partially), turn 3 (not addressed — "unclear which client")
+
+## Failed gates
+| Gate | Status | Evidence |
+
+## Known environment failures — DO NOT INVESTIGATE
+| Q-1 | {title} | pre-existing at the merge base; unrelated to this change |
+
+## Deferred to PR follow-up — do not act on these
+| F-11 | coverage | {title} |
+```
+
+"Previous attempts" costs nothing — it is already in the ledger — and it is precisely what
+a player invoked in a fresh context can never work out for itself. A player that has failed
+at the same item twice for the same reason needs to know that, or it will fail the same way
+a third time.
+
+Record the player report's changed files, build/tests/app result, concerns, and its per-item
+receipt table into the ledger turn record. Show the report to the user immediately.
+
+**Compare the receipt row count to `K`.** A short report against a long feedback file is the
+first observable sign that items are going missing, and it is worth catching at turn 2
+rather than at turn 9.
 
 ### 2. Commit and publish the player turn
 
@@ -245,7 +305,17 @@ For a traced run, fetch `BASE_REMOTE/$TARGET_BRANCH` immediately before comparis
 ```text
 /verify --mode=report-only --scope=branch --base={BASE_REMOTE}/{TARGET_BRANCH}
         --plan-file={plan_file} --format=json --output={unique_report_path}
+        --ledger={ledger_dir}/ledger.json [--since={carryForward.lastVerifiedHeadSha}]
 ```
+
+Pass `--ledger` from the first verification run — it is how findings acquire stable
+identities across rounds, and an empty ledger costs nothing. Add `--since` only from the
+second run onward, once `carryForward.lastVerifiedHeadSha` exists; on the first run there is
+no previous head and the whole diff is the delta anyway.
+
+Record the verification run in the ledger as soon as the report is read, **before** deciding
+gates, so a crash between the two is recoverable. Set `fullAudit` to true when `--since` was
+omitted or `--no-carry-forward` was passed, and update `carryForward` after the decision.
 
 For `--no-pr`, first mark every untracked player-owned file intent-to-add with `git add -N`
 (never stage its content), then increment `verify_runs` and invoke explicit file scope for
@@ -281,11 +351,25 @@ SHA. Never overwrite or reuse an earlier report.
 
 ### 4. Apply gates mechanically
 
+Re-read the ledger first. Reconcile every issue in the report against it — matching, and
+recording `matchedTo` and `matchReason`, by the identity rule in
+`references/run-ledger.md`: same path, plus the same defect mechanism or the same symbol
+and symptom. Never merge across files. This replaces comparing against remembered
+feedback, which is the comparison that stops working once a run is long enough to need it.
+
 Compute a factual decision from the report:
 
+0. **Quarantine first.** Match every issue against the active quarantine entries by
+   signature and path. A match is dispositioned `quarantined`, increments that entry's
+   `reraiseCount`, and **does not produce FEEDBACK regardless of severity**. It is recorded
+   in the ledger, rendered in the verification comment's Issues table with its quarantine
+   ID, and surfaced once in the friction log. It is never re-diagnosed and never handed to
+   a player. This is ordered before the threshold rule deliberately: a pre-existing
+   environment failure often carries a severity that would otherwise dominate every round
+   it appears in.
 1. Report `status` must be `ok`; `blocked` or `error` produces `RERUN` with the reported
    reason.
-2. Any issue with severity at or above the threshold produces `FEEDBACK`.
+2. Any remaining issue with severity at or above the threshold produces `FEEDBACK`.
 3. The `exerciser` skill result must exist and be `PASSED`. `FAILED` becomes severity 10
    feedback; `BLOCKED` becomes severity 9. A missing row produces `RERUN` on the same
    player turn and same SHA.
@@ -297,9 +381,55 @@ Compute a factual decision from the report:
    A `stop` decision publishes this verification record, terminalizes the open change, and ends
    `FAILED_CODEX_BLOCKED`; it never falls through to approval.
 
-Before deciding, compare issues by location, title, description, and root cause—not VI ID.
-Record findings repeated from the preceding feedback as sticky friction. Record non-empty
-player concerns by turn.
+A finding the ledger already holds as `open` with `occurrences > 1` is sticky friction.
+Record non-empty player concerns by turn. Write every disposition back to the ledger before
+moving on.
+
+**Coverage findings need their own rule, because coverage is the one class that generates
+its own successor.** Every test added is untested code by some standard, so an unbounded
+coverage gate never terminates: one run blocked its eighth round solely on a missing test
+for a failure ordering that the seventh round's own tests had just introduced.
+
+- **Second-order coverage never blocks.** A `coverage` finding whose location was added or
+  modified by the previous turn, when that turn's feedback contained a coverage item, is
+  capped at `threshold - 1` and dispositioned `deferred-out-of-scope` with
+  `followUp.kind: "pr-comment"`. Both facts are in the ledger, so this is a lookup rather
+  than a judgement call.
+- **From round `policy.coverageCapFromRound`** (default 3), a *new* coverage finding is
+  capped the same way **unless it is first-order**: a new public behaviour this change
+  introduces, or a bug this change fixes, with no test at all. "You shipped an untested
+  endpoint" must be able to block on any round.
+- **Coverage never escalates on repeat.** The reaffirmation rule below and sticky friction
+  both skip `class == "coverage"`. A weak-coverage observation restated three times is
+  still a weak-coverage observation.
+
+None of this touches a test that is *wrong* — one that asserts nothing, mocks the thing
+under test, or passes with the implementation deleted. Those are `correctness` findings
+about test code and they are never capped.
+
+**Reaffirmation escalation.** If two independent skills reaffirm the same
+`accepted-below-threshold` finding in one verification run, re-score it one higher, capped
+at its original severity, and return it to `open` if it crosses the threshold. Without this
+an early mis-disposition would be frozen for the rest of the run by the very mechanism
+meant to stop findings recurring.
+
+**Opening a quarantine entry.** Write one only when the debugger's determination says
+`PRE_EXISTING: yes` **and** `TOUCHED_BY_DIFF: none`. An entry may never cover a failure
+whose evidence names a path in the branch diff — that is the line between "this was already
+broken" and "we broke it", and it is not a judgement call.
+
+**Closing one.** An entry is invalidated, marked `active: false`, and re-diagnosed exactly
+once when any of these happen: the resolved merge base moves, the branch diff starts
+touching any path the entry names, or the failure signature changes. Quarantine is a record
+of something proven about a specific state of the world; when that state changes the proof
+expires.
+
+**Quarantine applies to verification gates only — never to CI.** A red check in Phase 3 is
+red. A pre-existing failure that also breaks CI is a real blocker for the merge and goes to
+a human; suppressing it here would turn a mechanism for not re-paying diagnosis costs into
+a mechanism for shipping known-broken pipelines. `tester` also keeps running the full suite
+and reporting everything it finds, and matching is on signature rather than on suite, so a
+*new* failure inside a quarantined suite is still caught.
 
 ### 5. Publish one immutable verification record
 
@@ -467,9 +597,17 @@ history. A terminal run with only pending records is `FAILED_TRACE`.
   feedback for the next player turn, so persistent infrastructure failure consumes the
   finite turn budget instead of looping forever. Reset `reruns_this_turn` after each
   player invocation.
-- `FEEDBACK`: pass every blocking issue and gate with evidence to the next player turn.
-  Below-threshold issues remain in the trace and final journey but do not block.
-- `APPROVED`: when no threshold issue or gate blocks, enter Phase 2.
+- `FEEDBACK`: render `feedback/turn-{turn+1}.md` from the ledger and pass its path to the
+  next player turn. Every blocking issue and failed gate goes in, with evidence — the
+  rendered count must equal the ledger query count. Below-threshold and deferred issues
+  remain in the trace and final journey but do not block.
+- `APPROVED`: when no threshold issue or gate blocks. **If the deciding verification run
+  was delta-scoped** (`fullAudit: false`), run one more verification at the same SHA with
+  `--no-carry-forward` first; approval requires *that* run. It is an ordinary numbered
+  verification run with its own immutable comment, and it does not count against
+  `reruns_this_turn`. The cost is one extra verification per run — not per round — and it
+  buys the guarantee that nothing ships having only ever been reviewed against a delta.
+  Then enter Phase 2.
 - If feedback remains after the last player turn, terminalize as `TURN_LIMIT_VERIFY`.
 - If the run reaches approval or exhaustion without a real commit and draft,
   `FAILED_TRACE` takes precedence over approval and turn-limit statuses; no trace can
@@ -481,6 +619,15 @@ does not accidentally end the loop:
 ```bash
 echo "VERIFY RETURNED. NEXT: decide gates, publish verification run $VERIFY_RUNS, then rerun, feed back, approve, or exhaust."
 ```
+
+And once gates are decided, a second anchor carrying the counts the next step has to honour:
+
+```bash
+echo "GATES DECIDED. BLOCKING=$K QUARANTINED=$Q DEFERRED=$D. NEXT: render feedback/turn-$NEXT_TURN.md from the ledger, then invoke the player with its path."
+```
+
+Both anchors work for the same reason: they reappear at the tail of the transcript, which is
+the part that survives when the middle of a long run gets summarised away.
 
 ## Phase 2: Verification-approved open change
 
@@ -686,3 +833,16 @@ mismatch is always failure evidence, never approval.
   define branch scope.
 - `create-pr` is the only forge-mutation boundary, including later pushes.
 - Threshold and gate decisions are mechanical; below-threshold findings remain visible.
+- **The run ledger is read from disk, never recalled.** Before deciding gates, before
+  rendering feedback, and before composing any player prompt, re-read `ledger.json` in
+  full. No gate decision, feedback set, sticky determination, or quarantine check may be
+  made from conversational memory of an earlier round. Re-reading a file you believe you
+  remember feels redundant, and that feeling is the failure mode: the rounds you are
+  surest about are the ones a compacted context has already paraphrased.
+- **Feedback is a rendered file, never a recollection.** `TOTAL BLOCKING ITEMS` in
+  `feedback/turn-{n}.md` must equal the number of ledger findings that are open, at or
+  above threshold, and not matched by an active quarantine entry. Rendering fewer is a run
+  defect: re-render from the ledger and re-invoke the player. Every other guarantee here
+  has an artifact whose absence fails — a unique report path, a SHA match, a digest chain,
+  a parseable status block. Batching had none, and it is the one that quietly stopped
+  holding.

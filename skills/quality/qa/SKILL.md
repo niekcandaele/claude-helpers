@@ -393,6 +393,17 @@ I will NOT write tests or modify any code.
 | 3-4 | Low | Suboptimal test type choice (works but not ideal), minor mock usage that could be cleaner, test names don't describe behavior |
 | 1-2 | Trivial | Test style inconsistency, could use a test helper but doesn't need to, minor naming convention difference |
 
+**Classify every finding as `coverage` or `correctness`, and be strict about the line.**
+`coverage` means the code is believed correct but is untested or under-tested.
+`correctness` means a test is *wrong* — it asserts nothing, mocks the thing under test,
+passes with the implementation deleted, or hides a bug. That distinction is already implicit
+in the 9-10 row above; making it an explicit label matters because callers running an
+iterative loop cap repeated `coverage` findings and never cap `correctness`. Coverage is the
+one class that generates its own successor — every test added is untested code by some
+standard — so an uncapped coverage gate never terminates. Mislabelling a broken test as
+`coverage` is the way a real defect gets capped, so when the two are close, it is
+`correctness`.
+
 **Maturity adjustment:** In GREENFIELD projects, shift severities down 1-2 points for coverage gaps (the baseline is nothing, so any tests are an improvement). In MATURE projects, severity stays as-is (the baseline is the codebase's established standard). In LEGACY projects, focus severity on the specific changes — don't penalize for the codebase's historical gaps.
 
 ## Required Practices

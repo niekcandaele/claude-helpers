@@ -44,6 +44,23 @@ Parse `$ARGUMENTS` for:
 - `--auto-fix-threshold=N`: Minimum severity for auto-fix mode (default: 3)
 - `--plan-file=<path>`: Explicit path to a plan file for completeness checking. If not provided, discover the plan from context — check if a plan is visible in conversation history (e.g., invoked from player-coach which read a plan, or a plan was created/discussed earlier in this session). If a plan is found from either source, resolve its contents for the plan completeness check in Phase 6.
 
+**Carry-forward across verification runs:**
+
+A caller that runs verification repeatedly against one change — `player-coach` is the
+obvious one — can supply what earlier runs already decided. Without it every run is the
+first run: fresh reviewers re-audit a diff that only grows, and each round opens a new
+line of inquiry into code the previous rounds already cleared. The findings never
+converge; they wander.
+
+- `--ledger=<path>`: a run ledger to read (see `player-coach`'s
+  `references/run-ledger.md`). Read-only — verify never writes it.
+- `--since=<sha>`: the head the last verification run approved. Requires `--ledger`.
+  Defines the **delta**.
+- `--no-carry-forward`: supply the ledger for reporting but review as though it were the
+  first run. This is how the confirming full audit before approval is requested.
+
+With no `--ledger`, verify behaves exactly as it always has, so it stays usable standalone.
+
 **Output Format:**
 - `--format=`: `markdown` (default) or `json`. When `json`, the report is serialized as a JSON object conforming to the adversary CLI schema (see Phase 8c)
 - `--output=<path>`: File path to write the JSON report to. Required when `--format=json`. The Write tool is used to write the file.
@@ -152,6 +169,13 @@ Also build a machine-usable `SCOPE_METADATA` block for agents that need exact di
 - `included_files`: ordered file/status records admitted to the scope
 - `excluded_files`: ordered path/reason records explicitly excluded; use
   `ALL_OTHER_FILES (outside selected scope)` when paths were not enumerated
+
+With `--since=<sha>`, add three more fields describing what changed since the last
+verified head. They are **additive**: every field above keeps its meaning and the full
+scoped diff is still what reviewers receive.
+- `delta_base_sha`: the `--since` value
+- `delta_files`: `git diff --name-status $DELTA_BASE $HEAD`
+- `delta_hunks`: the same comparison at `-U0`
 
 `SCOPE_METADATA` is the source of truth for any skill that needs to reconstruct the selected diff.
 
@@ -367,6 +391,16 @@ VERIFICATION SCOPE:
 SCOPE METADATA:
 {SCOPE_METADATA from Phase 1}
 
+{If --ledger was supplied:}
+KNOWN FINDINGS (decided by previous verification runs on this change):
+
+| ID | Location | Title | Root cause | Sev | Disposition | Reason |
+|----|----------|-------|------------|-----|-------------|--------|
+{one row per ledger finding that is not `fixed`}
+
+DELTA SINCE LAST VERIFIED HEAD: {delta_base_sha}
+{delta_files, one per line, with changed line ranges}
+
 ENGINEER SKILL SUMMARY:
 {Brief summary from ENGINEER_CONTEXT, or "No engineer skill found — toolchain discovered via exploration"}
 {If engineer skill exists: "Reference files available at {ENGINEER_SKILL_DIR} — read TESTING.md, ARCHITECTURE.md etc. for your domain"}
@@ -400,6 +434,12 @@ order listed below and concatenate their reports before Phase 7. The pipeline is
 correct either way; it is only slower. Do not drop skills to save time — the
 report's value comes from the combination.
 
+**If this phase is running one reviewer at a time on a harness that supports
+sub-agents, suspect a concurrency cap before suspecting this skill.** Measured on
+the Codex CLI: the same fan-out took 359 s of spawn-to-spawn at the default cap
+and 43 s once the cap was raised, with no change to these instructions.
+**Harness bindings** at the end of this skill records where that cap lives.
+
 **Always run, every time:** `reviewer`, `codex-reviewer`, `comment-review`, `qa`, `tester`. Triage focuses these with file assignments but never suppresses them — for correctness-facing review, a missed regression costs more than an extra skill run.
 
 **Run if triage says they apply:** `ux-reviewer`, `visual-verify` (see Phase 3 Job B gating). `--skip-ux` / `--skip-visual` override triage and force a skip.
@@ -424,6 +464,49 @@ each skill needs, as a rough cost signal:
 5. Skill-specific instructions (see templates below)
 
 For `codex-reviewer`, `SCOPE_METADATA` is authoritative. It must not infer scope mode from filenames or prose when exact metadata is available.
+
+### Carry-forward rules (only when `--ledger` was supplied without `--no-carry-forward`)
+
+Append this to the prompt of the **judgment** reviewers — `reviewer`, `codex-reviewer`,
+`qa`, `comment-review`, `ux-reviewer`, `visual-verify`. Never to `tester`,
+`static-analysis`, or `exerciser`: those run commands and report what came back, and a
+machine does not drift the way a fresh reader does.
+
+```
+CARRY-FORWARD RULES
+
+Tier A — regression lens, full scoped diff, always. You have the whole branch diff and you
+review all of it for anything the DELTA broke. A defect the delta introduced or made
+reachable is reportable at full severity even at a location listed in KNOWN FINDINGS: an
+accepted finding covers the exact state its root cause describes, never the file, the
+function, or the subsystem.
+
+Tier B — new audit territory. Do not open a new line of inquiry into code that is unchanged
+since DELTA BASE and that KNOWN FINDINGS does not mention. Previous rounds already reviewed
+that code against this threshold and dispositioned what they found. Widening the audit a
+little further each round is how a loop that was one round from done ends up reporting on a
+different subsystem every time.
+
+Matching a known finding:
+- Matches a KNOWN finding AND the code there is unchanged since DELTA BASE
+  -> do not report it as a finding. List it under REAFFIRMED with the known ID and one sentence.
+- Matches a KNOWN finding BUT the code there changed in the delta
+  -> report it normally, at full severity. It is a new finding about new code.
+- Has new evidence of concrete harm — a failing test, a reproduction, an exploit path
+  -> report it normally AND list it under REOPENED with that evidence.
+
+Never suppressible, whatever KNOWN FINDINGS says: anything at severity 9 or 10, and
+anything in the security class.
+
+OUTPUT ADDITIONS:
+REAFFIRMED: <known id> — <one sentence>    (or "none")
+REOPENED:   <known id> — <harm evidence>   (or "none")
+```
+
+**The orchestrator never filters.** Do not drop a reported finding because it matches the
+ledger. Suppression is a judgement a reviewer makes with the whole diff in front of it, and
+every instance of it is visible as a `REAFFIRMED` row. A quiet string-match filter in the
+pipeline would be undetectable exactly when it was wrong.
 
 ### Skill Prompt Templates
 
@@ -580,6 +663,16 @@ OUTPUT FORMAT: For each issue found, provide:
 
 ### 7a. Wait for all Phase 6 skills to complete
 
+This is one wait covering the whole set, not one wait per skill.
+
+**A skill that produced no result is `NOT_RUN`, never `COMPLETED`.** If it returned
+empty, hit a provider quota or rate limit, timed out, or was refused a start,
+record `NOT_RUN` with the observed reason. A review that never ran and a review
+that found nothing are opposite outcomes, and only one of them is good news —
+filing the first as the second turns a hole in the pipeline into a clean bill of
+health. Running the reviewers concurrently makes quota refusals more likely, not
+less, so this distinction earns its keep.
+
 Collect structured findings from each skill. Extract ONLY:
 - Title
 - Severity (1-10)
@@ -618,7 +711,21 @@ FAILURES TO INVESTIGATE:
 Analyze the root cause of these failures.
 Focus on failures caused by the scoped changes.
 If failures are unrelated to scope, note that explicitly.
+
+For each failure, determine whether the scoped changes caused it or whether it was already
+there. Check out {scope.mergeBase} in a scratch worktree and run the same command against it.
+Report, per failure:
+  PRE_EXISTING: yes | no | undetermined
+  COMMAND: <the exact command you ran>
+  EVIDENCE: <output excerpt showing the same failure signature at the merge base>
+  TOUCHED_BY_DIFF: <paths in the failure's stack that appear in the scoped diff, or none>
 ```
+
+That extra suite run costs one execution per distinct failure signature, once. It buys back
+far more than it costs: without it, an environment failure that has nothing to do with the
+change gets re-diagnosed from scratch on every round it appears in, at full suite price
+each time, and gets re-reported at a severity that dominates whatever the round was
+actually about.
 
 ### 7c. Always: exerciser with issue verification
 
@@ -674,7 +781,15 @@ status cannot be PASSED — use FAILED instead.
 2. Identify duplicates: same file/location, same root cause, same symptom from different angles
 3. Merge into single issue: list all source agents, combine descriptions, use highest severity
 4. Assign sequential VI-{n} IDs
-5. Sort by severity descending
+5. Assign each issue a `class`, since skills only emit it as a hint and callers gate on it:
+   `correctness`, `security`, `coverage`, `comment`, `ux`, `visual`, `test-failure`,
+   `environment`, `style`, `plan-completeness`. The one boundary worth stating explicitly is
+   `coverage` versus `correctness`: `coverage` means the code is believed correct but is
+   untested; a test that is *wrong* — asserts nothing, mocks the thing under test, passes
+   with the implementation deleted — is `correctness`, because the defect is in the test.
+   Callers cap repeated `coverage` findings and never cap `correctness`, so when in doubt
+   between the two it is `correctness`.
+6. Sort by severity descending
 
 **Never re-rate `comment-review` findings downward during dedup.** Its 5-6 severities are a
 deliberate floor, not an assessment — they correct a reproducible bias where comment
@@ -842,8 +957,11 @@ never add `endLine` there. Omit `findings[].location` when none applies and set
     ],
     "excluded": [
       {"path": "ALL_OTHER_FILES", "reason": "outside selected scope"}
-    ]
+    ],
+    "deltaBaseSha": null,
+    "deltaFiles": []
   },
+  "knownFindings": null,
   "triage": {
     "skillsRun": [
       {"skill": "reviewer", "reason": "code files require correctness review"},
@@ -915,6 +1033,21 @@ Field rules:
   and `evidence` is always present.
 - `customGates.exerciser` and `customGates.review` are always arrays, even when empty.
   Every gate records its rule, status, evidence, and the skill or command in `checker`.
+- `scope.deltaBaseSha` and `scope.deltaFiles` describe the delta when `--since` was given;
+  `deltaBaseSha` is `null` and `deltaFiles` is `[]` otherwise.
+- `knownFindings` is `null` when no ledger was supplied. Otherwise it records what the
+  carry-forward rules produced:
+
+```json
+"knownFindings": {
+  "supplied": 14,
+  "reaffirmed": [{"id": "F-3", "skill": "reviewer", "reason": "unchanged since delta base", "newHarmEvidence": false}],
+  "reopened": [{"id": "F-7", "skill": "tester", "reason": "now reproduces", "evidence": "…"}]
+}
+```
+
+  These are additive keys. A consumer that ignores unknown fields is unaffected, which is
+  why they do not bump `schemaVersion`.
 
 The JSON-v1 compatibility boundary is deliberate: `schemaVersion`, `status`, and `findings`
 retain their prior meanings and shapes, as required by adversary consumers. The formerly
@@ -1040,3 +1173,31 @@ This is critical since verify runs in the main context window.
 - **Structured extraction only**: When collecting skill results, extract ONLY: title, severity, location, category, description. Discard investigation narratives.
 - **No full file reads in orchestrator**: Never read source files except during the fix execution phase (interactive/auto-fix modes).
 - **Compact context bundle**: Scope + static summary + diff stat. ~50-100 lines max.
+
+## Harness bindings
+
+The pipeline above is harness-neutral. These are the mechanisms it maps onto. On
+a third harness, add a column and leave everything else alone.
+
+The reason this table exists is that the second column was missing for a long
+time, and its absence was invisible: the pipeline still produced a correct
+report, just eight times slower. A capability with no stated binding does not
+fail loudly — it quietly takes whichever fallback the skill offers.
+
+| Capability | Claude Code | Codex CLI |
+|---|---|---|
+| Start a sub-agent without blocking | one `Skill` or `Agent` call per skill, all in one message | `spawn_agent`, one per turn; returns a handle in well under a second |
+| Wait for the whole outstanding set | implicit — the harness returns when they finish | one `wait_agent` with a multi-minute `timeout_ms`, re-issued only after it returns |
+| Cap on simultaneously active sub-agents | none encountered in practice | `features.multi_agent_v2.max_concurrent_threads_per_session`, default 4, counting every active ancestor including this agent. A refused start reports `agent thread limit reached` |
+| Read-only exploration sub-agent (Phase 3) | the `Explore` agent type | `spawn_agent` with a read-only sandbox |
+| Hand a sub-agent a specific skill | the `Skill` tool by name | name the skill's `SKILL.md` absolute path in the spawned agent's message; the session's skill inventory lists that path |
+| Choose a model or effort per sub-agent | `model` on the call, or the skill's frontmatter | `model` / `reasoning_effort` on `spawn_agent` |
+| Ask the human a question (Phase 7c, Phase 9) | `AskUserQuestion` | a final-channel question; with no human attached, run `--mode=report-only` instead |
+| Enter and exit a reviewed plan before fixing | `EnterPlanMode` / `ExitPlanMode` | present the plan in the final channel and wait for the reply |
+| Write the JSON report to a path | the `Write` tool | `apply_patch`, or a shell redirect |
+
+**A cap below the number of applicable skills is a configuration problem, not a
+pipeline problem.** Phase 6 degrades correctly when it hits one, but the fix
+belongs wherever that harness is configured — and because the cap counts
+ancestors, the number that matters is the depth of the whole tree this `verify`
+is running inside, not what `verify` alone would like.

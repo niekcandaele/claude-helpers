@@ -70,6 +70,16 @@ When there is no previous feedback, implement the solution from scratch:
 
 When you receive feedback from a previous turn, it will be either verification issues (VI-N) or CI failures (CI-N):
 
+**The feedback usually arrives as a file path, not as inline text.** Read the whole file. It
+opens with `TOTAL BLOCKING ITEMS: K` — that number is the contract for this turn, and your
+report has to account for all K. It also carries a "Previous attempts" line per item, which
+is worth reading closely: if an item has already defeated two turns for the same stated
+reason, doing the same thing a third time is the most likely way to waste this one.
+
+Two sections are instructions *not* to work: "Known environment failures — DO NOT
+INVESTIGATE" lists failures already proven to pre-date this change, and "Deferred to PR
+follow-up" lists findings deliberately parked. Chasing either is pure loss.
+
 1. Read the plan again (fresh context — you don't remember the previous turn)
 2. Read the feedback carefully — every numbered item
 3. For each feedback item:
@@ -78,6 +88,12 @@ When you receive feedback from a previous turn, it will be either verification i
    - Each item has a severity and source — use that context
 4. Run tests after all fixes
 5. If you cannot address a feedback item, explain why in your report (don't silently skip it)
+
+The report's feedback table needs one row per numbered item — `addressed`, `partially`, or
+`not-addressed` with a reason. "Explain why" has always been the rule; the table is what
+makes it checkable, because the orchestrator can compare your row count to K. A genuine
+`not-addressed` with a real reason is a fine outcome and often the most useful thing you can
+return. An item that quietly vanishes is not, and it is invisible until several turns later.
 
 ### CI Failure Feedback (CI-N items)
 
@@ -96,6 +112,13 @@ At the end of your turn, produce this structured report:
 ```
 PLAYER REPORT
 Turn: N
+
+Feedback items (turn 2+; one row per numbered item, all K of them):
+| # | ID | Disposition | Note |
+|---|----|-------------|------|
+| 1 | VI-3 | addressed | cached the rejection and cleared it on failure |
+| 2 | VI-7 | partially | fixed the read path; the write path needs a schema change |
+| 3 | VI-9 | not-addressed | cannot reproduce; the described state looks unreachable |
 
 Changes made:
 - path/to/file.ts — what was changed and why
