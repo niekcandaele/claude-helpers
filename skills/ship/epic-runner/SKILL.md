@@ -8,7 +8,7 @@ description: >
   autonomously ("run this epic", "work through these tickets", "do the whole milestone").
   For a single ticket, use `player-coach` directly instead — this skill drives it once per
   issue and adds scheduling, dependency ordering, merging, and follow-up tracking on top.
-argument-hint: "<epic-reference> [--write-back=on|off] [--new-issues=never|propose|create] [--max-turns=N] [--severity=N] [--target=<branch>]"
+argument-hint: "<epic-reference> [--write-back=on|off] [--new-issues=never|propose|create] [--max-turns=N] [--severity=N] [--depth=light|full] [--target=<branch>]"
 disable-model-invocation: true
 allowed-tools:
   - Read
@@ -45,11 +45,15 @@ without losing the thread.
 
 ```
 epic-runner            you — the scheduler
-└── issue-agent        one per ticket, isolated context + worktree
-    └── player-coach   the implement/verify loop
-        ├── player
-        └── verify → reviewer, qa, tester, exerciser, codex-reviewer,
-                     comment-review, static-analysis, ux-reviewer, visual-verify
+├── issue-agent        one per ticket, isolated context + worktree
+│   └── player-coach   the implement/verify loop
+│       ├── player
+│       └── verify → at light depth: light-reviewer, codex-reviewer, tester,
+│                    static-analysis, exerciser
+│                    at full depth: reviewer, qa, comment-review, ux-reviewer,
+│                    codex-reviewer, tester, static-analysis, exerciser,
+│                    visual-verify
+└── epic-verify-agent  one per finalization round, holds the full report so you don't
 ```
 
 Everything below the first line already exists and is already isolated. Your job is to
@@ -74,6 +78,7 @@ using anything you need.
 | Fix a red PR | **yes** |
 | Merge a green PR | no |
 | Draft a follow-up ticket | no |
+| Verify or remediate the epic branch | **yes** |
 
 **The dev stack is the constraint** — ports, memory, the working tree. Exactly one
 implement-or-fix runs at a time. Everything else runs freely whenever you like.
@@ -104,8 +109,13 @@ stalls the run until the user happens to look at the terminal.
 --new-issues=never|propose|create    Follow-up ticket policy.            [propose]
 --max-turns=N                        Per-issue verify budget.                [15]
 --severity=N                         Per-issue severity threshold.            [5]
---target=<branch>                    Merge target.                 [repo default]
+--depth=light|full                   Force one verification depth for every
+                                     issue.               [light, per-issue]
+--target=<branch>                    Final merge target.           [repo default]
 ```
+
+`--target` names where the *epic* eventually lands. Individual issues never target it —
+they target the epic branch created in step 4.
 
 ### 2. Resolve the epic and build the tracker binding
 
@@ -160,7 +170,49 @@ just being obeyed.
 lists in the order they intend to do them, and treating that order as meaningless throws
 away information the user already gave you.
 
-### 4. Check the ground
+**Assign each issue a verification depth while you have its body in front of you.** Light is
+the default and is right for most of an epic: the issues are small, they build on each other,
+and the integrated result gets a full-depth review before it reaches the real target. Mark an
+issue **full** when the depth loss would be expensive to discover late — it touches
+authentication, authorization, or tenant isolation; it migrates data; or it changes a public
+API contract. `--depth` overrides the whole run either way.
+
+**Announce every full-depth issue in the confirmation**, the same way you announce inferred
+edges, and for the same reason:
+
+```
+Full depth: #12 (adds a permissions check on the export route)
+```
+
+A depth decision nobody sees is one nobody can correct, and its symptom — a review that was
+thinner than it should have been — surfaces only much later.
+
+### 4. Create the epic branch
+
+Every issue in the epic merges into one **epic branch**, and nothing this run does reaches the
+real target. Derive `<slug>` from the epic reference — the same key that names the state
+directory — and create `epic/<slug>` from the fetched target:
+
+```bash
+git fetch "$BASE_REMOTE" "$TARGET_BRANCH"
+git branch "epic/$SLUG" "$BASE_REMOTE/$TARGET_BRANCH"
+git push "$BASE_REMOTE" "epic/$SLUG"
+```
+
+If it already exists, this is a resumed run: adopt it and reconcile against the tracker as
+described under **State**.
+
+Two things fall out of this, and both are the point:
+
+- **Issues integrate against each other, not against a moving target.** Issue 4 branches from
+  the epic branch, which already contains issue 3, so "builds on the previous ticket" is
+  simply true rather than something to arrange.
+- **A human reviews the epic once, whole.** The per-issue runs use light depth precisely
+  because this branch gets a full-depth review and a remediation pass before anyone is asked
+  to look at it. Those two facts are one decision; keeping the branch while dropping the
+  finalization would ship less review than the old flow, not more.
+
+### 5. Check the ground
 
 Four cheap checks that each prevent a specific way the run wastes hours before failing:
 
@@ -171,21 +223,37 @@ Four cheap checks that each prevent a specific way the run wastes hours before f
   lifecycle or CI-proof capability means the epic cannot deliver its promised merges;
   disclose it in the confirmation and stop before implementation mutation unless the user
   explicitly narrows the run to drafts only.
-- **Branch protection on the target.** If merges require a human approval, say so plainly:
-  *"target branch requires 1 approval — PRs will be opened but not merged, so anything
-  depending on them will strand."* Then continue if the user still wants to. **Never work
-  around branch protection** — not by self-approving, not by pushing to the target, not by
-  disabling a rule. It exists for a reason and it is not yours to reinterpret.
+- **Branch protection.** Read it in two places. On the **epic branch**, protection requiring
+  human approval would stall every issue merge — say so plainly and continue only if the user
+  still wants to. On the **real target**, protection does not affect this run at all, since
+  you never merge there; report it so the user knows what the final human merge will ask of
+  them. **Never work around branch protection** — not by self-approving, not by pushing to a
+  protected branch, not by disabling a rule. It exists for a reason and it is not yours to
+  reinterpret.
 - **Codex availability.** `verify` runs `codex-reviewer` as an independent second-model
   review. If the Codex CLI is missing or unauthenticated it will be blocked on *every*
   ticket, and the whole epic ships with one fewer reviewer. That is a fine trade to make
   knowingly at minute one and a bad one to discover at hour six.
 - **Prior run state** for this epic (see **State** below). If found, ask resume-or-fresh.
 
-### 5. Confirm once, then go
+### 6. Write the shared context files
 
-Print the resolved binding, the graph, the order, the arguments in effect, and anything the
-ground checks turned up. Get one confirmation.
+Two files in the state directory, both passed to every issue as paths and **neither ever read
+by you**. That asymmetry is deliberate: it is how the epic shares knowledge across issues
+without any of it landing in the one context that has to survive the whole run.
+
+- `epic-context.md` — completed issues with one-line summaries, the current issue, and the
+  remaining issues by title. Reviewers use it to tell scheduled work apart from forgotten
+  work, which is a distinction nobody looking at a single issue can make. Rewrite it before
+  each implementation so "remaining" stays true.
+- `quarantine.json` — the epic quarantine described in `player-coach`'s
+  `references/run-ledger.md`. Starts as `[]`. A broken suite diagnosed once on issue 3 stays
+  diagnosed for issues 4 through 12 instead of costing a full suite run each time.
+
+### 7. Confirm once, then go
+
+Print the resolved binding, the epic branch, the graph, the order, the depth assignments, the
+arguments in effect, and anything the ground checks turned up. Get one confirmation.
 
 Then stop asking. From here to the end of the run, the only user interaction is progress
 output.
@@ -244,7 +312,9 @@ Spawn an issue-agent in an isolated worktree:
 Implement issue {id} using the player-coach loop.
 
 Invoke: /player-coach --headless --no-ci --plan-file={state_dir}/plans/{id}.md
-        --max-turns={max_turns} --severity={severity} --target={target}
+        --max-turns={max_turns} --severity={severity} --depth={depth for this issue}
+        --target=epic/{slug} --epic-context={state_dir}/epic-context.md
+        --epic-quarantine={state_dir}/quarantine.json
 
 Include "{id}" in the branch name.
 
@@ -256,6 +326,11 @@ outside this ticket's scope, a Discoveries section. Do not return diffs, verific
 reports, or turn-by-turn narration — the orchestrator does not read them and cannot
 afford the context.
 ```
+
+Targeting the epic branch needs nothing else from you: `player-coach` branches from
+`BASE_REMOTE/$TARGET_BRANCH`, which is now the epic branch, and you merge each issue before
+starting the next — so every issue branch is cut from a tip that already contains its
+predecessors.
 
 `--no-ci` is what makes the schedule work: player-coach opens the draft early but returns
 only after its player/verification loop approves the head. It then hands back the dev stack
@@ -383,7 +458,7 @@ Only when the affirmative green test passes. If the PR is still draft, first inv
 
 ```text
 /create-pr --ready --pr={PR_URL} --head-sha={approved full SHA}
-           --context={ready_delivery_context} --no-comments --base={target}
+           --context={ready_delivery_context} --no-comments --base=epic/{slug}
            [--reviewer={resolved_distinct_handle}]
 ```
 
@@ -396,6 +471,18 @@ including resumed turns; epic-runner must not replace it with its older issue jo
 If the PR was already ready, publish the same `ready` delivery state through the scheduler
 state procedure before the pre-merge reread. Thus both paths record the latest green proof
 without attempting a redundant ready transition.
+
+**Also require the issue head to contain the current epic tip.**
+
+```bash
+git fetch "$BASE_REMOTE" "epic/$SLUG"
+git merge-base --is-ancestor "$BASE_REMOTE/epic/$SLUG" "$APPROVED_SHA"
+```
+
+If it does not, the branch was verified against an epic branch that has since moved, and its
+green CI proves nothing about the integrated result. Send it back through the CI-fix flow to
+sync, then re-verify. On a protected target this is what `STRICT_POLICY: required` would
+enforce; an `epic/*` branch is usually unprotected, so nothing else does.
 
 Immediately before every merge invocation, read
 `/check-ci --pr={PR_URL} {approved full SHA} --once` and require the complete affirmative
@@ -514,7 +601,106 @@ is worth filing; a near-empty cleanup ticket on a clean epic is just noise.
 
 ---
 
-## Phase 2: Resolve the ledger
+## Phase 2: Finalize the epic
+
+Every issue that could land has landed. The epic branch now holds something no per-issue run
+ever saw: the integrated result. This is where the light-depth trade is repaid — issues that
+are each correct in isolation routinely conflict when assembled, and this branch is the only
+place that is visible.
+
+**Run this phase even when some issues failed.** A partial epic still gets reviewed as a
+whole; what it does not get is a claim of completeness.
+
+### 1. Verify the epic branch
+
+Spawn a verification agent. It holds the report so you don't:
+
+```
+Verify the epic branch as one integrated change.
+
+Check out epic/{slug} and invoke:
+/verify --mode=report-only --depth=full --scope=branch --base={BASE_REMOTE}/{target}
+        --format=json --output={state_dir}/epic-verify/{round}.json
+
+Return ONLY these three lines:
+BLOCKING: <count of issues at severity {severity} or above>
+TOTAL: <count of all issues>
+REPORT: {the output path}
+
+Return no findings, no descriptions, and no narration — the orchestrator does not read
+verification reports and cannot afford the context.
+```
+
+Zero blocking findings ends this phase; go to step 4.
+
+### 2. Plan the remediation
+
+Spawn a remediation-planning agent, which reads the report you did not:
+
+```
+Write a remediation plan for the findings in {report path}.
+
+The epic branch epic/{slug} is complete and its individual issues are merged. A full-depth
+verification of the integrated result found blocking issues. Read that report and the code,
+and write a plan to fix them.
+
+Write the plan to {state_dir}/plans/remediation-{round}.md
+
+Fix what was found. Add no functionality: anything that looks like new scope belongs in a
+follow-up ticket, not in this plan — say so in the plan rather than planning it.
+
+If a finding is not real, say so in the plan and explain why, instead of planning a change
+that exists to satisfy a reviewer.
+```
+
+### 3. Run the remediation
+
+An ordinary issue-agent on an ordinary branch — the flow you already have:
+
+```
+Implement the remediation plan using the player-coach loop.
+
+Invoke: /player-coach --headless --no-ci
+        --plan-file={state_dir}/plans/remediation-{round}.md
+        --max-turns=5 --severity={severity} --depth=full --target=epic/{slug}
+        --epic-quarantine={state_dir}/quarantine.json
+
+Use branch name epic-{slug}-remediation-{round}.
+```
+
+Then take it through the same CI, ready, and merge path as any issue. Its trace lands on its
+own PR, exactly like every other run's, which is why it does not need a special case.
+
+Full depth and severity 5 here are not an inconsistency with the light per-issue runs. This is
+the pass whose findings nobody else will catch, and it is bounded by working from a fixed
+list rather than an open-ended ticket — being strict is the entire point of it.
+
+**Then return to step 1 for one confirming round.** At most two rounds total. Anything still
+blocking after the second goes to the human in the completion report — a loop that keeps
+finding work in its own fixes is telling you the epic needs a person, not another turn.
+
+### 4. Open the epic PR
+
+With `epic/{slug}` checked out, and a context file built from the run's own state — the
+per-issue outcomes, the verification result of each finalization round, and anything left
+blocking:
+
+```text
+/create-pr --draft --base={target} --context={epic_pr_context}
+```
+
+`create-pr` opens the PR for the checked-out branch, so the checkout is what selects the head.
+The context file is the epic summary for a human reviewer; it is not `epic-context.md`, which
+is the reviewer-facing backlog and has no place in a PR body.
+
+**Leave it as a draft, and never merge it.** This is the whole reason the run could be
+autonomous: a human reads one integrated branch, exercises it however they exercise things,
+and merges it themselves. Marking it ready or merging it would quietly convert a reviewed
+hand-off into an unreviewed deployment.
+
+---
+
+## Phase 3: Resolve the ledger
 
 Depends on `--new-issues`:
 
@@ -532,13 +718,15 @@ ambiguous.
 
 ---
 
-## Phase 3: Completion report
+## Phase 4: Completion report
 
 Lead with what needs a human. The merged list is the boring part — those PRs can be read at
 leisure. The three lines demanding action must be unmissable in the first screenful.
 
 ```markdown
-Epic {name} — {n} of {m} issues merged, {duration}
+Epic {name} — {n} of {m} issues merged into epic/{slug}, {duration}
+
+REVIEW THIS  {epic PR url}  — draft, unmerged, waiting for you
 
 MERGED       #41 #42 #43 #44 #45 #47 #48 #50 #51
              {PR links}
@@ -546,17 +734,24 @@ NEEDS YOU    #46  turn limit — 15 turns, verify still flags {thing}. PR {url} 
              #49  plan agent refused — ticket doesn't specify {thing}.
 STRANDED     #52  blocked by #49
 
+EPIC VERIFY  round 1: {n} blocking → remediation merged; round 2: clean
+             {or: round 2 still flags {thing} — the epic PR carries the detail}
 FRICTION     {issues that took more than 3 turns, sticky findings, CI failures,
              quarantined environment failures with their re-raise counts,
-             findings deferred to PR follow-up}
-PERFORMANCE  {turns per issue, first-turn approvals, which verify skills fired most}
+             findings deferred to PR follow-up, items deferred to later issues}
+PERFORMANCE  {turns per issue, first-turn approvals, depth per issue, which verify
+             skills fired most}
 DISCOVERIES  {n} tickets drafted{, awaiting approval}{, + 1 combined cleanup ticket}
 ```
 
+The epic PR leads because it is the one thing the run cannot finish for the user.
+
 Then, with write-back on: post the report as a comment on the epic ticket, and **close the
-epic if every child issue is done.** If anything is stranded or needs attention, leave it
-open — a partially-finished epic that reports itself complete is a lie the user will only
-catch much later.
+epic only when every child issue is done *and* the final epic verification came back clean.**
+Anything stranded, needing attention, or still blocking at the end of Phase 2 leaves it open —
+a partially-finished epic that reports itself complete is a lie the user will only catch much
+later. The epic branch being unmerged is not itself a reason to keep the ticket open; that
+merge is the human's step.
 
 ---
 
@@ -567,10 +762,18 @@ Run state lives outside the repository, in `$XDG_STATE_HOME/epic-runner/{project
 
 ```
 plans/{id}.md          materialized implementation plans
+plans/remediation-{n}.md  the finalization plans written from each epic verification
 issues/{id}.md         per-issue journey logs written by issue-agents
 discoveries/{n}.md     drafted follow-up tickets
-run.json               status blocks, verified HEAD SHA, verify-run count, trace, pending merge-queue work, inferred edges, failure reasons
+epic-context.md        completed / current / remaining issues, handed to every reviewer
+quarantine.json        environment failures diagnosed once and shared by every issue
+epic-verify/{n}.json   the full-depth report for each finalization round
+run.json               status blocks, verified HEAD SHA, verify-run count, trace, pending merge-queue work, inferred edges, depth assignments, failure reasons
 ```
+
+`epic-context.md`, `quarantine.json`, and every `epic-verify/{n}.json` are paths you hand to
+sub-agents and never read yourself. The first two carry knowledge between issues; the third is
+a verification report, and the rule against reading those has not changed.
 
 Never in the repository — a long epic would litter the working tree and pollute the diffs
 being reviewed. Never in `/tmp` — a reboot mid-run would destroy the ledger and every
@@ -607,9 +810,13 @@ resumability genuinely degrades. Say so rather than pretending otherwise.
 ## Standing rules
 
 - **Don't write code.** Issue-agents do that.
-- **Don't verify.** `verify` does that, inside the loop, where you can't see it.
+- **Don't verify.** `verify` does that inside the loop, where you can't see it, and inside the
+  finalization agent in Phase 2, where you see three lines of it.
 - **Don't read verification reports or diffs.** Your context is the resource that has to
   last the whole run.
+- **Never merge the epic PR.** Open it as a draft and hand the human the link. The run's
+  autonomy is borrowed against that final human review; merging it spends something you were
+  not given.
 - **Never bypass branch protection**, weaken a rule, or self-approve to unblock a merge.
 - **Never merge a PR that isn't affirmatively green and mergeable.**
 - **One dev-stack consumer at a time.** Implementing and CI-fixing both count; polling,
@@ -640,6 +847,7 @@ still active. A cap sized for what any one layer wants leaves the bottom layer w
 and the symptom is not an error but a review pipeline that quietly runs one reviewer at a
 time.
 
-Use a high-capability model for all four sub-agent roles. The planning agent especially: a
-bad plan poisons every turn downstream of it, and it is the cheapest place in the whole
+Use a high-capability model for every sub-agent role — planning, implementation,
+ticket-writing, epic verification, and remediation planning. The planning agents especially:
+a bad plan poisons every turn downstream of it, and it is the cheapest place in the whole
 pipeline to be smart.

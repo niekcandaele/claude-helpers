@@ -5,10 +5,10 @@ description: >
   Detects scope, discovers toolchain, triages files to relevant skills, runs static
   analysis, invokes review skills in parallel, exercises the app, and produces a
   unified report. Supports interactive, report-only, and auto-fix modes.
-argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--base=<ref>] [--files=file1,file2] [--module=path] [--skip-ux] [--skip-visual] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>] [--plan-file=<path>]"
+argument-hint: "[--mode=interactive|report-only|auto-fix] [--depth=light|full] [--scope=staged|unstaged|branch|all] [--base=<ref>] [--files=file1,file2] [--module=path] [--skip-ux] [--skip-visual] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>] [--plan-file=<path>] [--epic-context=<path>]"
 metadata:
   group: quality
-  requires: [reviewer, codex-reviewer, comment-review, qa, tester, ux-reviewer, visual-verify, static-analysis, exerciser, debugger]
+  requires: [reviewer, light-reviewer, codex-reviewer, comment-review, qa, tester, ux-reviewer, visual-verify, static-analysis, exerciser, debugger]
 ---
 
 # Verify Changes — Triage-First Pipeline
@@ -25,6 +25,27 @@ Parse `$ARGUMENTS` for:
 - `interactive` (default): Full pipeline → report → interactive triage → plan → fix
 - `report-only`: Full pipeline → report → STOP
 - `auto-fix`: Full pipeline → report → auto-accept severity >= threshold → plan → fix → STOP
+
+**Depth** (`--depth=`) — which judgement reviewers Phase 6 fans out to:
+
+| Depth | Judgement reviewers | Always also run | Conditional |
+|---|---|---|---|
+| `full` (default) | `reviewer`, `codex-reviewer`, `comment-review`, `qa`, `ux-reviewer` | `static-analysis`, `tester`, `exerciser` | `visual-verify`, `debugger` |
+| `light` | `light-reviewer`, `codex-reviewer` | `static-analysis`, `tester`, `exerciser` | `visual-verify`, `debugger` |
+
+This table is the single source of truth for depth composition; callers name the flag and
+point here.
+
+**The default is `full`.** A standalone invocation, or a `player-coach` run against a single
+plan file, must not silently receive less review than it received before this flag existed —
+light depth is something a caller opts into for work it knows is deliberately partial.
+
+`light` keeps `codex-reviewer` because its value is an *independent engine's* opinion, which
+no amount of merging inside this harness reproduces. It keeps `exerciser` because starting
+the app and driving the real feature is the one check that proves the change works at all, and
+that is worth more on a small change, not less. It keeps `debugger` and `visual-verify` on
+their existing conditional triggers: `debugger` only fires after something already failed, and
+`visual-verify` only when the scope renders something — both cost nothing on the happy path.
 
 **Scope Control:**
 - `--scope=staged`: Verify only staged changes
@@ -60,6 +81,14 @@ converge; they wander.
   first run. This is how the confirming full audit before approval is requested.
 
 With no `--ledger`, verify behaves exactly as it always has, so it stays usable standalone.
+
+**Epic context:**
+
+- `--epic-context=<path>`: a file describing the epic this change is one issue of — what is
+  already done, what this issue is, and what is still to come. Read-only, and passed straight
+  through to the judgement reviewers. It exists so a reviewer can tell the difference between
+  work that was forgotten and work that is scheduled, which is the distinction a reviewer
+  looking at one issue of an epic has no way to make on its own.
 
 **Output Format:**
 - `--format=`: `markdown` (default) or `json`. When `json`, the report is serialized as a JSON object conforming to the adversary CLI schema (see Phase 8c)
@@ -293,7 +322,9 @@ user-facing skills apply at all.
 Read each changed file (not just the extension — look at actual content).
 
 ALWAYS-ON SKILLS — these run on every verification, no exceptions.
-Assign each the full scoped file list:
+Assign each the full scoped file list.
+
+At full depth:
 - reviewer          Business logic, architecture, patterns, security, robustness,
                     over-engineering. Needs breadth across the whole diff.
 - codex-reviewer    General second-opinion pass, not a specialist router target.
@@ -301,8 +332,17 @@ Assign each the full scoped file list:
 - qa                Test coverage assessment for everything that changed.
 - tester            Any code change could affect tests.
 
+At light depth, `light-reviewer` takes the place of reviewer, comment-review, qa, and
+ux-reviewer, and carries their gating decisions internally:
+- light-reviewer    Correctness, security, coverage, comment hygiene, and UX in one pass.
+- codex-reviewer    Unchanged.
+- tester            Unchanged.
+
 GATED SKILLS — these run only if the scope contains surfaces they can review.
 Decide applies: true/false for each, and state your reason either way.
+
+At light depth, decide `visual-verify` exactly as below and leave `ux-reviewer` out of the
+gating entirely — `light-reviewer` owns that decision inside its own pass.
 
 - ux-reviewer   APPLIES if the scope touches ANY user-facing surface:
                 UI components, CLI output or help text, user-facing strings,
@@ -328,7 +368,8 @@ Decide applies: true/false for each, and state your reason either way.
 
 A file can be assigned to multiple skills.
 
-Output a JSON-like mapping:
+Output a JSON-like mapping, with the depth's judgement reviewers in skill_assignments
+(at light depth, "light-reviewer" replaces the reviewer/comment-review/qa/ux-reviewer keys):
 {
   "skill_assignments": {
     "reviewer": ["all scoped files"],
@@ -401,6 +442,18 @@ KNOWN FINDINGS (decided by previous verification runs on this change):
 DELTA SINCE LAST VERIFIED HEAD: {delta_base_sha}
 {delta_files, one per line, with changed line ranges}
 
+{If --epic-context was supplied:}
+EPIC CONTEXT:
+{the file's contents — completed issues, this issue, remaining issues}
+
+Work whose natural home is one of the remaining issues is deferred, not reported: name it on
+a DEFERRED_TO_EPIC line instead of filing a finding. Anything at severity 9-10, anything in
+the security class, and any defect this change itself introduces is reported normally
+regardless of what the backlog says.
+
+OUTPUT ADDITION:
+DEFERRED_TO_EPIC: <issue> — <one sentence>    (or "none")
+
 ENGINEER SKILL SUMMARY:
 {Brief summary from ENGINEER_CONTEXT, or "No engineer skill found — toolchain discovered via exploration"}
 {If engineer skill exists: "Reference files available at {ENGINEER_SKILL_DIR} — read TESTING.md, ARCHITECTURE.md etc. for your domain"}
@@ -440,17 +493,19 @@ the Codex CLI: the same fan-out took 359 s of spawn-to-spawn at the default cap
 and 43 s once the cap was raised, with no change to these instructions.
 **Harness bindings** at the end of this skill records where that cap lives.
 
-**Always run, every time:** `reviewer`, `codex-reviewer`, `comment-review`, `qa`, `tester`. Triage focuses these with file assignments but never suppresses them — for correctness-facing review, a missed regression costs more than an extra skill run.
+**Always run, every time** — at full depth: `reviewer`, `codex-reviewer`, `comment-review`, `qa`, `tester`; at light depth: `light-reviewer`, `codex-reviewer`, `tester`. Triage focuses these with file assignments but never suppresses them — for correctness-facing review, a missed regression costs more than an extra skill run.
 
-**Run if triage says they apply:** `ux-reviewer`, `visual-verify` (see Phase 3 Job B gating). `--skip-ux` / `--skip-visual` override triage and force a skip.
+**Run if triage says they apply:** `visual-verify` at either depth, and `ux-reviewer` at full depth (see Phase 3 Job B gating). `--skip-ux` / `--skip-visual` override triage and force a skip; at light depth `--skip-ux` instructs `light-reviewer` to skip its UX lens.
 
 **Model routing is the harness's call.** No skill pins a model — the right one
 depends on how gnarly the change is, and only the orchestrator knows that. What
 each skill needs, as a rough cost signal:
 
-- **Most capable model** — `reviewer`. Comprehensive review across design,
-  architecture, coherence, hardening, security, and over-engineering. This is the
-  one that benefits most from raw capability.
+- **Most capable model** — `reviewer`, and `light-reviewer` for the same reason.
+  Comprehensive review across design, architecture, coherence, hardening, security,
+  and over-engineering. This is the one that benefits most from raw capability, and
+  a merged reviewer needs it more than the specialists did, not less — it is holding
+  four lenses in one pass.
 - **General-purpose model** — `codex-reviewer`, `comment-review`, `qa`,
   `ux-reviewer`, `exerciser`, `visual-verify`. Judgment calls, but bounded ones.
 - **Fast, cheap model** — `tester`, `static-analysis`. These run commands and
@@ -467,8 +522,8 @@ For `codex-reviewer`, `SCOPE_METADATA` is authoritative. It must not infer scope
 
 ### Carry-forward rules (only when `--ledger` was supplied without `--no-carry-forward`)
 
-Append this to the prompt of the **judgment** reviewers — `reviewer`, `codex-reviewer`,
-`qa`, `comment-review`, `ux-reviewer`, `visual-verify`. Never to `tester`,
+Append this to the prompt of the **judgment** reviewers — `reviewer`, `light-reviewer`,
+`codex-reviewer`, `qa`, `comment-review`, `ux-reviewer`, `visual-verify`. Never to `tester`,
 `static-analysis`, or `exerciser`: those run commands and report what came back, and a
 machine does not drift the way a fresh reader does.
 
@@ -553,6 +608,17 @@ Work the over-engineering lens in Dimension 1 deliberately — it is easy to rev
 for what is missing and never for what should be cut. Tag those findings
 (delete / stdlib / native / yagni / shrink), verify each proposed replacement actually
 exists before reporting it, and close the report with the net-lines metric.
+```
+
+**light-reviewer:** *(light depth only)*
+```
+Run one bounded pass over the scoped diff in the skill's priority order:
+correctness and security, then coverage, then comments, then UX.
+The comment and UX lenses gate themselves — no triage decided them for you.
+Report which lenses ran and which you skipped, with the reason for each skip.
+If the change turns out to be large, security-critical, or architecturally significant,
+say so: the caller can raise the depth, and that judgement is worth more than a thin
+review of something important.
 ```
 
 **codex-reviewer:**
@@ -805,6 +871,7 @@ bias the floor exists to cancel.
 ## Scope
 
 **Mode:** [staged / unstaged / branch / all / files / module]
+**Depth:** [full / light]
 **Base ref:** [exact `--base` value or resolved base; `null` outside branch scope]
 **Merge base:** [full SHA or `null` outside branch scope]
 **HEAD:** [full SHA observed when verification began]
@@ -835,6 +902,7 @@ A gated skip must always name its reason. A mis-gate is only correctable if it i
 | static-analysis | Completed | 4 findings (3 warnings, 1 error) |
 | tester | X passed, Y failed | [brief note] |
 | reviewer | Completed | Found N items (design, arch, coherence, hardening, security; net -N lines possible) |
+| light-reviewer | Completed | Found N items; lenses run and skipped with reasons |
 | codex-reviewer | Completed / **BLOCKED** / Skipped | Found N items / [reason] |
 | comment-review | Completed | Found N items / Comments clean |
 | qa | Completed | Found N items |
@@ -859,6 +927,19 @@ A gated skip must always name its reason. A mis-gate is only correctable if it i
 *Sources column shows which agents flagged the issue. Multiple sources = higher confidence.*
 
 **Total: N issues from M skill findings (deduplicated)**
+
+---
+
+## Deferred to Later Epic Issues
+
+{Omit this section entirely when no --epic-context was supplied or nothing was deferred}
+
+| Issue | Deferred item | Reported by |
+|---|---|---|
+| #47 | export endpoint has no pagination | light-reviewer |
+
+These are not findings and never block. They are recorded so a deferral is visible and
+correctable — a suppression nobody can see is only ever discovered by being wrong.
 
 ---
 
@@ -943,6 +1024,7 @@ never add `endLine` there. Omit `findings[].location` when none applies and set
   "overall": {"result": "issues-found", "mode": "branch"},
   "scope": {
     "mode": "branch",
+    "depth": "full",
     "baseRef": "origin/release",
     "mergeBase": "0123456789abcdef0123456789abcdef01234567",
     "headSha": "89abcdef0123456789abcdef0123456789abcdef",
@@ -962,6 +1044,7 @@ never add `endLine` there. Omit `findings[].location` when none applies and set
     "deltaFiles": []
   },
   "knownFindings": null,
+  "deferredToEpic": [],
   "triage": {
     "skillsRun": [
       {"skill": "reviewer", "reason": "code files require correctness review"},
@@ -1033,6 +1116,12 @@ Field rules:
   and `evidence` is always present.
 - `customGates.exerciser` and `customGates.review` are always arrays, even when empty.
   Every gate records its rule, status, evidence, and the skill or command in `checker`.
+- `scope.depth` is the resolved depth, `full` or `light`. It is always present, because a
+  consumer reading a report cannot otherwise tell how much review produced it.
+- `deferredToEpic` is `[]` with no `--epic-context` and otherwise holds one
+  `{"issue": …, "item": …, "source": …}` record per deferral. It is never merged into
+  `findings` or `issues`: a deferral is the absence of a finding, and a consumer that gates on
+  severity must not see it.
 - `scope.deltaBaseSha` and `scope.deltaFiles` describe the delta when `--since` was given;
   `deltaBaseSha` is `null` and `deltaFiles` is `[]` otherwise.
 - `knownFindings` is `null` when no ledger was supplied. Otherwise it records what the

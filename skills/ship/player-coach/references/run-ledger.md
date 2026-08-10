@@ -49,6 +49,27 @@ a crash never leaves a half-written ledger.
 Keep the directory after the run — it is the friction record the epic report wants.
 Prune directories untouched for 30 days at startup.
 
+## The epic quarantine file
+
+A ledger is per-change, and that is right for findings: identity is defined by path and
+defect mechanism against one diff, so merging ledgers across branches would make `matchedTo`
+meaningless. Quarantine entries are the exception. They record something proved about the
+*environment* — a suite that was already broken at the merge base and that the change never
+touches — and that proof does not stop being true when the next issue starts.
+
+`--epic-quarantine=<path>` names a file holding an array of quarantine entries in exactly the
+schema below, shared by every run in one epic:
+
+- **Seed** the ledger's `quarantine` array from it at Phase 0, then apply the closing rule to
+  each seeded entry against *this* run's merge base and diff. An entry whose paths now appear
+  in the diff, or whose merge base has moved, is invalidated and re-diagnosed once — inherited
+  evidence is still evidence about a specific state of the world.
+- **Append** when this run opens an entry, and mirror `active: false` when it invalidates one.
+- Writes are serialised by the orchestrator, which runs one implementation at a time, so
+  there is no concurrent writer to reconcile.
+
+Without the flag, quarantine behaves exactly as it always has and lives only in the ledger.
+
 ## Relationship to the run trace
 
 These are not two copies of the same thing.
@@ -115,6 +136,7 @@ Precedence, stated plainly because two records invite split-brain:
       "turn": 1,
       "headSha": "<full sha>",
       "reportPath": "reports/1.json",
+      "depth": "full",
       "deltaBaseSha": null,
       "fullAudit": true,
       "status": "ok",
@@ -185,6 +207,12 @@ Precedence, stated plainly because two records invite split-brain:
 **Stickiness is derived, not stored**: a finding is sticky when `occurrences > 1` and
 `disposition` is `open`. Making it a sixth enum value would let a finding be both
 sticky and fixed, which means nothing.
+
+### `depth` and `fullAudit`
+
+Two different axes, easy to conflate. `depth` is *which reviewers ran* — `full` or `light`.
+`fullAudit` is *how much of the diff they reviewed* — false when the run was delta-scoped by
+`--since`. A light run can be a full audit, and a full run can be delta-scoped.
 
 ### `class`
 
