@@ -1,14 +1,13 @@
 ---
 name: epic-runner
 description: >
-  Work an entire epic of tickets unattended — plan, implement, verify, PR, wait out CI,
-  merge, and file follow-ups — by delegating each ticket to its own sub-agent running the
-  player-coach loop. Works with any tracker: GitHub, Jira, GitLab, or a markdown checklist.
-  Use when the user hands over a batch of related issues and wants them worked through
-  autonomously ("run this epic", "work through these tickets", "do the whole milestone").
-  For a single ticket, use `player-coach` directly instead — this skill drives it once per
-  issue and adds scheduling, dependency ordering, merging, and follow-up tracking on top.
-argument-hint: "<epic-reference> [--write-back=on|off] [--new-issues=never|propose|create] [--max-turns=N] [--severity=N] [--depth=light|full] [--target=<branch>]"
+  Work an entire epic of tickets unattended — for each ticket: plan it, implement it,
+  verify it once, PR it into an epic branch, wait out CI, merge, and file follow-ups.
+  Works with any tracker: GitHub, Jira, GitLab, or a markdown checklist. Use when the user
+  hands over a batch of related issues and wants them worked through autonomously ("run
+  this epic", "work through these tickets", "do the whole milestone"). For a single ticket
+  where the work deserves an adversarial implement/review loop, use `player-coach` instead.
+argument-hint: "<epic-reference> [--write-back=on|off] [--new-issues=never|propose|create] [--max-ci-fixes=N] [--severity=N] [--target=<branch>]"
 disable-model-invocation: true
 allowed-tools:
   - Read
@@ -22,15 +21,16 @@ allowed-tools:
   - AskUserQuestion
 metadata:
   group: ship
-  requires: [player-coach, create-pr, check-ci, verify]
+  requires: [create-pr, check-ci, verify]
 ---
 
 # Epic Runner — Unattended Delivery of a Whole Epic
 
-You are the front office. `player-coach` runs a single game — one ticket, from plan to an
-approved draft. You own its CI, ready transition, and authorized merge. You decide which
-games get played, in what order, with what left over at the end. You never write code,
-never review it, and never run a verification pipeline yourself.
+You are the front office. Each ticket is one game — planned by an agent, implemented by an
+agent, verified once, and delivered as a PR into the epic branch. You own the schedule, the
+CI wait, and the authorized merge. You decide which games get played, in what order, with
+what left over at the end. You never write code, never review it, and never run a
+verification pipeline yourself.
 
 The person who starts you is going to walk away. They will come back in six hours to a
 terminal, and what they find there is the entire product of the run. Everything below
@@ -45,14 +45,10 @@ without losing the thread.
 
 ```
 epic-runner            you — the scheduler
+├── plan-agent         one per ticket, plans in plan mode, writes a plan file
 ├── issue-agent        one per ticket, isolated context + worktree
-│   └── player-coach   the implement/verify loop
-│       ├── player
-│       └── verify → at light depth: light-reviewer, codex-reviewer, tester,
-│                    static-analysis, exerciser
-│                    at full depth: reviewer, qa, comment-review, ux-reviewer,
-│                    codex-reviewer, tester, static-analysis, exerciser,
-│                    visual-verify
+│   └── verify → reviewer, codex-reviewer, comment-review, qa, ux-reviewer,
+│                static-analysis, tester, exerciser, visual-verify
 └── epic-verify-agent  one per finalization round, holds the full report so you don't
 ```
 
@@ -107,10 +103,9 @@ stalls the run until the user happens to look at the terminal.
 <epic-reference>                     Required. Free-form — see step 2.
 --write-back=off|on                  Update the tracker as work completes.   [on]
 --new-issues=never|propose|create    Follow-up ticket policy.            [propose]
---max-turns=N                        Per-issue verify budget.                [15]
---severity=N                         Per-issue severity threshold.            [5]
---depth=light|full                   Force one verification depth for every
-                                     issue.               [light, per-issue]
+--max-ci-fixes=N                     Per-issue CI-fix attempts.               [3]
+--severity=N                         Auto-fix threshold: findings at or above
+                                     this are fixed before the PR opens.      [5]
 --target=<branch>                    Final merge target.           [repo default]
 ```
 
@@ -170,22 +165,6 @@ just being obeyed.
 lists in the order they intend to do them, and treating that order as meaningless throws
 away information the user already gave you.
 
-**Assign each issue a verification depth while you have its body in front of you.** Light is
-the default and is right for most of an epic: the issues are small, they build on each other,
-and the integrated result gets a full-depth review before it reaches the real target. Mark an
-issue **full** when the depth loss would be expensive to discover late — it touches
-authentication, authorization, or tenant isolation; it migrates data; or it changes a public
-API contract. `--depth` overrides the whole run either way.
-
-**Announce every full-depth issue in the confirmation**, the same way you announce inferred
-edges, and for the same reason:
-
-```
-Full depth: #12 (adds a permissions check on the export route)
-```
-
-A depth decision nobody sees is one nobody can correct, and its symptom — a review that was
-thinner than it should have been — surfaces only much later.
 
 ### 4. Create the epic branch
 
@@ -207,10 +186,9 @@ Two things fall out of this, and both are the point:
 - **Issues integrate against each other, not against a moving target.** Issue 4 branches from
   the epic branch, which already contains issue 3, so "builds on the previous ticket" is
   simply true rather than something to arrange.
-- **A human reviews the epic once, whole.** The per-issue runs use light depth precisely
-  because this branch gets a full-depth review and a remediation pass before anyone is asked
-  to look at it. Those two facts are one decision; keeping the branch while dropping the
-  finalization would ship less review than the old flow, not more.
+- **A human reviews the epic once, whole.** Every issue is reviewed on its own way in, but
+  no per-issue run ever sees the assembled result. This branch is where Phase 2 reviews it,
+  and it is the one thing the run hands a person: one branch, one diff, one decision.
 
 ### 5. Check the ground
 
@@ -238,22 +216,23 @@ Four cheap checks that each prevent a specific way the run wastes hours before f
 
 ### 6. Write the shared context files
 
-Two files in the state directory, both passed to every issue as paths and **neither ever read
-by you**. That asymmetry is deliberate: it is how the epic shares knowledge across issues
-without any of it landing in the one context that has to survive the whole run.
+One file in the state directory, passed to every issue as a path and **never read by you**.
+That asymmetry is deliberate: it is how the epic shares knowledge across issues without any
+of it landing in the one context that has to survive the whole run.
 
 - `epic-context.md` — completed issues with one-line summaries, the current issue, and the
   remaining issues by title. Reviewers use it to tell scheduled work apart from forgotten
   work, which is a distinction nobody looking at a single issue can make. Rewrite it before
   each implementation so "remaining" stays true.
-- `quarantine.json` — the epic quarantine described in `player-coach`'s
-  `references/run-ledger.md`. Starts as `[]`. A broken suite diagnosed once on issue 3 stays
-  diagnosed for issues 4 through 12 instead of costing a full suite run each time.
+
+It earns its keep at the moment a reviewer would otherwise file a finding about work the
+next ticket already owns — and with auto-fix on, an unfiled deferral is not just noise, it
+is code written outside the plan.
 
 ### 7. Confirm once, then go
 
-Print the resolved binding, the epic branch, the graph, the order, the depth assignments, the
-arguments in effect, and anything the ground checks turned up. Get one confirmation.
+Print the resolved binding, the epic branch, the graph, the order, the arguments in effect,
+and anything the ground checks turned up. Get one confirmation.
 
 Then stop asking. From here to the end of the run, the only user interaction is progress
 output.
@@ -270,10 +249,13 @@ the next unblocked issue** → **plan ahead** → **draft a follow-up ticket**.
 
 Spawn a planning agent. Give it the issue and let it do its own research — it has the
 repository, git history, and the tracker, and it should use all three rather than being fed
-summaries.
+summaries. **Where the harness has a plan mode — a mode that researches and drafts without
+being able to edit — the planning agent runs in it.** The guarantee is what matters: a
+planner that cannot write code cannot start implementing the easy half of the ticket and
+call the result a plan.
 
 ```
-Plan the implementation of this ticket.
+Plan the implementation of this ticket. Plan only — write no code.
 
 Ticket: {id} — {title}
 {body and acceptance criteria}
@@ -282,7 +264,7 @@ Already completed in this epic: {ids and one-line summaries}
 
 Write an implementation plan to: {state_dir}/plans/{id}.md
 
-The plan is the requirements document for an implementation loop that will not see this
+The plan is the requirements document for an implementation agent that will not see this
 ticket — only your plan. Read the codebase. Check git history for how similar work was
 done here. Look at what the completed tickets above actually changed.
 
@@ -297,8 +279,8 @@ are stale, and a stale plan is worse than no plan because it looks authoritative
 **On ambiguity, the threshold is doubt, not certainty.** Minor gaps — an unspecified error
 message, an obvious default — should be resolved with an explicit assumption written into
 the plan and flagged for the PR description. Genuine doubt about what the ticket is asking
-for should be a refusal. Guessing wrong burns fifteen turns and an hour of CI to produce
-the wrong feature.
+for should be a refusal. Guessing wrong burns an implementation pass and an hour of CI to
+produce the wrong feature.
 
 A refusal is not a failure of the run. Record it, mark the issue needs-attention, continue.
 
@@ -309,44 +291,63 @@ A refusal is not a failure of the run. Record it, mark the issue needs-attention
 Spawn an issue-agent in an isolated worktree:
 
 ```
-Implement issue {id} using the player-coach loop.
+Implement issue {id} from the plan at {state_dir}/plans/{id}.md.
 
-Invoke: /player-coach --headless --no-ci --plan-file={state_dir}/plans/{id}.md
-        --max-turns={max_turns} --severity={severity} --depth={depth for this issue}
-        --target=epic/{slug} --epic-context={state_dir}/epic-context.md
-        --epic-quarantine={state_dir}/quarantine.json
+Branch from {BASE_REMOTE}/epic/{slug}, with "{id}" in the branch name. Implement the
+plan and commit. The plan is your requirements document — you will not see the ticket.
 
-Include "{id}" in the branch name.
+Then verify, exactly once:
 
-Write the full journey — turn history, friction, verification summary — to
-{state_dir}/issues/{id}.md for a human to read later.
+/verify --mode=auto-fix --auto-fix-threshold={severity} --scope=branch
+        --base={BASE_REMOTE}/epic/{slug} --plan-file={state_dir}/plans/{id}.md
+        --epic-context={state_dir}/epic-context.md --format=json
+        --output={state_dir}/verify/{id}-1.json
 
-Return ONLY player-coach's final status block plus, if anything was found that falls
-outside this ticket's scope, a Discoveries section. Do not return diffs, verification
-reports, or turn-by-turn narration — the orchestrator does not read them and cannot
-afford the context.
+That pass fixes everything at or above the threshold itself. If it changed any file,
+commit the fixes and run verification once more to confirm the fixes did not break
+anything, identically but with --mode=report-only and
+--output={state_dir}/verify/{id}-2.json. Stop there either way: a finding that survives
+its own fix pass is reported, not re-attacked.
+
+Open the PR against the epic branch:
+
+/create-pr "{concise user-facing title}" --base=epic/{slug}
+           --plan-file={state_dir}/plans/{id}.md --context={your journey context}
+
+Write the full journey — what you built, friction, the verification summary, and every
+finding the fix pass left standing — to {state_dir}/issues/{id}.md for a human.
+
+Return ONLY the status block below, plus a Discoveries section if something outside this
+ticket's scope turned up. No diffs, no verification reports, no narration — the
+orchestrator does not read them and cannot afford the context.
+
+STATUS: IMPLEMENTED | BLOCKED_VERIFY | FAILED
+PR_URL: {url or none}
+BRANCH: {branch}
+HEAD_SHA: {full 40-character SHA}
+REMOTE_HEAD_SHA: {full SHA observed on the remote after the push}
+BLOCKING: {count of findings still at or above the threshold}
+DEFERRED: {count deferred to later issues}
 ```
 
-Targeting the epic branch needs nothing else from you: `player-coach` branches from
-`BASE_REMOTE/$TARGET_BRANCH`, which is now the epic branch, and you merge each issue before
-starting the next — so every issue branch is cut from a tip that already contains its
-predecessors.
+Targeting the epic branch needs nothing else from you: the agent branches from the epic
+tip, and you merge each issue before starting the next — so every issue branch is cut from
+a tip that already contains its predecessors.
 
-`--no-ci` is what makes the schedule work: player-coach opens the draft early but returns
-only after its player/verification loop approves the head. It then hands back the dev stack
-instead of holding it through an hour of CI. You own CI from that approved handoff.
+**Verification runs inside the issue-agent, not here**, which is what makes the schedule
+work. The agent returns once the code is written, fixed, and pushed; you own everything
+from CI onward and never hold the dev stack through an hour of it.
 
-Parse the final block, including `STATUS`, `PR_URL`, `PR_STATE`, `BRANCH`, `HEAD_SHA`,
-`REMOTE_HEAD_SHA`, `TURNS_USED`, `VERIFY_RUNS`, `TRACE`, and `CODEX`. An approved result
-requires `REMOTE_HEAD_SHA` to equal `HEAD_SHA`. `APPROVED_DRAFT_OPEN` with `PR_STATE: draft` and
-`TRACE: complete` enters the CI queue. `APPROVED_READY_OPEN` with `PR_STATE: ready` and a
-complete trace re-enters the same queue after a ready-PR fix. A `--resume-ci` result of `READY_FOR_REVIEW` with
-`PR_STATE: ready` and `TRACE: complete` proceeds to the merge gate because that invocation
-already observed green CI. `FAILED_TRACE`, any other failure status, a missing field, or a
-claimed state that disagrees with `PR_STATE` fails the issue. Also record any discoveries.
-Require an approved result's parsed `HEAD_SHA` to be a full SHA, then treat it as the
-approved SHA for every subsequent CI, ready, and merge comparison. That compact state is
-all you keep.
+Parse the block. `IMPLEMENTED` requires `REMOTE_HEAD_SHA` to equal `HEAD_SHA`, both full
+SHAs, and `BLOCKING: 0`; it enters the CI queue, and its `HEAD_SHA` is the approved SHA for
+every later CI and merge comparison. `BLOCKED_VERIFY` means the fix pass could not resolve
+something at or above the threshold: the PR stays open, the issue is needs-attention, and
+it is never merged. `FAILED`, a missing field, or a head mismatch fails the issue. Record
+any discoveries. That compact state is all you keep.
+
+**A `BLOCKED_VERIFY` issue does not get a second implementation attempt.** The fix pass is
+the second attempt; a third agent on the same code is how a scheduler spends four hours
+converging on something a person would settle in five minutes.
 
 ### Polling CI
 
@@ -367,9 +368,9 @@ never substitute a GitHub command on another forge.
 
 Schedule from the proof, not only the headline: running or queued checks stay in the cheap
 poll queue; `CI: FAILED`, a source conflict, or `STRICT_POLICY: required` with
-`UP_TO_DATE: no` re-enters player-coach's CI-fix flow. `CI: NONE`, `CI: BLOCKED`, an exact
+`UP_TO_DATE: no` goes to the CI-fix flow below. `CI: NONE`, `CI: BLOCKED`, an exact
 head mismatch, or unobservable policy evidence fails the issue. Pending human approval is
-recorded but does not block the later ready transition.
+recorded and leaves the PR for a person rather than failing it.
 
 **Green is an affirmative test, not the absence of red.** A PR is ready to merge only when
 *all* of these hold:
@@ -387,37 +388,30 @@ started reporting yet, and a path-filtered workflow that skipped everything.
 
 ### Publishing scheduler state
 
-The player-coach body describes its handoff, so epic-runner must keep the delivery state
-current afterward. For every ready, queued, merged, or scheduler-terminal failure state,
-write a mode-0600 context beginning `CONTEXT_KIND: delivery-state` with the exact PR state,
-approved head, complete `check-ci` proof, queue/merge evidence, and failure reason. Publish it
+The issue-agent wrote the PR body; keeping it true as the schedule moves the PR is yours.
+For every queued, merged, or scheduler-terminal failure state, write a mode-0600 context
+beginning `CONTEXT_KIND: delivery-state` with the exact PR state, approved head, the
+complete `check-ci` proof, queue or merge evidence, and any failure reason. Publish it
 through `create-pr`:
 
 ```text
 /create-pr --context={delivery_context} --no-comments --no-push --pr={PR_URL}
+           --head-sha={approved or last observed full remote head}
 ```
 
 `create-pr` preserves the existing journey/testing/friction body and replaces only its
 bounded generated Final State block. Require post-update inspection to preserve the exact
-head and intended PR state. On scheduler failure also append one immutable agent-attributed
-terminal comment through `--comment-file`; never edit a verification comment. A state update
-or terminal-comment failure is `FAILED_TRACE`, even if the provider already completed an
-irreversible merge. Persist the observed state and failed operation rather than reporting a
-false draft or rolling the change back.
-Parse `create-pr`'s failure block and carry its last factual `PR_URL`, `PR_STATE`, `HEAD_SHA`,
-`MERGE_QUEUE`, and `COMMENT_ID` into scheduler state; never replace them with the requested
-transition after a partial or irreversible provider operation. Store the failure block's
-`HEAD_SHA` as the observed remote head without overwriting player-coach's approved SHA.
-Sanitize both files with the same HMAC redaction construction under a scheduler-scoped
-random key stored mode-0600 outside the repository; never copy raw CI log secrets or
-personal data into delivery state.
-Every scheduler comment supplies `--head-sha={approved or last observed full remote head}`
-and requires create-pr's before/after head proof. Before rendering one, inspect and validate
-the accepted trace chain, then append a sanitized canonical `recordKind: delivery` envelope
-with a new trace ID, the immediately preceding trace ID/digest, the unchanged last
-verification counter, exact CI/queue/merge proof, and scheduler status. Apply the same
-multipart and payload-digest rules as player-coach; do not treat an incomplete delivery
-record as scheduler state.
+head and intended PR state. On scheduler failure also append one agent-attributed terminal
+comment through `--comment-file`. Earlier comments are never edited.
+
+**Report what the provider did, not what you asked it to do.** Parse `create-pr`'s failure
+block and carry its last factual `PR_URL`, `PR_STATE`, `HEAD_SHA`, and `MERGE_QUEUE` into
+scheduler state rather than the transition you requested. A merge that completed and then
+failed to record its state is still a merge; rolling it back, or reporting the PR as
+unmerged, turns a bookkeeping failure into a lie about the repository. Store a failure
+block's `HEAD_SHA` as the observed remote head without overwriting the approved SHA.
+
+Never copy raw CI logs, tokens, or personal data into a delivery context or a comment.
 
 **Be patient.** An hour is normal. Extensive CI is precisely why this much autonomy is
 safe, and when several branches land at once the shared runners queue. A pipeline that has
@@ -437,40 +431,36 @@ then spawn an agent in the PR's worktree:
 ```
 Fix the CI failures on PR {url} for issue {id}.
 
-Invoke: /player-coach --headless --resume-ci --no-ci --plan-file={state_dir}/plans/{id}.md
-        --pr={PR_URL} --approved-head={stored HEAD_SHA}
-        --max-turns={remaining} --severity={severity}
+The branch is {branch} at {stored HEAD_SHA}; the plan it was built from is at
+{state_dir}/plans/{id}.md. Fix the failures below, commit, and push:
+
+/create-pr --push --pr={PR_URL}
+
+Fix CI. Do not implement anything the plan does not call for, and do not re-verify —
+CI is the check that just spoke, and it speaks again on the pushed head.
 
 CI failure detail:
 {the failing checks and their errors — the error output and file references, not full logs}
+
+Return two lines and nothing else:
+STATUS: PUSHED | FAILED
+HEAD_SHA: {full 40-character SHA of the pushed head}
 ```
 
-`--resume-ci --no-ci` re-enters the existing branch and PR at the CI-fix step without
-rechecking the unchanged starting SHA. If the player changes that SHA to fix CI,
-player-coach pushes it and runs the full verification/gate/comment sequence, then returns
-`APPROVED_DRAFT_OPEN` or `APPROVED_READY_OPEN` according to the preserved PR state so the
-epic can release the dev stack and resume cheap polling. The prior approval covers only the
-prior SHA.
+The returned `HEAD_SHA` becomes the approved SHA — the earlier approval covered only the
+earlier SHA — and the PR re-enters cheap polling against it.
+
+**Bounded by `--max-ci-fixes` attempts per issue** (default 3). CI that is still red after
+the third fix is telling you the problem is not the kind an agent resolves by trying again;
+fail the issue and leave the PR for a human.
 
 ### Merging
 
-Only when the affirmative green test passes. If the PR is still draft, first invoke:
+Only when the affirmative green test passes.
 
-```text
-/create-pr --ready --pr={PR_URL} --head-sha={approved full SHA}
-           --context={ready_delivery_context} --no-comments --base=epic/{slug}
-           [--reviewer={resolved_distinct_handle}]
-```
-
-Resolve a reviewer only from explicit caller or repository ownership information; omit it
-when no distinct candidate is available. Require the returned observed `PR_STATE: ready`.
-A missing ready operation, failed update, or state mismatch is `FAILED_TRACE`: keep the
-draft open and do not merge. Reviewer assignment itself remains non-blocking.
-The delivery-state context deliberately preserves the complete current player-coach body,
-including resumed turns; epic-runner must not replace it with its older issue journal.
-If the PR was already ready, publish the same `ready` delivery state through the scheduler
-state procedure before the pre-merge reread. Thus both paths record the latest green proof
-without attempting a redundant ready transition.
+Issue PRs open ready and carry no reviewer: nobody is asked to review one, because the
+review a human actually does is of the epic branch, once, in Phase 2. Publish the green
+proof as delivery state through the procedure above before the pre-merge reread.
 
 **Also require the issue head to contain the current epic tip.**
 
@@ -480,38 +470,39 @@ git merge-base --is-ancestor "$BASE_REMOTE/epic/$SLUG" "$APPROVED_SHA"
 ```
 
 If it does not, the branch was verified against an epic branch that has since moved, and its
-green CI proves nothing about the integrated result. Send it back through the CI-fix flow to
-sync, then re-verify. On a protected target this is what `STRICT_POLICY: required` would
-enforce; an `epic/*` branch is usually unprotected, so nothing else does.
+green CI proves nothing about the integrated result. Send it back to an issue-agent on the
+existing branch to merge the epic tip in — its verification pass then runs against the
+integrated diff, which is the thing nothing else has reviewed. Re-verifying is the point:
+this is code the merge would ship and no reviewer has seen. On a protected target this is
+what `STRICT_POLICY: required` would enforce; an `epic/*` branch is usually unprotected, so
+nothing else does.
 
 Immediately before every merge invocation, read
 `/check-ci --pr={PR_URL} {approved full SHA} --once` and require the complete affirmative
 green predicate plus `REVIEW_REQUIREMENTS: satisfied|not-required`. This closes the race
-where the target, checks, or review requirements changed after the earlier reading or ready
-transition. Pending human approval leaves the ready PR open for a human; any other
+where the target, checks, or review requirements changed after the earlier reading.
+Pending human approval leaves the PR open for a human; any other
 non-green reread returns the issue to the appropriate poll/fix/failure queue. Neither falls
 through to merge.
 
 Honor contrary user instructions and branch protection even after CI turns green. When
 merge authority remains in force, use whatever merge method the repository prefers — do
-not override it. Squash is common and good here: the target branch gets one clean commit
-per issue, while the turn-by-turn history stays visible on the PR, which is where the human
-reviews how the loop performed.
+not override it. Squash is common and good here: the epic branch gets one clean commit per
+issue, while the commit-by-commit history stays visible on the PR.
 
 Invoke `/create-pr --merge --pr={PR_URL} --head-sha={approved full SHA}`. `create-pr`
 resolves the repository-preferred merge method through the preflighted delivery binding.
 Observed `PR_STATE: merged` completes delivery. `PR_STATE: queued` creates a persisted
 pending merge work item containing the PR URL, approved SHA, and queue identifier; poll it
 with `/create-pr --inspect --pr={PR_URL}`. Require every inspection's `HEAD_SHA` to equal
-the stored approved SHA, then delete its returned `TRACE_FILE` without reading it because
-queue polling needs state only. A mismatch is `FAILED_TRACE`; never bless or mark a different
-head complete. Continue until the approved head is observed merged or terminally rejected.
+the stored approved SHA. A mismatch fails the issue; never bless or mark a different head
+complete. Continue until the approved head is observed merged or terminally rejected.
 Any other output is a merge failure: leave the issue open and do not unblock dependents.
 
 Immediately publish `queued` after queue acceptance and `merged` after observed merge using
-the scheduler-state procedure above. A queue rejection, CI/policy observation failure, turn
-exhaustion, or other scheduler terminal path with an existing PR uses the same procedure
-with its factual failed state and immutable terminal comment.
+the scheduler-state procedure above. A queue rejection, CI/policy observation failure,
+exhausted CI-fix attempts, or other scheduler terminal path with an existing PR uses the
+same procedure with its factual failed state and terminal comment.
 
 Only after observed merge, mark the issue complete via the tracker binding (if write-back
 is on) and re-evaluate the graph — this merge may have unblocked dependents.
@@ -526,9 +517,9 @@ and what is the realistic chance a retry ends differently?
 | Failure | Retry? | Why |
 |---|---|---|
 | The agent died — crash, tool error, context exhaustion | Yes, once | Nothing was learned; it just fell over |
-| `FAILED_TRACE` — push, draft, comment, update, or ready failed | No | Retrying could duplicate immutable artifacts; preserve the branch/draft for a human |
-| Turn limit hit with issues still above threshold | No | The full budget is already spent; a fresh agent usually finds the same wall |
-| CI red and the fix agent couldn't resolve it | No | Same, plus CI minutes |
+| A push, PR, comment, or state update failed | No | Retrying could duplicate artifacts; preserve the branch and PR for a human |
+| `BLOCKED_VERIFY` — findings survived the fix pass | No | The fix pass was already the retry; a fresh agent finds the same wall |
+| CI still red after `--max-ci-fixes` attempts | No | Same, plus CI minutes |
 | Blocked on something outside the epic — a schema change, a credential, a decision | Never | Retrying cannot supply what's missing |
 | Plan agent refused — ticket too vague | Never | Needs a human |
 
@@ -562,7 +553,7 @@ either fixed or consciously left; either way it belongs in the PR, not the ledge
 this line, verify's below-threshold output alone would bury the ledger in dozens of items,
 and a wall of noise is functionally identical to reporting nothing.
 
-The one override: **severity beats scope.** A serious problem the loop genuinely could not
+The one override: **severity beats scope.** A serious problem the run genuinely could not
 resolve deserves a ticket even though it's in-scope, because "we shipped a known hole" must
 not evaporate when the session ends.
 
@@ -604,9 +595,10 @@ is worth filing; a near-empty cleanup ticket on a clean epic is just noise.
 ## Phase 2: Finalize the epic
 
 Every issue that could land has landed. The epic branch now holds something no per-issue run
-ever saw: the integrated result. This is where the light-depth trade is repaid — issues that
-are each correct in isolation routinely conflict when assembled, and this branch is the only
-place that is visible.
+ever saw: the integrated result. Issues that are each correct in isolation routinely
+conflict when assembled — a helper two tickets rewrote in different directions, a contract
+issue 4 widened and issue 9 narrowed again — and this branch is the only place that is
+visible.
 
 **Run this phase even when some issues failed.** A partial epic still gets reviewed as a
 whole; what it does not get is a claim of completeness.
@@ -619,7 +611,7 @@ Spawn a verification agent. It holds the report so you don't:
 Verify the epic branch as one integrated change.
 
 Check out epic/{slug} and invoke:
-/verify --mode=report-only --depth=full --scope=branch --base={BASE_REMOTE}/{target}
+/verify --mode=report-only --scope=branch --base={BASE_REMOTE}/{target}
         --format=json --output={state_dir}/epic-verify/{round}.json
 
 Return ONLY these three lines:
@@ -640,9 +632,9 @@ Spawn a remediation-planning agent, which reads the report you did not:
 ```
 Write a remediation plan for the findings in {report path}.
 
-The epic branch epic/{slug} is complete and its individual issues are merged. A full-depth
-verification of the integrated result found blocking issues. Read that report and the code,
-and write a plan to fix them.
+The epic branch epic/{slug} is complete and its individual issues are merged. Verification
+of the integrated result found blocking issues. Read that report and the code, and write a
+plan to fix them.
 
 Write the plan to {state_dir}/plans/remediation-{round}.md
 
@@ -655,29 +647,17 @@ that exists to satisfy a reviewer.
 
 ### 3. Run the remediation
 
-An ordinary issue-agent on an ordinary branch — the flow you already have:
+An ordinary issue-agent on an ordinary branch — the same brief you already use for an
+issue, with `{state_dir}/plans/remediation-{round}.md` as the plan, branch name
+`epic-{slug}-remediation-{round}`, and `{state_dir}/verify/remediation-{round}-{n}.json` as
+the report paths.
 
-```
-Implement the remediation plan using the player-coach loop.
-
-Invoke: /player-coach --headless --no-ci
-        --plan-file={state_dir}/plans/remediation-{round}.md
-        --max-turns=5 --severity={severity} --depth=full --target=epic/{slug}
-        --epic-quarantine={state_dir}/quarantine.json
-
-Use branch name epic-{slug}-remediation-{round}.
-```
-
-Then take it through the same CI, ready, and merge path as any issue. Its trace lands on its
-own PR, exactly like every other run's, which is why it does not need a special case.
-
-Full depth and severity 5 here are not an inconsistency with the light per-issue runs. This is
-the pass whose findings nobody else will catch, and it is bounded by working from a fixed
-list rather than an open-ended ticket — being strict is the entire point of it.
+Then take it through the same CI and merge path as any issue. It lands on its own PR,
+exactly like every other run, which is why it does not need a special case.
 
 **Then return to step 1 for one confirming round.** At most two rounds total. Anything still
 blocking after the second goes to the human in the completion report — a loop that keeps
-finding work in its own fixes is telling you the epic needs a person, not another turn.
+finding work in its own fixes is telling you the epic needs a person, not another round.
 
 ### 4. Open the epic PR
 
@@ -730,17 +710,16 @@ REVIEW THIS  {epic PR url}  — draft, unmerged, waiting for you
 
 MERGED       #41 #42 #43 #44 #45 #47 #48 #50 #51
              {PR links}
-NEEDS YOU    #46  turn limit — 15 turns, verify still flags {thing}. PR {url} open.
+NEEDS YOU    #46  verify still flags {thing} after its fix pass. PR {url} open.
              #49  plan agent refused — ticket doesn't specify {thing}.
 STRANDED     #52  blocked by #49
 
 EPIC VERIFY  round 1: {n} blocking → remediation merged; round 2: clean
              {or: round 2 still flags {thing} — the epic PR carries the detail}
-FRICTION     {issues that took more than 3 turns, sticky findings, CI failures,
-             quarantined environment failures with their re-raise counts,
-             findings deferred to PR follow-up, items deferred to later issues}
-PERFORMANCE  {turns per issue, first-turn approvals, depth per issue, which verify
-             skills fired most}
+FRICTION     {issues whose fix pass left findings standing, CI failures and the
+             fix attempts they cost, items deferred to later issues}
+PERFORMANCE  {findings fixed per issue, issues green on the first CI run,
+             CI-fix attempts, which verify skills fired most}
 DISCOVERIES  {n} tickets drafted{, awaiting approval}{, + 1 combined cleanup ticket}
 ```
 
@@ -766,37 +745,32 @@ plans/remediation-{n}.md  the finalization plans written from each epic verifica
 issues/{id}.md         per-issue journey logs written by issue-agents
 discoveries/{n}.md     drafted follow-up tickets
 epic-context.md        completed / current / remaining issues, handed to every reviewer
-quarantine.json        environment failures diagnosed once and shared by every issue
-epic-verify/{n}.json   the full-depth report for each finalization round
-run.json               status blocks, verified HEAD SHA, verify-run count, trace, pending merge-queue work, inferred edges, depth assignments, failure reasons
+verify/{id}-{n}.json   the verification reports for each issue
+epic-verify/{n}.json   the verification report for each finalization round
+run.json               status blocks, approved HEAD SHA, pending merge-queue work, inferred edges, CI-fix counts, failure reasons
 ```
 
-`epic-context.md`, `quarantine.json`, and every `epic-verify/{n}.json` are paths you hand to
-sub-agents and never read yourself. The first two carry knowledge between issues; the third is
-a verification report, and the rule against reading those has not changed.
+`epic-context.md` and every report under `verify/` and `epic-verify/` are paths you hand to
+sub-agents and never read yourself. The first carries knowledge between issues; the rest are
+verification reports, and the rule against reading those has not changed.
 
 Never in the repository — a long epic would litter the working tree and pollute the diffs
 being reviewed. Never in `/tmp` — a reboot mid-run would destroy the ledger and every
 drafted ticket.
 
-Each issue's player-coach run keeps its own **run ledger** under a sibling root,
-`$XDG_STATE_HOME/player-coach/{project}/{branch}/`, keyed by branch rather than by issue.
-That is the issue-agent's record, not yours — do not read it, for the same reason you do not
-read verification reports. It matters here only because a resumed issue must find it, which
-is another reason the issue id belongs in every branch name.
-
 **The tracker is authoritative for what's done; the local file holds only what the tracker
 cannot express.** On resume, re-read the tracker and the open PRs *first*, and where the
-local file disagrees about merged work, the tracker wins. An open PR's current head is not
-automatically verified: inspect its authenticated trace export, delete that temporary file
-after parsing, and recover the newest full SHA whose complete verification record says every
-threshold/gate decision produced `APPROVED` under its recorded policy (including an explicit
-Codex-blocked `continue` decision). Use that SHA as `--approved-head`; player-coach re-verifies a
-different observed head before it can regain approval. If no authenticated approving record
-exists, do not enqueue the PR for CI/merge—record `FAILED_TRACE` for human recovery. Never
-derive approval merely from the current PR head, tracker state, or a stale `run.json` entry.
-Otherwise you get the split-brain where the file says #5 is pending, its PR merged an hour
-ago, and you re-implement shipped work.
+local file disagrees about merged work, the tracker wins. Otherwise you get the split-brain
+where the file says #5 is pending, its PR merged an hour ago, and you re-implement shipped
+work.
+
+**An open PR rejoins the queue only on a head that was actually verified.** Adopt it when
+`run.json` holds an `IMPLEMENTED` block for that issue whose `HEAD_SHA` equals the PR's
+current head, observed through `/create-pr --inspect`. A head that moved since — or an issue
+with no such record — has never been through verification at that SHA, so it goes back
+through the issue-agent on its existing branch rather than into the CI queue. Never derive
+approval from the current PR head, from tracker state, or from a `run.json` entry that
+disagrees with what the forge reports.
 
 **Resume rejoins; it does not restart.** An issue whose PR is open and mid-CI gets adopted
 into the in-flight set — not re-implemented on a second branch. This is why the issue id
@@ -810,8 +784,8 @@ resumability genuinely degrades. Say so rather than pretending otherwise.
 ## Standing rules
 
 - **Don't write code.** Issue-agents do that.
-- **Don't verify.** `verify` does that inside the loop, where you can't see it, and inside the
-  finalization agent in Phase 2, where you see three lines of it.
+- **Don't verify.** `verify` runs inside the issue-agent, where you can't see it, and inside
+  the finalization agent in Phase 2, where you see three lines of it.
 - **Don't read verification reports or diffs.** Your context is the resource that has to
   last the whole run.
 - **Never merge the epic PR.** Open it as a draft and hand the human the link. The run's
@@ -835,6 +809,7 @@ another harness, swap this section and leave everything else alone.
 |---|---|
 | Spawn an isolated sub-context | `Agent` tool |
 | Give a sub-agent its own checkout | `isolation: "worktree"` on `Agent` |
+| Research and draft without being able to edit | plan mode — `EnterPlanMode` / `ExitPlanMode` |
 | Invoke another skill | `Skill` tool |
 | Choose a model per sub-agent | `model` on `Agent`, or the skill's frontmatter |
 | Concurrency budget for the whole agent tree | none encountered; where a harness has one, it is set on the launching invocation and children inherit it |
@@ -842,12 +817,11 @@ another harness, swap this section and leave everything else alone.
 **If the harness caps concurrent sub-agents, that cap is yours to get right**, because it
 is a property of the outermost invocation and this skill is the outermost invocation. It has
 to accommodate the deepest point of the tree, not the widest: `verify` fans out to nine
-sub-agents while three ancestors — this scheduler, the issue-agent, and player-coach — are
-still active. A cap sized for what any one layer wants leaves the bottom layer with nothing,
-and the symptom is not an error but a review pipeline that quietly runs one reviewer at a
-time.
+sub-agents while two ancestors — this scheduler and the issue-agent — are still active. A
+cap sized for what any one layer wants leaves the bottom layer with nothing, and the symptom
+is not an error but a review pipeline that quietly runs one reviewer at a time.
 
 Use a high-capability model for every sub-agent role — planning, implementation,
 ticket-writing, epic verification, and remediation planning. The planning agents especially:
-a bad plan poisons every turn downstream of it, and it is the cheapest place in the whole
-pipeline to be smart.
+with one implementation pass and one verification behind it, a bad plan is not something a
+later round catches, and planning is the cheapest place in the whole pipeline to be smart.

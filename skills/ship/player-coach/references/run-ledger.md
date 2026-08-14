@@ -136,7 +136,6 @@ Precedence, stated plainly because two records invite split-brain:
       "turn": 1,
       "headSha": "<full sha>",
       "reportPath": "reports/1.json",
-      "depth": "full",
       "deltaBaseSha": null,
       "fullAudit": true,
       "status": "ok",
@@ -208,11 +207,10 @@ Precedence, stated plainly because two records invite split-brain:
 `disposition` is `open`. Making it a sixth enum value would let a finding be both
 sticky and fixed, which means nothing.
 
-### `depth` and `fullAudit`
+### `fullAudit`
 
-Two different axes, easy to conflate. `depth` is *which reviewers ran* — `full` or `light`.
-`fullAudit` is *how much of the diff they reviewed* — false when the run was delta-scoped by
-`--since`. A light run can be a full audit, and a full run can be delta-scoped.
+*How much of the diff the reviewers reviewed* — false when the run was delta-scoped by
+`--since`, true when they saw the whole change.
 
 ### `class`
 

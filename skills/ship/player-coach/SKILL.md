@@ -6,7 +6,7 @@ description: >
   trace, CI passes, and the PR is marked ready. Invoke only when the user explicitly asks
   for the player-coach loop, or when epic-runner orchestrates it for one issue. Do not use
   for an ordinary coding request. For a whole epic, use epic-runner instead.
-argument-hint: "[--headless] [--resume-ci] [--max-turns=N] [--severity=N] [--depth=light|full] [--ci-timeout=<duration>] [--no-pr] [--no-ci] [--plan-file=<path>] [--target=<branch>] [--pr=<reference>] [--approved-head=<sha>] [--epic-context=<path>] [--epic-quarantine=<path>] [--on-codex-blocked=continue|stop]"
+argument-hint: "[--headless] [--resume-ci] [--max-turns=N] [--severity=N] [--ci-timeout=<duration>] [--no-pr] [--no-ci] [--plan-file=<path>] [--target=<branch>] [--pr=<reference>] [--approved-head=<sha>] [--epic-context=<path>] [--epic-quarantine=<path>] [--on-codex-blocked=continue|stop]"
 allowed-tools:
   - Read
   - Bash
@@ -48,9 +48,6 @@ Parse:
 
 - `--max-turns=N` — shared implementation and CI-fix turn budget.
 - `--severity=N` — findings at or above this value block approval.
-- `--depth=light|full` — verification depth, forwarded to `verify`, which owns the
-  composition table. Default `full`. Light depth also changes which classes of finding block
-  approval; see Phase 1 step 4.
 - `--epic-context=<path>` — the epic backlog file, forwarded to `verify` unread. This
   orchestrator never interprets it; it is context for the reviewers.
 - `--epic-quarantine=<path>` — a quarantine file shared by every run in one epic, seeded into
@@ -145,9 +142,7 @@ Treat `--approved-head` as a comparison assertion, not approval proof. Skip veri
 the unchanged starting SHA only when the observed head equals it **and** the authenticated
 trace contains a complete canonical envelope for that SHA with `decision: APPROVED`, a
 threshold at least as strict as the resumed threshold (recorded numeric threshold less than
-or equal to the resumed value), a recorded depth at least as deep as the resumed depth (a
-`light` record cannot satisfy a `full` resume, because it never ran the reviewers a full
-resume assumes), and a Codex policy/result compatible with the resumed policy
+or equal to the resumed value), and a Codex policy/result compatible with the resumed policy
 (`completed`, or `blocked/continue` only when resume also permits continue). When any value
 differs or the envelope is absent/incomplete, run
 Phase 1 verification/gates/comments against the observed SHA before entering CI or giving
@@ -168,7 +163,6 @@ sticky_issues = rehydrated history on resume, otherwise []
 player_concerns = rehydrated history on resume, otherwise []
 ci_failures = rehydrated history on resume, otherwise []
 accumulated_player_untracked_paths = []
-depth = light | full
 base_ref = exact BASE_REMOTE/TARGET_BRANCH
 pr_url = inspected URL on resume, otherwise none
 pr_state = inspected state on resume, otherwise none
@@ -198,8 +192,8 @@ export, comment part, and terminal context gets its own mode-0600 path inside it
 runs must never share fixed filenames. Delete it after terminal output. The ledger
 directory is **not** this directory and outlives the run.
 
-Tell the user the plan summary, branch and exact target, budget, threshold, verification
-depth, and whether CI is owned here or by the caller.
+Tell the user the plan summary, branch and exact target, budget, threshold, and whether CI
+is owned here or by the caller.
 
 ## Phase 1: Player and verification loop
 
@@ -318,7 +312,7 @@ For a traced run, fetch `BASE_REMOTE/$TARGET_BRANCH` immediately before comparis
 
 ```text
 /verify --mode=report-only --scope=branch --base={BASE_REMOTE}/{TARGET_BRANCH}
-        --depth={depth} --plan-file={plan_file} --format=json
+        --plan-file={plan_file} --format=json
         --output={unique_report_path} --ledger={ledger_dir}/ledger.json
         [--since={carryForward.lastVerifiedHeadSha}] [--epic-context={epic_context}]
 ```
@@ -350,15 +344,13 @@ untracked files.
 
 ```text
 /verify --mode=report-only --files={accumulated_player_owned_paths}
-        --depth={depth} --plan-file={plan_file} --format=json
+        --plan-file={plan_file} --format=json
         --output={unique_report_path}
 ```
 
 Read the JSON report. Require schema v1 plus `status`, `error`, `findings`, `scope`, `triage`,
 `skillResults`, `issues`, `exerciserVerification`, and `customGates`. Confirm
-`scope.headSha` matches the current full SHA and `scope.depth` matches the requested depth —
-a report produced at a depth other than the one asked for cannot be gated against the rules
-below. Confirm For traced branch scope, also require
+`scope.headSha` matches the current full SHA. Confirm For traced branch scope, also require
 `scope.baseRef` and `scope.mergeBase` to match the exact target comparison; for local-only
 file scope they must be `null`. A malformed or mismatched report is incomplete
 verification and produces `RERUN`, not approval. Its trace comment records the parse/scope
@@ -387,28 +379,13 @@ Compute a factual decision from the report:
    it appears in.
 1. Report `status` must be `ok`; `blocked` or `error` produces `RERUN` with the reported
    reason.
-2. Any remaining issue with severity at or above the threshold produces `FEEDBACK`. **At
-   light depth, only the blocking classes do:** `correctness`, `security`, `test-failure`,
-   and `plan-completeness`. A `coverage`, `comment`, `ux`, `visual`, or `style` issue at or
-   above the threshold is instead dispositioned `deferred-out-of-scope` with
-   `followUp.kind: "pr-comment"` — the same mechanism the coverage cap already uses, so this
-   is a lookup rather than a judgement call.
-
-   This reads as a lowered bar and is not one. Light depth exists for one issue of an epic
-   whose remaining issues will touch the same code, and where the integrated result gets a
-   full-depth review before it reaches the real target. What it removes is turns spent
-   polishing an intentionally partial change; what it keeps is the property that matters —
-   the loop cannot approve code that is broken or exploitable. The deferred items stay in the
-   ledger, in the trace, and in the final PR body, so nothing is lost, only rescheduled.
+2. Any remaining issue with severity at or above the threshold produces `FEEDBACK`,
+   whatever its class.
 3. The `exerciser` skill result must exist and be `PASSED`. `FAILED` becomes severity 10
    feedback; `BLOCKED` becomes severity 9. A missing row produces `RERUN` on the same
    player turn and same SHA.
 4. Every custom exerciser/review gate must pass. `FAIL` becomes severity 10 feedback;
    `BLOCKED` or `NOT CHECKED` becomes severity 9.
-
-   Rules 3 and 4 are class-independent and identical at both depths. An app that does not
-   start, and a maintainer-defined gate that fails, block a light run exactly as they block a
-   full one — otherwise light depth could approve a branch nobody can run.
 5. `codex-reviewer: COMPLETED` passes. `BLOCKED` follows the interactive question or
    headless policy and is recorded. A missing row is blocked. The documented unsupported
    whole-codebase skip is not relevant to branch scope and therefore cannot approve it.
@@ -499,7 +476,6 @@ local branch before its first commit or push and require `git check-ref-format` 
 **HEAD:** `{full 40-character SHA}`<br>
 **Target:** `{branch}` → `{BASE_REMOTE}/{TARGET_BRANCH}`<br>
 **Decision:** `{APPROVED | FEEDBACK | RERUN | FAILED_CODEX_BLOCKED}`<br>
-**Verification depth:** `{full | light}`<br>
 **Severity threshold:** `{severity}`<br>
 **Report:** `{status}` / `{overall.result}` / error `{code or none}`<br>
 **Scope:** `{baseRef}` @ `{mergeBase}` → `{headSha}`<br>
@@ -578,7 +554,7 @@ CI failures and every exact-head `check-ci` proof observed for the current SHA; 
 concerns, friction, and final-description/delivery context; previously published comment
 IDs; and a
 `traceEnvelope`. The envelope records run number, verification run, player turn, full SHA,
-target/base/merge-base, decision, threshold, verification depth, Codex policy/result, comment part count,
+target/base/merge-base, decision, threshold, Codex policy/result, comment part count,
 `recordKind: verification`, `traceId`, `previousTraceId`, `previousPayloadDigest`, and
 `payloadDigest`. Compute the
 payload digest over the canonical sanitized object with the `payloadDigest` field omitted,

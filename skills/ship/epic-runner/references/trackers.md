@@ -11,7 +11,7 @@ If one exists it already holds the resolved binding — the commands, the label 
 the rest of this file is just the fallback for repos that don't have one. Read it, confirm one
 command still works, and skip to "Extracting dependencies".
 
-Everything below the orchestrator is tracker-blind. `player-coach` wants a plan file path;
+Everything below the orchestrator is tracker-blind. An issue-agent wants a plan file path;
 it has never heard of Jira. So the entire job of a tracker binding is:
 
 > Given an epic reference, produce (a) an ordered list of issue handles, and (b) enough
