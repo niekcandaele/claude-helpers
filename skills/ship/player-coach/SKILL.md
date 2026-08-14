@@ -4,8 +4,8 @@ description: >
   Adversarial cooperation loop for ONE ticket — player implements, verify reviews,
   every changed default turn is pushed and every turn is recorded in a durable draft-PR
   trace, CI passes, and the PR is marked ready. Invoke only when the user explicitly asks
-  for the player-coach loop, or when epic-runner orchestrates it for one issue. Do not use
-  for an ordinary coding request. For a whole epic, use epic-runner instead.
+  for the player-coach loop. Do not use for an ordinary coding request. For a whole epic,
+  use epic-runner instead.
 argument-hint: "[--headless] [--resume-ci] [--max-turns=N] [--severity=N] [--ci-timeout=<duration>] [--no-pr] [--no-ci] [--plan-file=<path>] [--target=<branch>] [--pr=<reference>] [--approved-head=<sha>] [--epic-context=<path>] [--epic-quarantine=<path>] [--on-codex-blocked=continue|stop]"
 allowed-tools:
   - Read
@@ -79,7 +79,7 @@ headless mode make bounded assumptions and record them in the journey.
 Reject `--resume-ci` with `--no-pr`. Require both `--pr` and `--approved-head` with
 `--resume-ci`; reject either option without it. A supplied `--target` on resume must equal
 the inspected PR/MR target or the resume fails before mutation. `--resume-ci --no-ci` is
-the explicit non-blocking form for an owning scheduler such as `epic-runner`.
+the explicit non-blocking form for a scheduler that owns the CI wait itself.
 
 ### Prepare exact target and branch
 
