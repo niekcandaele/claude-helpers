@@ -18,7 +18,6 @@ A binding supplies these operations:
 |---|---|
 | `default-target` | Return the repository's default branch. |
 | `inspect` | Inspect the explicit PR/MR reference when supplied, otherwise find the open change for the current branch; return URL, number/IID, canonical base/head repository identities, source/target branches, draft state, title/body, full remote head SHA, mergeability, queue state, and merged state. |
-| `trace-read` | Paginate top-level comments/notes and return the description plus each record's provider ID, author identity, creation order/time, and exact body for authenticated resume. |
 | `fetch-head` | Fetch the selected change's exact head object without checking it out, and prove it equals the inspected full SHA. |
 | `push` | Push the current branch to a configured remote whose canonical repository identity equals the inspected head repository, and establish its upstream. |
 | `create` | Create a normal, reviewable change from the current branch. |
@@ -32,9 +31,10 @@ A binding supplies these operations:
 | `merge-policy` | Return provider-allowed merge methods and the repository's required/preferred method. |
 | `merge` | Merge the exact ready head with the repository's permitted method and confirm observed merged state; used only by an authorized caller such as `epic-runner`. |
 
-`inspect`, `trace-read`, `push`, `draft`, `update`, `comment`, and `ready` are required by the durable
-run-trace lifecycle. `fetch-head` is conditionally required only when an inspected head is
-absent from the local object store and the selected path must render its diff. If the
+`inspect`, `push`, `draft`, `update`, and `ready` are required by the durable PR lifecycle;
+`comment` is required only by a caller that appends one. `fetch-head` is conditionally
+required only when an inspected head is absent from the local object store and the selected
+path must render its diff. If the
 selected provider cannot perform a requested required operation, fail before mutating
 anything else in that invocation. `reviewer` is best-effort: a missing candidate or failed
 assignment is reported but never reverses a successful ready transition.
@@ -64,44 +64,14 @@ methods with an explicit repository rule from its engineer skill, CONTRIBUTING g
 or caller context. If several methods remain and none is declared preferred, fail the
 operation; never silently choose squash.
 
-Top-level trace comments are append-only under this binding. It never edits, resolves, or
+Top-level comments are append-only under this binding. It never edits, resolves, or
 deletes one, and records each returned identifier. Forge administrators may retain their
-own moderation powers, so “immutable” in the run-trace contract means that this workflow
-performs no mutation after creation, not that the provider offers write-once storage.
-The export retains provider authorship metadata. A resume accepts state only from comments
-whose author is the authenticated automation identity or an explicit repository-configured
-trusted automation identity and whose attribution, run/part numbering, full SHA, table
-encoding, and trace-chain fields validate together. Reassemble multipart comments by
-provider creation order and require exactly one of every part `1..N`, with no duplicate or
-missing part. Decode the payload and verify its digest before accepting the logical record.
-The SHA inside a recovered record must equal the selected source head or be an ancestor of
-it in the fetched PR/MR source history. This admits records verified before the first real
-commit and rejects comments copied from unrelated history. The `--head-sha` used to publish
-a comment is separately the exact current remote-head concurrency guard.
+own moderation powers, so append-only here means that this workflow performs no mutation
+after creation, not that the provider offers write-once storage.
 
-Every logical trace record contains a unique `traceId`, its canonical `payloadDigest`, and
-the `previousTraceId` and `previousPayloadDigest` of the immediately preceding accepted
-record. Its `recordKind` distinguishes verification, terminal, and delivery records. The
-first record for a change uses `null` predecessors; the first record of a later
-run anchors to the last accepted record from the preceding run. Within a run, verification
-run numbers start at 1 and increase by exactly one, player-turn numbers never decrease, and
-a terminal or delivery record repeats the last verification counter without claiming a new
-verification run. When no verification has completed, such a record uses counter `0`. A
-same-turn rerun may advance only the verification-run number. Reject replayed IDs, duplicate
-**verification-record** counters, gaps in verification-record counters, mismatched
-predecessors or digests, forked successors, and records whose provider comment IDs/timestamps
-do not preserve the chain order. Repeated counters on terminal/delivery records are valid;
-their unique trace IDs and predecessor links order them without fabricating verification runs.
-
-An incomplete multipart candidate is not a logical record and does not reserve its claimed
-predecessor. Keep it as interruption evidence, continue scanning provider order, and permit
-the next complete valid record to point directly to the last accepted predecessor. This is
-how a later run bridges a crash after parts `1..k/N`. If two complete valid candidates claim
-the same predecessor, stop at that ambiguity as a fork; never choose one by content. A
-late-arriving completion of the abandoned candidate is likewise a stale fork, not permission
-to rewrite the accepted chain. Orphaned, malformed, replayed, and untrusted candidates remain
-evidence but cannot change counters, approval, or history. A copied marker from an untrusted
-author remains human-authored content.
+The `--head-sha` used to publish a comment is the exact current remote-head concurrency
+guard, checked before and after the mutation. It asserts what the change looks like right
+now; it never certifies anything about the comment's content.
 
 ## GitHub binding
 
@@ -128,11 +98,6 @@ HEAD_OWNER=${HEAD_REPOSITORY_PATH%%/*}
 # default target
 gh -R "$BASE_REPOSITORY" repo view --json defaultBranchRef --jq .defaultBranchRef.name
 
-# ordered description/comments with provider IDs/authors/timestamps for resume
-gh -R "$BASE_REPOSITORY" pr view "$PR_NUMBER" --json body --jq .body
-gh api --hostname "$BASE_HOST" --paginate \
-  "repos/$BASE_REPOSITORY_PATH/issues/$PR_NUMBER/comments"
-
 # fetch exact selected head without checkout
 git fetch "$BASE_REMOTE" "pull/$PR_NUMBER/head:refs/remotes/$BASE_REMOTE/pr/$PR_NUMBER"
 test "$(git rev-parse "refs/remotes/$BASE_REMOTE/pr/$PR_NUMBER")" = "$HEAD_SHA"
@@ -155,7 +120,7 @@ gh -R "$BASE_REPOSITORY" pr ready "$PR_NUMBER" --undo  # only for --draft when i
 # update without changing state/target; add --title only for an explicit title
 gh -R "$BASE_REPOSITORY" pr edit "$PR_NUMBER" --body-file "$BODY_FILE"
 
-# immutable top-level comment
+# append-only top-level comment
 gh -R "$BASE_REPOSITORY" pr comment "$PR_NUMBER" --body-file "$COMMENT_FILE"
 # retain the returned comment URL as COMMENT_ID
 
@@ -245,11 +210,6 @@ HEAD_REPOSITORY_SELECTOR=$HEAD_REPOSITORY_URL
 glab -R "$BASE_REPOSITORY_SELECTOR" repo view --output json \
   | jq -er '.default_branch // .defaultBranch'
 
-# ordered description/notes with provider IDs/authors/timestamps for resume
-glab -R "$BASE_REPOSITORY_SELECTOR" mr view "$MR_IID" --output json | jq -r .description
-glab api --hostname "$BASE_HOST" --paginate \
-  "projects/$BASE_PROJECT_ID/merge_requests/$MR_IID/notes"
-
 # fetch exact selected head without checkout
 git fetch "$BASE_REMOTE" "merge-requests/$MR_IID/head:refs/remotes/$BASE_REMOTE/mr/$MR_IID"
 test "$(git rev-parse "refs/remotes/$BASE_REMOTE/mr/$MR_IID")" = "$HEAD_SHA"
@@ -275,7 +235,7 @@ glab -R "$BASE_REPOSITORY_SELECTOR" mr update "$MR_IID" --draft --yes \
 glab -R "$BASE_REPOSITORY_SELECTOR" mr update "$MR_IID" --yes \
   --description "$(<"$BODY_FILE")"
 
-# immutable, non-resolvable top-level note
+# append-only, non-resolvable top-level note
 glab -R "$BASE_REPOSITORY_SELECTOR" mr note create "$MR_IID" --resolvable=false < "$COMMENT_FILE"
 # retain the returned note identifier or URL as COMMENT_ID
 
@@ -324,8 +284,8 @@ Inspect again after `draft` or `ready`; confirm the returned draft/work-in-progr
 For an explicit URL, require the inspected canonical URL to identify the selected base
 repository and normalized IID; reject a mismatched selector, but permit a checkout whose
 `origin` is the MR's inspected head fork.
-GitLab trace comments use `--resolvable=false` deliberately, so a verification record
-cannot later disappear behind a resolved discussion. Inline comments are different: build
+GitLab comments use `--resolvable=false` deliberately, so an appended record cannot later
+disappear behind a resolved discussion. Inline comments are different: build
 their JSON position from the MR's `diff_refs` and verify the returned note is a `DiffNote`
 with a non-null position.
 
@@ -339,4 +299,4 @@ verified and how append-only top-level comments are created.
 
 If no authenticated capability supplies an exact equivalent, stop with the missing
 operation named. A regular issue comment, edited description section, local log, or
-resolvable review thread is not an equivalent to an append-only top-level trace comment.
+resolvable review thread is not an equivalent to an append-only top-level comment.

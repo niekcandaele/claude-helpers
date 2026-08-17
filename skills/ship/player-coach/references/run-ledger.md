@@ -31,16 +31,16 @@ the repository, because a long run would litter the diff under review; never in
 far.
 
 - `project` — the canonical base repository slug resolved while preparing the target.
-- `change_key` — the feature branch name, slugified. The branch is chosen before the
-  first commit and carries the ticket identifier, and on `--resume-ci` it is checked
-  out before anything else, so the key is available and stable on both entry paths.
+- `change_key` — the feature branch name, slugified. A default run chooses the branch
+  before its first commit, and a `--resume-ci` run learns it from the inspected change and
+  checks it out before any ledger read, so the key is available and stable on both entry
+  paths — after branch resolution, never before it.
 
 Record `prUrl` in the ledger once it exists, but never key on it: at turn 1 there is
 no PR.
 
-**The ledger is written under `--no-pr` too.** That mode publishes no remote trace,
-which is precisely why the local record has to exist — otherwise a local-only run has
-no memory at all.
+**The ledger is written under `--no-pr` too.** That mode publishes nothing at all, so
+without the local record a local-only run would have no memory whatsoever.
 
 Directory mode 0700, files 0600. Single writer: the coach. Write by creating
 `ledger.json.tmp` in the same directory, flushing it, and renaming over the target, so
@@ -70,32 +70,17 @@ schema below, shared by every run in one epic:
 
 Without the flag, quarantine behaves exactly as it always has and lives only in the ledger.
 
-## Relationship to the run trace
+## The ledger is the only memory
 
-These are not two copies of the same thing.
+Nothing the coach decides is published anywhere else. The PR carries commits, state, and a
+final description written for a human; none of that records which findings were deferred,
+which suite was quarantined, or how many turns a run has spent. The ledger is authoritative
+unconditionally, in every mode.
 
-| | Run ledger | Run trace |
-|---|---|---|
-| Medium | local disk | forge comments |
-| Lifetime | the run, plus a retention window | permanent, immutable |
-| Read | every round | only on resume |
-| Role | live working state | published projection and disaster recovery |
-
-The ledger is the write-ahead record; the trace is its immutable published
-projection. The trace gains two keys inside the *existing* canonical payload —
-`ledger` and `ledgerDigest` — rather than a second comment mechanism or a new
-`recordKind`.
-
-Precedence, stated plainly because two records invite split-brain:
-
-- **Within a run** the ledger is authoritative; the trace is append-only output.
-- **On resume** the trace wins. It is the authenticated, attribution-checked artifact;
-  the local file may be stale, from another machine, or absent. Rebuild the ledger
-  from the newest complete authenticated payload's `ledger` key and extend it. If a
-  local ledger disagrees, record the divergence as interruption evidence.
-- **Under `--no-pr`** there is no trace, so the ledger is authoritative
-  unconditionally. A lost ledger there means lost carry-forward, and that is a real
-  limitation of the mode rather than something to paper over.
+A missing ledger is therefore a real loss, not a recoverable one: a resume on another
+machine, or after the retention window, starts with empty history and fresh counters and
+re-verifies the observed head. That is the honest outcome — re-verifying costs one run,
+while reconstructing decisions from a PR body would be inventing them.
 
 ## Schema
 
@@ -141,8 +126,7 @@ Precedence, stated plainly because two records invite split-brain:
       "status": "ok",
       "decision": "FEEDBACK",
       "gates": {"exerciser": "PASSED", "codexReviewer": "COMPLETED", "customGates": "PASS"},
-      "findingIds": ["F-1", "F-2"],
-      "commentIds": ["3287451209"]
+      "findingIds": ["F-1", "F-2"]
     }
   ],
 
@@ -195,7 +179,7 @@ Precedence, stated plainly because two records invite split-brain:
   ],
 
   "policy": {"coverageCapFromRound": 3},
-  "carryForward": {"lastVerifiedHeadSha": "<full sha>", "lastFullAuditSha": "<full sha>"}
+  "carryForward": {"lastVerifiedHeadSha": "<full sha>", "lastFullAuditSha": "<full sha>", "lastVerifiedThreshold": 5}
 }
 ```
 
@@ -240,11 +224,11 @@ the decision is written down where a human can audit it afterwards.
 
 | When | What is written |
 |---|---|
-| Phase 0, initialising state | create, or rebuild from the trace on resume; record run number, threshold, base, plan |
+| Phase 0, initialising state | create, or reopen the existing file on resume; record run number, threshold, base, plan; seed `quarantine` from `--epic-quarantine` |
 | Phase 1 step 1, after the player returns | the turn record, including `feedbackItemsAddressed` from the player's receipt table |
-| Phase 1 step 3, as soon as the report is read | the verification-run record, *before* gates — so a crash mid-gate is recoverable |
+| Phase 1 step 3, as soon as the report is read | the verification-run record with `decision` and `gates` still null, *before* gates — so a crash mid-gate is recoverable |
 | Phase 1 step 4, after reconciliation | findings, dispositions, quarantine updates, coverage decisions |
-| Phase 1 step 5, after publication | comment identifiers |
+| Phase 1 step 5, once the decision is made | that run's `decision` and `gates`, and `carryForward` on an approving run |
 | Phase 3 | CI failures |
 | Phase 4 | the terminal status |
 

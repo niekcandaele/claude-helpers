@@ -40,11 +40,6 @@ _Avoid_: iteration, attempt
 One invocation of the verify skill, including a same-player-turn rerun.
 _Avoid_: coach turn, review pass
 
-**Run trace**:
-The ordered remote player-turn commits, immutable verification comments, and terminal PR
-state produced by a traced run.
-_Avoid_: log, transcript, PR history
-
 **Run ledger**:
 The durable per-run record of every finding, its disposition, and every player turn and
 verification run, held outside the repository and re-read rather than remembered.
@@ -63,7 +58,7 @@ _Avoid_: known issue, ignore list, allowlist
 **Implementation journey**:
 The synthesized narrative in the final PR body that explains player turns, verification,
 friction, testing, and terminal state.
-_Avoid_: run trace (the trace is the underlying evidence), summary
+_Avoid_: log, transcript, summary
 
 ## Relationships
 
@@ -75,10 +70,10 @@ _Avoid_: run trace (the trace is the underlying evidence), summary
 - Several **Skills** read the **Engineer skill** of the repository they run against
 - A **Skill** is **Harness-neutral** or it names the **Harness** it requires
 - A player–coach **Run** contains one or more **Player turns** and **Verification runs**
-- A traced **Run** publishes a **Run trace**; its final PR body presents the
-  **Implementation journey** synthesized from that trace
-- A **Run** maintains exactly one **Run ledger**; a traced **Run** publishes that ledger
-  inside its **Run trace**, and on resume the trace is authoritative over the ledger
+- A published **Run** leaves ordered commits and PR state on the forge; its final PR body
+  presents the **Implementation journey** synthesized from those and the **Run ledger**
+- A **Run** maintains exactly one **Run ledger**, which is never published and is
+  authoritative for everything the run decided, on resume included
 - Every finding in a **Run ledger** carries one **Disposition**; a finding still `open`
   after more than one **Verification run** is sticky
 - A **Quarantine** entry suppresses a finding at the verification gate only, never at CI
