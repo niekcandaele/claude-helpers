@@ -254,6 +254,7 @@ When `--context` is supplied, read it completely. It may contain:
 - Verification and CI evidence.
 - Terminal state.
 - Testing-plan hints.
+- A tracker linkage line (`Closes #N`, `Refs #N`).
 
 A scheduler may supply a context whose first field is `CONTEXT_KIND: delivery-state`, plus
 the observed full head, PR state, exact CI proof, queue/merge evidence, and failure reason.
@@ -261,6 +262,10 @@ This is a bounded terminal-state update, not a request to regenerate the narrati
 from the selected PR/MR's observed body, preserve its summary, implementation journey,
 testing plan, friction, and human-authored content byte-for-byte, and replace only the
 generated Final State block described below (or append it when absent).
+
+Reproduce a supplied linkage line verbatim in the body. The caller chose that exact keyword
+against that exact target branch, and rewording it either fabricates a closing relationship
+the forge will not honour or drops one the caller depends on.
 
 Also read `--plan-file` when supplied. Without caller context, look for a visible plan,
 then inspect commit messages for issue identifiers and resolve their issue text through the
