@@ -128,11 +128,16 @@ concrete commands for five operations:
 | `read` | Fetch one issue's title, body, acceptance criteria, and dependency links |
 | `start` | Mark an issue as being worked (optional) |
 | `comment` | Post a comment on an issue |
-| `close` | Mark an issue complete |
+| `close` | Explicitly mark an issue complete |
 
 `references/tracker-github.md`, `tracker-markdown.md`, and `tracker-jira.md` are worked
 examples. If the tracker is none of those, work out the binding from whatever CLI or MCP
 tools are available and write it down in the same shape.
+
+`--write-back=on` spends `comment` and `close` at the four moments in **Publishing tracker
+state**. Resolve both here, and confirm `close` actually reaches completion from an issue's
+current state — a `close` discovered unreachable at hour three has already lost the run its
+lifecycle record.
 
 **If you cannot resolve write operations, degrade to read-only** and say so — a tracker you
 can read is still perfectly workable, it just means the user reconciles status by hand
@@ -289,8 +294,9 @@ A refusal is not a failure of the run. Record it, mark the issue needs-attention
 
 **This takes the dev stack.** Nothing else that needs it runs until this returns.
 
-Spawn an issue-agent in an isolated worktree. It owns the ticket end to end — code, PR, and
-CI — and hands you back a PR that is ready to merge:
+Post the start moment from **Publishing tracker state**, then spawn an issue-agent in an
+isolated worktree. It owns the ticket end to end — code, PR, and CI — and hands you back a
+PR that is ready to merge:
 
 ```
 Implement issue {id} from the plan at {state_dir}/plans/{id}.md.
@@ -305,6 +311,9 @@ satisfy yourself it would survive review. CI is the gate, not the first reader.
 
 /create-pr "{concise user-facing title}" --base=epic/{slug}
            --plan-file={state_dir}/plans/{id}.md --context={your journey context}
+
+The context carries the tracker linkage line "{linkage}" for the PR body — it references
+issue {id} without claiming the merge closes it, because this PR targets the epic branch.
 
 Then take the PR to green yourself:
 
@@ -343,6 +352,10 @@ it goes to the merge check, and its `HEAD_SHA` is the approved SHA for every lat
 comparison. `FAILED`, a missing field, or a head mismatch fails the issue. Record any
 discoveries. That compact state is all you keep.
 
+A block carrying a `PR_URL` — mergeable or failed — is where the PR-opened moment from
+**Publishing tracker state** gets posted: the agent opened the PR, so you are the first to
+hold its URL alongside the issue.
+
 **A failed issue does not get a second implementation attempt.** The CI-fix attempts were
 the retries; a fresh agent on the same code is how a scheduler spends four hours converging
 on something a person would settle in five minutes.
@@ -373,6 +386,34 @@ unmerged, turns a bookkeeping failure into a lie about the repository. Store a f
 block's `HEAD_SHA` as the observed remote head without overwriting the approved SHA.
 
 Never copy raw CI logs, tokens, or personal data into a delivery context or a comment.
+
+### Publishing tracker state
+
+**The tracker is where an issue's lifecycle lives** — pending, active, completed, failed —
+and it is the only record a human, a resumed run, or another tool ever sees. `run.json` holds
+evidence, never lifecycle. So an issue is complete when the tracker says it is complete.
+
+With `--write-back=off`, none of this runs: the run performs no tracker mutation of any kind.
+Otherwise write at these four moments, one comment each through the binding's `comment`
+operation, each carrying the attribution line Phase 3 requires:
+
+| Moment | The comment carries |
+|---|---|
+| Implementation starts | the epic run, the epic integration branch, that implementation has started |
+| The issue PR opens | PR URL, source branch, target epic branch, current remote head |
+| Exact-head merge observed | PR URL, epic branch, approved head SHA, observed merge commit, CI outcome and fix-attempt count, and an explicit line that the work is integrated into the epic branch and **not yet merged to the default branch** |
+| Terminal failure | PR URL and the failure reason; the issue stays open |
+
+Apply a workflow label or status at the start moment only where the binding already resolved
+one. Create no project-management vocabulary implicitly.
+
+**After the delivery comment, invoke `close` and re-read the issue.** Dependants are unblocked
+on the tracker reporting the issue closed as completed, not on your having asked for it. A
+comment or close that fails preserves and reports the last factual tracker state — never
+record an issue as tracker-complete while the tracker still reports it open.
+
+A binding whose `comment` or `close` is a no-op degrades: the moment goes into the completion
+report instead, and Phase 0's confirmation says so once.
 
 **Be patient.** An issue-agent that has been gone an hour is normal — most of that hour is
 CI, and when several branches land at once the shared runners queue. Extensive CI is
@@ -462,8 +503,9 @@ the scheduler-state procedure above. A queue rejection, CI/policy observation fa
 exhausted CI-fix attempts, or other scheduler terminal path with an existing PR uses the
 same procedure with its factual failed state and terminal comment.
 
-Only after observed merge, mark the issue complete via the tracker binding (if write-back
-is on) and re-evaluate the graph — this merge may have unblocked dependents.
+Only after observed merge, publish the delivery comment and close the issue through
+**Publishing tracker state**. Re-evaluate the graph once the tracker reports it closed as
+completed — that observation, not the merge, is what unblocks dependents.
 
 ### When an issue fails
 
@@ -485,8 +527,9 @@ The expensive failures are the least likely to succeed on a rerun, so a blanket 
 once" spends the most effort on the least promising work.
 
 **A failed issue keeps its PR and its branch.** Do not close the PR, do not delete the
-branch. The work is real and a human will pick it up. The issue stays incomplete in the
-graph, so its dependents become **stranded**.
+branch. It also keeps its tracker issue open, with the terminal comment from **Publishing
+tracker state** naming the PR and the reason. The work is real and a human will pick it up.
+The issue stays incomplete in the graph, so its dependents become **stranded**.
 
 **Never build on failed work.** If #3 fails, do not attempt #4, #5, #6 on #3's branch. That
 branch contains code that never got to green; if the human later fixes
@@ -637,6 +680,10 @@ blocking:
 The context file is the epic summary for a human reviewer; it is not `epic-context.md`, which
 is the reviewer-facing backlog and has no place in a PR body.
 
+**This is the one PR that targets the default branch**, so it is the one PR whose body can
+promise closure. The context carries the epic's closing linkage line, and the human's merge
+closes the epic ticket atomically with the delivery it describes.
+
 **Leave it as a draft, and never merge it.** This is the whole reason the run could be
 autonomous: a human reads one integrated branch, exercises it however they exercise things,
 and merges it themselves. Marking it ready or merging it would quietly convert a reviewed
@@ -689,12 +736,11 @@ DISCOVERIES  {n} tickets drafted{, awaiting approval}{, + 1 combined cleanup tic
 
 The epic PR leads because it is the one thing the run cannot finish for the user.
 
-Then, with write-back on: post the report as a comment on the epic ticket, and **close the
-epic only when every child issue is done *and* the final epic verification came back clean.**
-Anything stranded, needing attention, or still blocking at the end of Phase 2 leaves it open —
-a partially-finished epic that reports itself complete is a lie the user will only catch much
-later. The epic branch being unmerged is not itself a reason to keep the ticket open; that
-merge is the human's step.
+Then, with write-back on, post the report as a comment on the epic ticket and **leave the epic
+open.** Clean verification is not delivery: the epic PR is still a draft against the default
+branch, and until a human merges it nothing the run produced has shipped. An open epic ticket
+states that accurately, and the `Closes` linkage in that PR closes it the moment the human
+merges — atomically, with the delivery it describes.
 
 ---
 
@@ -721,11 +767,17 @@ Never in the repository — a long epic would litter the working tree and pollut
 being reviewed. Never in `/tmp` — a reboot mid-run would destroy the ledger and every
 drafted ticket.
 
-**The tracker is authoritative for what's done; the local file holds only what the tracker
-cannot express.** On resume, re-read the tracker and the open PRs *first*, and where the
-local file disagrees about merged work, the tracker wins. Otherwise you get the split-brain
-where the file says #5 is pending, its PR merged an hour ago, and you re-implement shipped
-work.
+**The tracker owns lifecycle; `run.json` owns evidence.** Lifecycle is pending / active /
+completed / failed, the durable PR linkage, and what unblocks dependants — all human-visible,
+all written back as Phase 1 goes. Evidence is the approved head SHA, the CI proof, merge-queue
+identifiers, retry counts, plans, journey logs, and unpublished drafts: technical, private,
+and never the sole record that an issue completed.
+
+On resume, re-read the tracker *first*, then the open PRs. **A child observed closed as
+completed is not reimplemented**, whatever the local file says. Where local evidence is
+missing, reconstruct delivery from the agent-attributed delivery comments and
+`/create-pr --inspect`. Where the two disagree, surface the disagreement in the report rather
+than resolving it into a second implementation of shipped work.
 
 **An open PR goes to the merge check only on a head an issue-agent finished.** Adopt it when
 `run.json` holds a `MERGEABLE` block for that issue whose `HEAD_SHA` equals the PR's current

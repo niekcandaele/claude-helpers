@@ -38,13 +38,19 @@ gh issue edit {id} --add-label in-progress          # only if the label exists
 # comment
 gh issue comment {id} --body-file {file}
 
-# close — prefer automatic
+# close — explicit, then confirm
+gh issue close {id} --reason completed
+gh issue view {id} --json state,stateReason      # require CLOSED / COMPLETED
 ```
 
-**Don't close issues manually.** Put `Closes #{id}` in the PR body and GitHub closes the
-issue when the PR merges, atomically and with the linkage recorded. A manual `gh issue
-close` can drift from reality if the merge fails. Pass the issue id to the issue-agent so it
-lands in the PR body.
+**Child PR bodies carry `Refs #{id}`.** GitHub records a closing relationship only for a PR
+targeting the default branch; a child PR targets `epic/{slug}`, so `Closes` there is a
+promise the forge never keeps — the PR merges and the issue stays open. `Refs` states the
+linkage truthfully and leaves closing to the explicit `close` above, which is what moves the
+parent's sub-issue progress.
+
+**The epic PR is the exception.** It targets the default branch, so its body carries
+`Closes #{epic}` and the human's eventual merge closes the parent atomically.
 
 Before using `start`, confirm the label exists — `gh label list --json name -q '.[].name'`.
 Creating labels in someone's repo is not your call.

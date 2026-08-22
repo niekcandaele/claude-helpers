@@ -28,7 +28,7 @@ without re-deriving it for the rest of the run.
 | `read` | Yes | Title, body, acceptance criteria, dependency links |
 | `start` | No | Marks an issue in-progress |
 | `comment` | No | Posts a comment |
-| `close` | No | Marks an issue complete |
+| `close` | No | Explicit completion, confirmed observed |
 
 **Only `list` and `read` are required.** A tracker you can read but not write is fully
 workable — the user reconciles status by hand afterward. Refusing to run because you
@@ -42,7 +42,7 @@ list:     gh issue list --milestone "Q3 export" --json number,title,body --limit
 read:     gh issue view {id} --json title,body,labels
 start:    gh issue edit {id} --add-label in-progress
 comment:  gh issue comment {id} --body-file {file}
-close:    (automatic — PR body says "Closes #{id}")
+close:    gh issue close {id} --reason completed
 ```
 
 ## Resolving an unknown tracker
@@ -93,3 +93,10 @@ no ceremony.
 **Write at meaningful moments only.** Marking in-progress when work starts, linking the PR,
 closing on merge, one summary comment on the epic at the end. A tracker notification per
 turn would make the user's inbox useless and teach their team to ignore the project.
+
+**Close explicitly, then confirm.** `close` is an operation you invoke and whose effect you
+re-read — never a side effect you expect the forge to produce. An issue counts as complete
+when the tracker itself reports it complete.
+
+**Use the workflow that exists.** Apply labels, statuses, and transitions the binding already
+resolved; creating project-management vocabulary in someone's tracker is not your call.
