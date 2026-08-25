@@ -263,6 +263,72 @@ Apply this when scoped changes include ANY of:
 - Type 5+ chars rapidly via `pressSequentially`, wait for debounce → verify only ONE API call fired (check network requests)
 - Verify no error UI appears mid-typing for queries that will be valid when complete
 
+### 4b. The Visual Lens
+
+**Active only when the verify prompt says `VISUAL LENS: ACTIVE`.** At deep verification depth
+the `visual-verify` skill owns visual review; do not duplicate it. When the prompt says
+`VISUAL LENS: INACTIVE`, or says nothing about a visual lens at all, skip this section.
+
+**The trigger is what you actually did, not what the files were called.** If you exercised the
+feature through a browser and looked at rendered pages, look at them properly. If you
+exercised it through an API, a CLI, a job, or the database, nothing was rendered — record
+`visual lens: no rendered output in this exercise path` and move on. A change that merely sits
+near the UI is exactly one whose exercise path never reached a screen.
+
+You are already holding the browser and you are already on the screens the change touches,
+which makes this cheaper and better-targeted than a separate pass that has to rediscover the
+app from scratch.
+
+**Capture.** For each page your exercise path reached, `browser_resize` to 1440x900 and take a
+full-page `browser_take_screenshot`. If the change touches responsive layout, take a 390-wide
+shot of the same route too. Then open every image with `Read` — you have to actually look at
+the pixels, not reason about the CSS diff.
+
+**4b-i. The holistic read (do this first, before any checklist).**
+
+Write 2-3 sentences describing the composition in a designer's terms: balance, visual weight,
+hierarchy, rhythm, alignment, density, whitespace, color harmony, typography. Describe what
+the page IS, not what is wrong with it.
+
+**The rule: anything in that paragraph that reads as a complaint becomes a finding.** "The card
+grid sits slightly left of the header's axis" is a finding. "Generous whitespace gives the hero
+room to breathe" is not.
+
+This ordering is deliberate. The defects a human eye catches instantly are gestalt-level — they
+surface when you describe the whole, and they hide when you jump straight to scanning for
+individual flaws.
+
+**4b-ii. The defect checklist (second pass).** Sweep each image for:
+
+- **Alignment** — elements that should share an axis and do not
+- **Spacing / padding** — inconsistent gaps between siblings, cramped or orphaned elements
+- **Overlap / clipping** — anything touching or cut off by its container
+- **Centering** — things that claim to be centered and are not
+- **Color / contrast** — text that is hard to read against its background
+- **Typography** — mismatched sizes or weights where hierarchy should be consistent
+- **Truncation / overflow** — text escaping its box, or an unintended scrollbar
+- **Responsive breakage** — compare the 1440 and 390 shots of the same route
+- **Broken assets** — missing images, failed icon fonts, placeholder boxes
+
+**4b-iii. The bar: "would a competent designer ship this?"** — NOT "is anything imperfect?".
+
+- If it jumps out of a full-page screenshot at a glance, it is a finding.
+- If you would need to zoom to 300% or measure pixels to notice, it is not.
+- Consistency is innocence: an unusual choice applied uniformly is a style, not a defect. Do
+  not second-guess intentional design (brutalist spacing, asymmetric layouts) — flag only what
+  reads as accident, not intent.
+- Five high-confidence findings beat twenty maybes. Nitpick spam erodes trust in the whole
+  verification report, and your findings compete for the human's attention with correctness and
+  security issues.
+
+**4b-iv. Visual findings never change your status.**
+
+Report them in `## Issues Found` at their own severity, like any other issue, and let the
+pipeline's threshold decide what happens to them. Your `## Status:` line stays strictly about
+whether the feature **works when used**. A misaligned card grid is not a broken feature, and a
+pipeline that treats it as one will spend rounds polishing pixels while calling it a functional
+failure.
+
 ### 5. Backend Exercise Path
 
 Use this path when changes affect APIs, services, data layers, jobs, or infrastructure.
@@ -426,6 +492,15 @@ docker compose down
 
 ---
 
+## Visual Lens
+
+[Omit this section entirely when the lens was inactive.]
+
+**Status:** [holistic reads below / no rendered output in this exercise path]
+**/route @ 1440:** [the 2-3 sentence articulation]
+
+---
+
 ## Issues Found
 
 Report each issue with structured format:
@@ -496,6 +571,11 @@ When returning BLOCKED, use these specific reasons:
 - Environment started
 - Feature was exercised
 - Feature does NOT work (severity 7+ issues found), OR any custom verification gate failed
+
+**Visual findings from the visual lens never enter this decision, at any severity.** These
+three statuses answer one question — does the feature work when a person uses it — and a
+cosmetic defect is not an answer to it. Report visual findings in `## Issues Found` and let
+the verification threshold handle them.
 
 **BLOCKED**
 - Could not complete the exercise

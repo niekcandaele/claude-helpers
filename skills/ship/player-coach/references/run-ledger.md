@@ -125,7 +125,7 @@ while reconstructing decisions from a PR body would be inventing them.
       "fullAudit": true,
       "status": "ok",
       "decision": "FEEDBACK",
-      "gates": {"exerciser": "PASSED", "codexReviewer": "COMPLETED", "customGates": "PASS"},
+      "gates": {"exerciser": "PASSED", "judgementReviewer": "reviewer (Codex unavailable)", "customGates": "PASS"},
       "findingIds": ["F-1", "F-2"]
     }
   ],
@@ -150,7 +150,7 @@ while reconstructing decisions from a PR body would be inventing them.
       "evidence": "reviewer quoted the cached rejection at line 34",
       "matchedTo": null,
       "matchReason": null,
-      "reaffirmedBy": [{"verifyRun": 4, "skill": "qa", "reason": "unchanged since delta base", "newHarmEvidence": false}],
+      "reaffirmedBy": [{"verifyRun": 4, "skill": "codex-reviewer", "reason": "unchanged since delta base", "newHarmEvidence": false}],
       "followUp": {"kind": "none", "ref": null}
     }
   ],

@@ -607,6 +607,13 @@ branch could have seen it.
 So give it room. Three rounds, remediating as it goes, and the run's whole quality claim
 rests here.
 
+**This is the one place in the whole system that asks for `--depth=deep`.** Verification is
+light by default everywhere else — a human typing `/verify`, and every turn of a
+`player-coach` loop — because a judgement fan-out over a diff that keeps growing does not
+converge. That reasoning does not apply here. This pass runs once, over a finished integrated
+branch that is not going to grow underneath it, and it is the only review the epic gets. The
+cost light exists to avoid is not a cost this phase can incur.
+
 **Run this phase even when some issues failed.** A partial epic still gets reviewed as a
 whole; what it does not get is a claim of completeness.
 
@@ -618,7 +625,7 @@ Spawn a verification agent. It holds the report so you don't:
 Verify the epic branch as one integrated change.
 
 Check out epic/{slug} and invoke:
-/verify --mode=report-only --scope=branch --base={BASE_REMOTE}/{target}
+/verify --depth=deep --mode=report-only --scope=branch --base={BASE_REMOTE}/{target}
         --format=json --output={state_dir}/epic-verify/{round}.json
 
 Return ONLY these three lines:
