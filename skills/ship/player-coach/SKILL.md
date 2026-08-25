@@ -6,7 +6,7 @@ description: >
   ready. Invoke only when the user explicitly asks
   for the player-coach loop. Do not use for an ordinary coding request. For a whole epic,
   use epic-runner instead.
-argument-hint: "[--headless] [--resume-ci] [--max-turns=N] [--severity=N] [--ci-timeout=<duration>] [--no-pr] [--no-ci] [--plan-file=<path>] [--target=<branch>] [--pr=<reference>] [--approved-head=<sha>] [--epic-context=<path>] [--epic-quarantine=<path>] [--on-codex-blocked=continue|stop]"
+argument-hint: "[--headless] [--resume-ci] [--max-turns=N] [--severity=N] [--ci-timeout=<duration>] [--no-pr] [--no-ci] [--plan-file=<path>] [--target=<branch>] [--pr=<reference>] [--approved-head=<sha>] [--epic-context=<path>] [--epic-quarantine=<path>]"
 allowed-tools:
   - Read
   - Bash
@@ -63,7 +63,6 @@ Parse:
 - `--target=<branch>` — exact PR target; otherwise use the provider default branch.
 - `--pr=<reference>` — exact existing PR/MR URL or number/IID; required by `--resume-ci`.
 - `--approved-head=<sha>` — originating verified full SHA; required by `--resume-ci`.
-- `--on-codex-blocked=continue|stop` — headless Codex policy; default `continue`.
 - `--headless` — suppress every user question and use defaults (10 turns, severity 5).
 - `--resume-ci` — resume an existing draft or ready PR/MR at the CI-fix loop.
 
@@ -312,12 +311,20 @@ real commit available for draft”.
 
 ### 3. Run verification against the exact target
 
+**Every verification run in this loop is light depth, including the final one before
+approval.** This loop's job is to converge, and a judgement fan-out that meets a growing diff
+each round is the thing that stops it converging. Light gives one independent review plus an
+exerciser that actually uses the feature; carry-forward keeps that review from wandering. A
+change that genuinely warrants the full fan-out gets it from a human running
+`/verify --depth=deep`, or from `epic-runner`'s pass over the integrated epic — not from this
+loop quietly escalating on its own.
+
 For a published run, fetch `BASE_REMOTE/$TARGET_BRANCH` immediately before comparison,
 increment `verify_runs`, set `unique_report_path` to `{ledger_dir}/reports/{verify_runs}.json`
 — never a path an earlier run already wrote — and invoke:
 
 ```text
-/verify --mode=report-only --scope=branch --base={BASE_REMOTE}/{TARGET_BRANCH}
+/verify --depth=light --mode=report-only --scope=branch --base={BASE_REMOTE}/{TARGET_BRANCH}
         --plan-file={plan_file} --format=json
         --output={unique_report_path} --ledger={ledger_dir}/ledger.json
         [--since={carryForward.lastVerifiedHeadSha}] [--epic-context={epic_context}]
@@ -350,7 +357,7 @@ the deduplicated `accumulated_player_untracked_paths` set. Do not include or alt
 untracked files.
 
 ```text
-/verify --mode=report-only --files={accumulated_player_owned_paths}
+/verify --depth=light --mode=report-only --files={accumulated_player_owned_paths}
         --plan-file={plan_file} --format=json
         --output={unique_report_path}
 ```
@@ -392,11 +399,16 @@ Compute a factual decision from the report:
    player turn and same SHA.
 4. Every custom exerciser/review gate must pass. `FAIL` becomes severity 10 feedback;
    `BLOCKED` or `NOT CHECKED` becomes severity 9.
-5. `codex-reviewer: COMPLETED` passes. `BLOCKED` follows the interactive question or
-   headless policy and is recorded. A missing row is blocked. The documented unsupported
-   whole-codebase skip is not relevant to branch scope and therefore cannot approve it.
-   A `stop` decision records this verification run, terminalizes the open change, and ends
-   `FAILED_CODEX_BLOCKED`; it never falls through to approval.
+5. A judgement reviewer must have run. At light depth `verify` invokes `codex-reviewer` when
+   Codex is available and `reviewer` when it is not, and reports which. Either one at
+   `COMPLETED` passes. A run where neither produced a result is `RERUN` — that is a hole in
+   the pipeline, not a review that found nothing. Record the reviewer's identity in the
+   ledger and name it once in the friction log, because the two are different models and a
+   reader deciding how much this approval is worth needs to know which one gave it.
+
+   There is no stop-the-world policy for an unavailable Codex any more. The fallback means
+   the change was independently reviewed either way, and the hole a policy would have
+   guarded is closed structurally.
 
 A finding the ledger already holds as `open` with `occurrences > 1` is sticky friction.
 Record non-empty player concerns by turn. Write every disposition back to the ledger before
@@ -416,19 +428,23 @@ for a failure ordering that the seventh round's own tests had just introduced.
   capped the same way **unless it is first-order**: a new public behaviour this change
   introduces, or a bug this change fixes, with no test at all. "You shipped an untested
   endpoint" must be able to block on any round.
-- **Coverage never escalates on repeat.** The reaffirmation rule below and sticky friction
-  both skip `class == "coverage"`. A weak-coverage observation restated three times is
-  still a weak-coverage observation.
+- **Coverage never escalates on repeat.** Sticky friction skips `class == "coverage"`. A
+  weak-coverage observation restated three times is still a weak-coverage observation.
 
 None of this touches a test that is *wrong* — one that asserts nothing, mocks the thing
 under test, or passes with the implementation deleted. Those are `correctness` findings
 about test code and they are never capped.
 
-**Reaffirmation escalation.** If two independent skills reaffirm the same
-`accepted-below-threshold` finding in one verification run, re-score it one higher, capped
-at its original severity, and return it to `open` if it crosses the threshold. Without this
-an early mis-disposition would be frozen for the rest of the run by the very mechanism
-meant to stop findings recurring.
+**There is no reaffirmation escalation.** An earlier version re-scored an
+`accepted-below-threshold` finding upward when two independent skills reaffirmed it in one
+verification run. This loop verifies at light depth, where there is exactly one judgement
+reviewer, so two independent skills can never reaffirm anything and the rule could only ever
+have been dead text.
+
+The mis-disposition it guarded against is now caught the other way round: carry-forward's own
+rules let any reviewer reopen an accepted finding at full severity when it brings new evidence
+of concrete harm — a failing test, a reproduction, an exploit path. Evidence reopens a
+finding; agreement no longer does.
 
 **Opening a quarantine entry.** Write one only when the debugger's determination says
 `PRE_EXISTING: yes` **and** `TOUCHED_BY_DIFF: none`. An entry may never cover a failure
@@ -644,7 +660,7 @@ HEAD_SHA: <full SHA verified by the final verification run, current HEAD in --no
 REMOTE_HEAD_SHA: <last observed full provider head, equal to HEAD_SHA on a stable published run, or none>
 TURNS_USED: <n> of <m>
 VERIFY_RUNS: <n>
-CODEX: completed | blocked (<reason>) | not-run
+REVIEWER: codex-reviewer | reviewer (Codex unavailable) | none
 ```
 
 | Status | Meaning |
@@ -656,7 +672,6 @@ CODEX: completed | blocked (<reason>) | not-run
 | `TURN_LIMIT_VERIFY` | Blocking verification issues remained at the turn limit. |
 | `TURN_LIMIT_CI` | Verification passed but CI did not become affirmatively green in budget. |
 | `FAILED_NO_PLAN` | The exact or discoverable plan did not exist. |
-| `FAILED_CODEX_BLOCKED` | Codex was blocked and policy required stopping. |
 | `FAILED_CI_BLOCKED` | CI, policy, or mergeability could not produce affirmative proof. |
 | `FAILED_PUBLISH` | A binding preflight, push, draft, PR update, or state transition failed; the remote head moved under a mutation; or no real commit was ever produced. |
 

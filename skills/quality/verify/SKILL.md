@@ -5,7 +5,7 @@ description: >
   Detects scope, discovers toolchain, triages files to relevant skills, runs static
   analysis, invokes review skills in parallel, exercises the app, and produces a
   unified report. Supports interactive, report-only, and auto-fix modes.
-argument-hint: "[--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--base=<ref>] [--files=file1,file2] [--module=path] [--skip-ux] [--skip-visual] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>] [--plan-file=<path>] [--epic-context=<path>]"
+argument-hint: "[--depth=light|deep] [--mode=interactive|report-only|auto-fix] [--scope=staged|unstaged|branch|all] [--base=<ref>] [--files=file1,file2] [--module=path] [--skip-ux] [--skip-visual] [--auto-fix-threshold=N] [--format=markdown|json] [--output=<path>] [--plan-file=<path>] [--epic-context=<path>]"
 metadata:
   group: quality
   requires: [reviewer, codex-reviewer, comment-review, qa, tester, ux-reviewer, visual-verify, static-analysis, exerciser, debugger]
@@ -26,16 +26,40 @@ Parse `$ARGUMENTS` for:
 - `report-only`: Full pipeline → report → STOP
 - `auto-fix`: Full pipeline → report → auto-accept severity >= threshold → plan → fix → STOP
 
-**Composition** — what Phase 6 fans out to, every time:
+**Depth** (`--depth=`):
+- `light` (default): one independent judgement review plus empirical evidence
+- `deep`: the full judgement fan-out
 
-| Judgement reviewers | Always also run | Conditional |
+**Composition** — what the pipeline runs, by depth:
+
+| | `light` (default) | `deep` |
 |---|---|---|
-| `reviewer`, `codex-reviewer`, `comment-review`, `qa`, `ux-reviewer` | `static-analysis`, `tester`, `exerciser` | `visual-verify`, `debugger` |
+| Triage (Phase 3) | Job A only | Job A + Job B |
+| Judgement review | **one**: `codex-reviewer`, or `reviewer` when Codex is unavailable | `reviewer`, `codex-reviewer`, `comment-review`, `qa`, `ux-reviewer` |
+| Deterministic | `static-analysis`, `tester` | `static-analysis`, `tester` |
+| Empirical | `exerciser`, carrying its own visual lens | `exerciser`, plus `visual-verify` when triage gates it in |
+| Diagnostic | `debugger` on failure | `debugger` on failure |
+| Plan completeness | when a plan resolves | when a plan resolves |
 
 This table is the single source of truth for composition; callers point here rather than
-restating it. There is one composition and no way to ask for less: a caller that wants a
-cheaper pass narrows the *scope*, which reviews less code properly, rather than reviewing
-the same code with fewer eyes.
+restating it.
+
+**The two depths are different bets, not different amounts of the same bet.** Deep buys more
+lenses on one diff: five reviewers, each with its own specialism, each free to open a line of
+inquiry the others would miss. Light buys model diversity and empirical evidence instead: one
+review from a genuinely different model where the machine has one, plus starting the
+application and actually using the feature. Both keep the checks that cannot wander — a
+linter and a test runner report what came back and never widen their own remit.
+
+Light is the default because the caller is usually a model that has already reviewed and
+tested its own work. Stacking five more judgement reviewers on top of that does not converge:
+each round fixes the previous round's findings, and reviewers meeting a diff that only grew
+open new inquiries into code earlier rounds already cleared. Every fix becomes fresh surface
+to review.
+
+Deep exists for the change where that cost is worth paying — the integrated result of a whole
+epic, an unusually risky diff, a human who asks for it. Ask for it explicitly; nothing selects
+it on your behalf.
 
 **Scope Control:**
 - `--scope=staged`: Verify only staged changes
@@ -50,8 +74,11 @@ the same code with fewer eyes.
   pass it; do not replace it with a default-branch guess.
 
 **Other Options:**
-- `--skip-ux`: Skip UX review for pure backend changes
-- `--skip-visual`: Skip visual review for changes the human has already eyeballed (e.g. copy-only). Visual review is also auto-skipped when `visual-verify` is not among the available skills (defensive — it is normally installed globally, and a project may shadow it with its own copy to customize capture conventions).
+- `--skip-ux`: Skip UX review for pure backend changes. **Valid only at `--depth=deep`.** At
+  light there is no `ux-reviewer` to skip, so accepting the flag would let a caller believe it
+  suppressed something that was never going to run. Reject it as an argument error rather than
+  treating it as a no-op.
+- `--skip-visual`: Skip visual review for changes the human has already eyeballed (e.g. copy-only). Valid at both depths: at deep it skips `visual-verify`, at light it suppresses the exerciser's visual lens. Visual review is also auto-skipped when `visual-verify` is not among the available skills (defensive — it is normally installed globally, and a project may shadow it with its own copy to customize capture conventions).
 - `--auto-fix-threshold=N`: Minimum severity for auto-fix mode (default: 3)
 - `--plan-file=<path>`: Explicit path to a plan file for completeness checking. If not provided, discover the plan from context — check if a plan is visible in conversation history (e.g., invoked from player-coach which read a plan, or a plan was created/discussed earlier in this session). If a plan is found from either source, resolve its contents for the plan completeness check in Phase 6.
 
@@ -276,6 +303,14 @@ ls -d .*/skills/*-engineer/ */skills/*-engineer/ 2>/dev/null | grep -v '^\.\./'
 ## Phase 3: Discovery & Triage
 
 Launch ONE fast, read-only exploration sub-agent with two jobs in a single prompt.
+
+**At `--depth=light`, send Job A only.** Job B produces two things and light consumes
+neither: per-skill file assignments, when the single judgement reviewer wants the whole
+scoped diff anyway, and the `ux-reviewer` / `visual-verify` gating decision, when neither
+skill is in the light composition and the visual lens gates itself on what the exerciser
+actually did. Reading every changed file to produce a routing table nobody reads is exactly
+the kind of cost light exists to avoid. Job A stays either way — `static-analysis` and
+`tester` need `TOOLCHAIN`.
 (On Claude Code that is the `Explore` agent type; any read-only sub-agent will do.)
 
 ### Job A: Discover Project Toolchain
@@ -304,6 +339,8 @@ Output concrete commands that can be executed.
 ```
 
 ### Job B: Triage Changed Files
+
+**Deep depth only** — see the note above Job A.
 
 Triage does two things: assign files to focus each skill, and decide whether the two
 user-facing skills apply at all.
@@ -378,6 +415,10 @@ Output a JSON-like mapping:
 `visual-verify` is also skipped if it is not among the available skills (defensive — it is normally installed globally and always present; a project may shadow it with its own copy to customize capture conventions).
 
 **Output:** Store the skill assignments and gating decisions as `TRIAGE_RESULT` and toolchain commands as `TOOLCHAIN`.
+
+At light, Job B did not run. Set `TRIAGE_RESULT.skill_assignments` to the full scoped file
+list for every skill in the light composition, and leave its gating decisions empty. Every
+later reference to `TRIAGE_RESULT.skill_assignments` then resolves without branching on depth.
 
 ## Phase 4: Static Analysis
 
@@ -472,9 +513,38 @@ the Codex CLI: the same fan-out took 359 s of spawn-to-spawn at the default cap
 and 43 s once the cap was raised, with no change to these instructions.
 **Harness bindings** at the end of this skill records where that cap lives.
 
+### At `--depth=deep`
+
 **Always run, every time:** `reviewer`, `codex-reviewer`, `comment-review`, `qa`, `tester`. Triage focuses these with file assignments but never suppresses them — for correctness-facing review, a missed regression costs more than an extra skill run.
 
 **Run if triage says they apply:** `ux-reviewer` and `visual-verify` (see Phase 3 Job B gating). `--skip-ux` / `--skip-visual` override triage and force a skip.
+
+### At `--depth=light` (default)
+
+**Always run, every time:** `tester`, and exactly **one** judgement reviewer chosen like this:
+
+```bash
+which codex
+```
+
+On success, invoke `codex-reviewer`. Otherwise invoke `reviewer`. Record which one ran — the
+report must say, because a reader cannot otherwise tell what kind of review the change got.
+
+**Never resolve this fallback inside `codex-reviewer`.** That skill's entire value is model
+diversity; a substitute review running the same model hidden behind its name would report
+`codex-reviewer: COMPLETED` for a pass that had no diversity in it at all. The choice belongs
+here, where it is visible in the composition and in the report.
+
+`reviewer` is the more expensive of the two — it is the broadest review in the suite and its
+cost tier is the most capable model available. On a machine without Codex, light is one
+expensive agent rather than one cheap one. That is still one agent, and it is still the right
+substitute: the alternative is a change nobody independently reviewed.
+
+**Never run at light:** `comment-review`, `qa`, `ux-reviewer`, `visual-verify`. These are not
+failures or skips-for-cause — they are outside the composition. Phase 7 records them
+accordingly.
+
+`exerciser` runs at both depths in Phase 7c, and at light it carries its own visual lens.
 
 **Model routing is the harness's call.** No skill pins a model — the right one
 depends on how gnarly the change is, and only the orchestrator knows that. What
@@ -702,7 +772,12 @@ empty, hit a provider quota or rate limit, timed out, or was refused a start,
 record `NOT_RUN` with the observed reason. A review that never ran and a review
 that found nothing are opposite outcomes, and only one of them is good news —
 filing the first as the second turns a hole in the pipeline into a clean bill of
-health. Running the reviewers concurrently makes quota refusals more likely, not
+health.
+
+**A skill outside the current depth's composition is `SKIPPED`, never `NOT_RUN`.** Record it
+as `SKIPPED` with the reason `not in light composition`. `NOT_RUN` has to keep meaning "this
+should have run and did not" — that is the entire point of the rule above, and reusing it for
+"this was never part of the plan" would hide a real hole behind an expected one. Running the reviewers concurrently makes quota refusals more likely, not
 less, so this distinction earns its keep.
 
 Collect structured findings from each skill. Extract ONLY:
@@ -730,7 +805,12 @@ For `visual-verify`, also collect skill status if no findings were produced:
 
 ### 7b. Conditional: debugger
 
-If tester OR ux-reviewer OR exerciser reported failures (severity 7+):
+If tester OR exerciser — or, at deep, ux-reviewer — reported failures (severity 7+):
+
+`debugger` runs at both depths. It is a diagnostic that fires on an observed failure, not a
+reviewer that goes looking for one, so it cannot widen an audit the way a judgement skill can.
+Callers depend on it: `player-coach` can only open a quarantine entry on a debugger
+determination, so dropping it at light would silently disable quarantine.
 
 Invoke `debugger` with:
 ```
@@ -782,6 +862,16 @@ Exercise the changes end-to-end:
 If you hit a barrier (can't start, need credentials, unclear what to test, no engineer skill for complex backend):
 - Return BLOCKED status with specific reason
 - If you cannot determine HOW to exercise the change, that is severity 9-10
+
+{At --depth=light, and unless --skip-visual was passed:}
+VISUAL LENS: ACTIVE
+If your exercise path went through rendered UI in a browser, also look at what you rendered
+and report visual defects, following your skill's visual lens section. If you exercised the
+feature through an API, a CLI, a job, or the database, there is nothing rendered to look at —
+say so and move on.
+
+{At --depth=deep:}
+VISUAL LENS: INACTIVE — visual-verify owns visual review at this depth. Do not duplicate it.
 
 ISSUES FOUND BY REVIEW SKILLS:
 {List of all issues found in Phase 6 with VI-IDs, severity, title, location}
@@ -836,6 +926,7 @@ bias the floor exists to cancel.
 
 ## Scope
 
+**Depth:** [light / deep]
 **Mode:** [staged / unstaged / branch / all / files / module]
 **Base ref:** [exact `--base` value or resolved base; `null` outside branch scope]
 **Merge base:** [full SHA or `null` outside branch scope]
@@ -853,10 +944,15 @@ bias the floor exists to cancel.
 ## Triage Summary
 
 **Skills run:** reviewer, codex-reviewer, comment-review, tester, qa, ux-reviewer, visual-verify, exerciser
-**Skills skipped:** [none, or each skipped skill with its reason — `visual-verify (gated: no UI-rendering files in scope)`, `ux-reviewer (--skip-ux)`, `visual-verify (not present in available skills)`]
+**Skills skipped:** [none, or each skipped skill with its reason — `visual-verify (gated: no UI-rendering files in scope)`, `ux-reviewer (--skip-ux)`, `visual-verify (not present in available skills)`, `qa (not in light composition)`]
+**Judgement reviewer:** [at light: `codex-reviewer` or `reviewer (Codex unavailable)`; at deep: `all five`]
 **Static analysis:** ESLint (3 findings), tsc (1 finding)
 
 A gated skip must always name its reason. A mis-gate is only correctable if it is visible in the report.
+
+At light the reviewer line is not decoration. `codex-reviewer` and `reviewer` are different
+models looking for different things, and a reader deciding how much to trust this report needs
+to know which one they got.
 
 ---
 
@@ -987,6 +1083,7 @@ never add `endLine` there. Omit `findings[].location` when none applies and set
   ],
   "overall": {"result": "issues-found", "mode": "branch"},
   "scope": {
+    "depth": "light",
     "mode": "branch",
     "baseRef": "origin/release",
     "mergeBase": "0123456789abcdef0123456789abcdef01234567",
@@ -1021,8 +1118,9 @@ never add `endLine` there. Omit `findings[].location` when none applies and set
     "skills_skipped": ["visual-verify"]
   },
   "skillResults": [
-    {"skill": "reviewer", "status": "COMPLETED", "notes": "Found 1 item"},
-    {"skill": "exerciser", "status": "PASSED", "notes": "Flow completed"}
+    {"skill": "reviewer", "status": "COMPLETED", "notes": "Judgement reviewer at light depth (Codex unavailable). Found 1 item"},
+    {"skill": "qa", "status": "SKIPPED", "notes": "not in light composition"},
+    {"skill": "exerciser", "status": "PASSED", "notes": "Flow completed; visual lens active, 0 visual findings"}
   ],
   "issues": [
     {
@@ -1055,6 +1153,9 @@ Field rules:
   `status` is `ok` with no issues. These are its only values.
 - `error` is `null` for `ok`/`blocked`, and an object with stable `code` and factual
   `message` for `status: error`.
+- `scope.depth` is `light` or `deep`, always present. A report that does not say how hard it
+  looked cannot be interpreted later, and light and deep reports will be compared against each
+  other.
 - `scope.mode` is the resolved scope mode. `baseRef` is a string only for branch scope and
   `null` otherwise. `mergeBase` is the resolved full SHA for successful branch scope,
   `null` outside branch scope, and also `null` when an invalid base prevents resolution.
@@ -1097,7 +1198,7 @@ Field rules:
 ```
 
   These are additive keys. A consumer that ignores unknown fields is unaffected, which is
-  why they do not bump `schemaVersion`.
+  why they do not bump `schemaVersion`. `scope.depth` is additive for the same reason.
 
 The JSON-v1 compatibility boundary is deliberate: `schemaVersion`, `status`, and `findings`
 retain their prior meanings and shapes, as required by adversary consumers. The formerly
@@ -1251,3 +1352,7 @@ pipeline problem.** Phase 6 degrades correctly when it hits one, but the fix
 belongs wherever that harness is configured — and because the cap counts
 ancestors, the number that matters is the depth of the whole tree this `verify`
 is running inside, not what `verify` alone would like.
+
+The number of applicable skills is itself depth-dependent: light fans out to a handful and is
+unlikely to meet a cap at all, while deep is where a low cap turns a parallel phase into a
+serial one. A cap that never bites at light can still be badly wrong for deep.
