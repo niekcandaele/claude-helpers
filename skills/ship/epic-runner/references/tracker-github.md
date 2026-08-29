@@ -26,7 +26,7 @@ gh issue view {n} --json body -q .body | grep -oE '^\s*- \[[ x]\] .*#([0-9]+)'
 Checked boxes are already done — exclude them. Indentation is a dependency signal: a nested
 item generally depends on its parent.
 
-## The five operations
+## The six operations
 
 ```bash
 # read
@@ -41,7 +41,16 @@ gh issue comment {id} --body-file {file}
 # close — explicit, then confirm
 gh issue close {id} --reason completed
 gh issue view {id} --json state,stateReason      # require CLOSED / COMPLETED
+
+# create — a drafted follow-up ticket
+gh issue create --title {title} --body-file {file}
 ```
+
+**Create it into the epic the way `list` finds the epic.** The four resolutions need four
+different things, and a follow-up that skips this vanishes from the next `list` and from any
+resume: add `--milestone` for a milestone epic, `--label` for a label one, append it to the
+parent's task list for a tracking issue, and add the project item for a project board.
+Invent no grouping the epic doesn't already have.
 
 **Child PR bodies carry `Refs #{id}`.** GitHub records a closing relationship only for a PR
 targeting the default branch; a child PR targets `epic/{slug}`, so `Closes` there is a

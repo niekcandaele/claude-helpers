@@ -49,6 +49,8 @@ epic-runner            you — the scheduler
 ├── plan-agent         one per ticket, plans in plan mode, writes a plan file
 ├── issue-agent        one per ticket, isolated context + worktree — implements, opens
 │                      the PR, drives CI green, returns a mergeable PR
+├── delivery-agent     every forge call and tracker mutation the schedule needs — CI
+│                      proof, merge, PR state, lifecycle — returned as fixed fields
 └── epic-verify-agent  one per finalization round, holds the full report so you don't
     └── verify → reviewer, codex-reviewer, comment-review, qa, ux-reviewer,
                  static-analysis, tester, exerciser, visual-verify
@@ -61,6 +63,12 @@ ticket; the full journey is written to disk for the human, not returned to you.
 **So: never read a verification report. Never read a diff. Never read a plan you didn't
 have to.** If you find yourself wanting to inspect implementation details, that is a sign
 the work belongs in a sub-agent, not in you.
+
+**The delivery-agent is what keeps that true of the forge.** `create-pr` and `check-ci` are
+large skills over noisy commands, and a scheduler that invokes them holds both their prose
+and their output for the rest of the run — the one remaining way your context grows with the
+ticket count. You never invoke either one. You decide, it acts, and what comes back is a
+handful of fields. Every model tier in this tree is set per role; see **Harness bindings**.
 
 ## Work items and the one scarce resource
 
@@ -85,7 +93,8 @@ CI, and drafting discovery tickets** — so an hour of CI is an hour of the run 
 An orchestrator watching a progress bar is the failure this design exists to prevent.
 
 Stop when no unblocked work remains. Not when a ticket fails — when there is genuinely
-nothing left you could be doing.
+nothing left you could be doing. The one thing that stops the run outright is an unapproved
+head found merged into the epic branch; see **Merging**.
 
 ---
 
@@ -120,7 +129,7 @@ issue URL, a Jira epic key, a path to a markdown checklist. Different projects m
 differently and the skill has no business insisting on one of them.
 
 Read `references/trackers.md` and resolve the reference into a **tracker binding** — the
-concrete commands for five operations:
+concrete commands for six operations:
 
 | Operation | Purpose |
 |---|---|
@@ -129,6 +138,7 @@ concrete commands for five operations:
 | `start` | Mark an issue as being worked (optional) |
 | `comment` | Post a comment on an issue |
 | `close` | Explicitly mark an issue complete |
+| `create` | File a new issue (only for `--new-issues=create|propose`) |
 
 `references/tracker-github.md`, `tracker-markdown.md`, and `tracker-jira.md` are worked
 examples. If the tracker is none of those, work out the binding from whatever CLI or MCP
@@ -200,14 +210,25 @@ Two things fall out of this, and both are the point:
 
 Four cheap checks that each prevent a specific way the run wastes hours before failing:
 
-- **Delivery binding.** Read `create-pr`'s disclosed forge-operations reference and resolve
-  authenticated inspection, ready, and exact-head merge operations for this provider.
-  Also preflight `check-ci`'s exact-head check enumeration, target required-policy reads,
-  target-tip/strict-policy proof, review requirements, and mergeability operations. Missing
-  lifecycle or CI-proof capability means the epic cannot deliver its promised merges;
+- **Delivery binding.** `PREFLIGHT`, because resolving it means reading `create-pr`'s
+  disclosed forge-operations reference and preflighting `check-ci` — tens of thousands of
+  tokens of provider detail, to answer one yes-or-no question. The dispatch resolves each
+  capability against the authenticated provider and reports it as `ok` or `missing`:
+  `INSPECT`, `DRAFT`, `PUSH`, `UPDATE`, `READY`, `MERGE_EXACT_HEAD`, `CI_PROOF`,
+  `REQUIRED_POLICY`, `STRICT_POLICY`, `REVIEW_REQUIREMENTS`, `MERGEABILITY`, plus the named
+  `PROVIDER`, the `comment` and `close` operations of the tracker binding — and `create` only
+  when `--new-issues` is not `never`, since a policy that files nothing needs no way to file —
+  and one `BLOCKERS` line per gap. **It returns the resolved binding itself**, not just the statuses —
+  the concrete operation per capability, a few lines of commands. That distinction is the
+  whole point of preflighting once: the provider reference is tens of thousands of tokens and
+  the binding it yields is short, so you hold the short thing and hand it to every later
+  dispatch. A status is not something an agent can execute. The draft half of that list is not padding: Phase 2 ends on a draft epic PR,
+  and a run that discovers at hour six that it cannot open one has nowhere to put its work.
+  Any `missing` in lifecycle or CI proof means the epic cannot deliver its promised merges;
   disclose it in the confirmation and stop before implementation mutation unless the user
   explicitly narrows the run to drafts only.
-- **Branch protection.** Read it in two places. On the **epic branch**, protection requiring
+- **Branch protection.** The same dispatch reads it in two places and returns both:
+  `EPIC_PROTECTION` and `TARGET_PROTECTION`. On the **epic branch**, protection requiring
   human approval would stall every issue merge — say so plainly and continue only if the user
   still wants to. On the **real target**, protection does not affect this run at all, since
   you never merge there; report it so the user knows what the final human merge will ask of
@@ -265,6 +286,7 @@ Plan the implementation of this ticket. Plan only — write no code.
 
 Ticket: {id} — {title}
 {body and acceptance criteria}
+Tracker binding, if you need to read further than the ticket above: {tracker_binding}
 
 Already completed in this epic: {ids and one-line summaries}
 
@@ -360,32 +382,71 @@ hold its URL alongside the issue.
 the retries; a fresh agent on the same code is how a scheduler spends four hours converging
 on something a person would settle in five minutes.
 
+### The delivery-agent
+
+Every forge call the schedule needs, and every tracker *mutation*, happens here. `create-pr`
+and `check-ci` are large skills over noisy commands: a scheduler that invokes them holds
+their prose and their output for the rest of the run, and that cost grows with every ticket.
+One short-lived agent per operation absorbs the noise and hands back fields. Reading the
+tracker is not routed through it: you read it directly in Phase 0, because `list` and `read`
+are how you build the graph at all and their output is issue bodies you have to hold anyway,
+and any agent you hand the tracker binding to reads it directly too.
+
+| Operation | You supply | It returns |
+|---|---|---|
+| `PREFLIGHT` | the tracker binding, the epic branch, the target branch | the capability block in Phase 0, including the resolved delivery binding |
+| `COMMENT` | issue id, which moment, what that moment carries, any resolved workflow label | `TRACKER`, and the last factual tracker state |
+| `CLOSE` | issue id | `TRACKER`, and what the re-read observed |
+| `FILE_TICKET` | the drafted ticket's path | `TRACKER`, and the created issue id |
+| `PUBLISH_STATE` | PR URL, head SHA, intended state, the evidence | `PR_STATE`, `HEAD_SHA`, `MERGE_QUEUE` as the provider reports them |
+| `READ_GREEN` | PR URL, approved SHA, epic branch | every green-predicate field, and the ancestry result |
+| `MERGE` | PR URL, approved SHA, the epic branch, the green predicate, your authorization | `PR_STATE`, `HEAD_SHA`, `BASE`, `MERGE_COMMIT`, `MERGE_QUEUE`, `REASON` |
+| `INSPECT` | PR URL | the same six fields as `MERGE` |
+| `OPEN_EPIC_PR` | epic branch, target branch, context path | `PR_URL`, `PR_STATE`, `BASE`, `HEAD_REF`, `HEAD_SHA` |
+
+**Every dispatch carries the binding it needs** — the delivery binding `PREFLIGHT` resolved
+for a forge operation, the tracker binding for a tracker one. A fresh context cannot turn
+`#42` into a provider, a repository, and a concrete command, and an agent that has to guess
+at that will guess plausibly and wrongly.
+
+Every brief has the same shape: the operation, its parameters, its binding, the policy that
+operation carries, then the return discipline in the issue-agent's words — *return ONLY these
+fields, no command output, no CI logs, no reference text, no narration; the orchestrator does
+not read them and cannot afford the context.*
+
+Four rules travel with every dispatch, because a fresh context inherits none of them:
+
+- **`BASE` and `MERGE_COMMIT` come from the provider, not from `create-pr`.** `create-pr`
+  reports `PR_STATE`, `HEAD_SHA`, `MERGE_QUEUE`, and `TARGET` — take `BASE` from the target
+  half of that pair, and read the merge commit through the provider inspection operation
+  `PREFLIGHT` resolved. A merge commit `create-pr` never emitted is `none`, and `none` on a
+  merge that really happened blocks a delivery that should have completed.
+- **Report what the provider did, not what it was asked to do.** Parse `create-pr`'s failure
+  block and return its last factual `PR_URL`, `PR_STATE`, `HEAD_SHA`, and `MERGE_QUEUE`
+  rather than the transition that was requested. A merge that completed and then failed to
+  record its state is still a merge; rolling it back, or reporting the PR as unmerged, turns
+  a bookkeeping failure into a lie about the repository.
+- **Use the preflighted provider's own operations.** Never substitute a GitHub command on
+  another forge; resolve exact equivalents from the authenticated provider capability instead.
+- **Never bypass branch protection**, weaken a rule, or self-approve to unblock a merge.
+- **Never copy raw CI logs, tokens, or personal data** into a context or a comment.
+
+Store a returned failure block's `HEAD_SHA` as the observed remote head; it never overwrites
+the approved SHA, which is yours and only yours.
+
 ### Publishing scheduler state
 
-The issue-agent wrote the PR body; keeping it true as the schedule moves the PR is yours.
-For every queued, merged, or scheduler-terminal failure state, write a mode-0600 context
-beginning `CONTEXT_KIND: delivery-state` with the exact PR state, approved head, the
-complete `check-ci` proof, queue or merge evidence, and any failure reason. Publish it
-through `create-pr`:
-
-```text
-/create-pr --context={delivery_context} --no-comments --no-push --pr={PR_URL}
-           --head-sha={approved or last observed full remote head}
-```
+The issue-agent wrote the PR body; keeping it true as the schedule moves the PR is yours to
+order, through `PUBLISH_STATE`. For every queued, merged, or scheduler-terminal failure
+state, the delivery-agent writes a mode-0600 context beginning `CONTEXT_KIND: delivery-state`
+with the exact PR state, approved head, the complete `check-ci` proof, queue or merge
+evidence, and any failure reason, and publishes it through `create-pr` with
+`--no-comments --no-push` against the PR and the approved-or-last-observed full remote head.
 
 `create-pr` preserves the existing journey/testing/friction body and replaces only its
-bounded generated Final State block. Require post-update inspection to preserve the exact
-head and intended PR state. On scheduler failure also append one agent-attributed terminal
-comment through `--comment-file`. Earlier comments are never edited.
-
-**Report what the provider did, not what you asked it to do.** Parse `create-pr`'s failure
-block and carry its last factual `PR_URL`, `PR_STATE`, `HEAD_SHA`, and `MERGE_QUEUE` into
-scheduler state rather than the transition you requested. A merge that completed and then
-failed to record its state is still a merge; rolling it back, or reporting the PR as
-unmerged, turns a bookkeeping failure into a lie about the repository. Store a failure
-block's `HEAD_SHA` as the observed remote head without overwriting the approved SHA.
-
-Never copy raw CI logs, tokens, or personal data into a delivery context or a comment.
+bounded generated Final State block. The dispatch requires post-update inspection to preserve
+the exact head and intended PR state. On scheduler failure it also appends one
+agent-attributed terminal comment through `--comment-file`. Earlier comments are never edited.
 
 ### Publishing tracker state
 
@@ -394,8 +455,8 @@ and it is the only record a human, a resumed run, or another tool ever sees. `ru
 evidence, never lifecycle. So an issue is complete when the tracker says it is complete.
 
 With `--write-back=off`, none of this runs: the run performs no tracker mutation of any kind.
-Otherwise write at these four moments, one comment each through the binding's `comment`
-operation, each carrying the attribution line Phase 3 requires:
+Otherwise write at these four moments, one `COMMENT` dispatch each through the binding's
+`comment` operation, each carrying the attribution line Phase 3 requires:
 
 | Moment | The comment carries |
 |---|---|
@@ -407,10 +468,11 @@ operation, each carrying the attribution line Phase 3 requires:
 Apply a workflow label or status at the start moment only where the binding already resolved
 one. Create no project-management vocabulary implicitly.
 
-**After the delivery comment, invoke `close` and re-read the issue.** Dependants are unblocked
-on the tracker reporting the issue closed as completed, not on your having asked for it. A
-comment or close that fails preserves and reports the last factual tracker state — never
-record an issue as tracker-complete while the tracker still reports it open.
+**After the delivery comment, dispatch `CLOSE`, which closes and re-reads the issue.**
+Dependants are unblocked on the tracker reporting the issue closed as completed, not on your
+having asked for it — so what you act on is the re-read, not the request. A comment or close
+that fails returns the last factual tracker state; never record an issue as tracker-complete
+while the tracker still reports it open.
 
 A binding whose `comment` or `close` is a no-op degrades: the moment goes into the completion
 report instead, and Phase 0's confirmation says so once.
@@ -423,17 +485,19 @@ without it. Spend the wait on the free work: plan the next issue, draft a discov
 
 ### Merging
 
-A `MERGEABLE` status block is the issue-agent's claim, not proof. You confirm it yourself,
-because you are the one with merge authority.
+A `MERGEABLE` status block is the issue-agent's claim, not proof. You confirm it, because you
+hold merge authority — and **authority here is the decision, not the keystrokes.** You are the
+only holder of the approved SHA and the only thing that can authorize a merge against it. A
+delivery-agent executes an authorization; it cannot manufacture one.
 
-```text
-/check-ci --pr={PR_URL} {approved full SHA} --once
+Dispatch `READ_GREEN` with the PR, the approved SHA, and the epic branch. It reads
+`check-ci --once` at that exact head and returns the fields below, and it answers one more
+question at the same time — whether the head still contains the current epic tip:
+
+```bash
+git fetch "$BASE_REMOTE" "epic/$SLUG"
+git merge-base --is-ancestor "$BASE_REMOTE/epic/$SLUG" "$APPROVED_SHA"
 ```
-
-Read `create-pr`'s disclosed `references/forge-operations.md` when building this delivery
-binding. Use its GitHub or GitLab inspection operations, or resolve exact equivalents from
-the authenticated provider capability exposed by the harness; never substitute a GitHub
-command on another forge.
 
 **Green is an affirmative test, not the absence of red.** A PR is ready to merge only when
 *all* of these hold:
@@ -461,42 +525,117 @@ the PR for a person rather than failing it.
 
 Issue PRs open ready and carry no reviewer: nobody is asked to review one, because the
 review a human actually does is of the epic branch, once, in Phase 2. Publish the green
-proof as delivery state through the procedure above before the pre-merge reread.
+proof as delivery state through `PUBLISH_STATE` before authorizing the merge.
 
-**Also require the issue head to contain the current epic tip.**
+**A head that no longer contains the epic tip fails the same way.** The branch was built and
+tested against an epic branch that has since moved, so its green CI proves nothing about the
+integrated result. Send it back to an issue-agent on the existing branch to merge the epic
+tip in and take the PR to green again — that CI run is the first thing to have exercised the
+integrated head. On a protected target this is what `STRICT_POLICY: required` would enforce;
+an `epic/*` branch is usually unprotected, so nothing else does.
 
-```bash
-git fetch "$BASE_REMOTE" "epic/$SLUG"
-git merge-base --is-ancestor "$BASE_REMOTE/epic/$SLUG" "$APPROVED_SHA"
+With the predicate satisfied, authorize the merge by dispatching `MERGE`. The reread and the
+merge live in one context precisely because nothing may come between them:
+
+```
+Merge {PR_URL} at exactly {approved full SHA}, and only if it is green at that head.
+
+Immediately before the merge invocation, read
+/check-ci --pr={PR_URL} {approved full SHA} --once and require every one of:
+
+{the green predicate above, verbatim}
+
+plus REVIEW_REQUIREMENTS: satisfied|not-required. This closes the race where the target,
+checks, or review requirements changed since the authorization was issued. Any non-green
+reread, and pending human approval, mean you do not merge — report it and stop.
+
+Then invoke /create-pr --merge --pr={PR_URL} --head-sha={approved full SHA}. create-pr
+resolves the repository-preferred merge method through the preflighted delivery binding.
+Use whatever the repository prefers and override nothing.
+
+Merge no head other than {approved full SHA}. If you cannot merge that exact head under
+those conditions, reporting why is the correct outcome.
+
+Return ONLY:
+PR_STATE: merged | queued | unmerged
+HEAD_SHA: {the full head the provider reports}
+MERGE_COMMIT: {sha or none}
+MERGE_QUEUE: {queue identifier or none}
+REASON: {why, when not merged}
 ```
 
-If it does not, the branch was built and tested against an epic branch that has since moved,
-and its green CI proves nothing about the integrated result. Send it back to an issue-agent
-on the existing branch to merge the epic tip in and take the PR to green again — that CI run
-is the first thing to have exercised the integrated head. On a protected target this is
-what `STRICT_POLICY: required` would enforce; an `epic/*` branch is usually unprotected, so
-nothing else does.
-
-Immediately before every merge invocation, read
-`/check-ci --pr={PR_URL} {approved full SHA} --once` and require the complete affirmative
-green predicate plus `REVIEW_REQUIREMENTS: satisfied|not-required`. This closes the race
-where the target, checks, or review requirements changed after the earlier reading.
-Pending human approval leaves the PR open for a human; any other
-non-green reread fails the issue. Neither falls through to merge.
-
-Honor contrary user instructions and branch protection even after CI turns green. When
-merge authority remains in force, use whatever merge method the repository prefers — do
-not override it. Squash is common and good here: the epic branch gets one clean commit per
+Honor contrary user instructions and branch protection even after CI turns green. Squash is
+a common and good repository preference here: the epic branch gets one clean commit per
 issue, while the commit-by-commit history stays visible on the PR.
 
-Invoke `/create-pr --merge --pr={PR_URL} --head-sha={approved full SHA}`. `create-pr`
-resolves the repository-preferred merge method through the preflighted delivery binding.
-Observed `PR_STATE: merged` completes delivery. `PR_STATE: queued` creates a persisted
-pending merge work item containing the PR URL, approved SHA, and queue identifier; poll it
-with `/create-pr --inspect --pr={PR_URL}`. Require every inspection's `HEAD_SHA` to equal
-the stored approved SHA. A mismatch fails the issue; never bless or mark a different head
-complete. Continue until the approved head is observed merged or terminally rejected.
-Any other output is a merge failure: leave the issue open and do not unblock dependents.
+**A merge is confirmed by something other than the agent that performed it.** A tier is not
+a guard, and neither is re-reading a report against itself: an agent that merged the wrong
+head and transcribed the requested one passes any check made only of its own return. So
+`PR_STATE: merged` completes delivery only on two confirmations the merging agent did not
+write:
+
+- **A fresh `INSPECT`** — a different agent, reading the forge's own record of which head was
+  merged. Require `PR_STATE: merged`, `HEAD_SHA` equal to the approved SHA, a `BASE` of
+  `epic/{slug}`, and a `MERGE_COMMIT` that is a full SHA and not `none`.
+- **The commit is really on the branch**, read with your own hands:
+
+  ```bash
+  git fetch "$BASE_REMOTE" "epic/$SLUG"
+  git merge-base --is-ancestor "$MERGE_COMMIT" "$BASE_REMOTE/epic/$SLUG"
+  ```
+
+  The check is on the *merge commit*, not the approved SHA. Under a squash preference the
+  approved SHA is deliberately not an ancestor of anything — the commit is new — so testing
+  for it would fail every squash merge and pass nothing extra.
+
+**Either confirmation failing is contamination**, and the second one failing is the more
+alarming of the two: a clean `INSPECT` beside a merge commit that is not on the epic branch
+means the PR merged somewhere else — the likeliest cause being a branch that targeted the
+default branch rather than `epic/{slug}`, which nothing before this point re-checks. Treat a
+`BASE` that is not the epic branch the same way, and do not wait for the ancestry test to
+tell you what the base field already said.
+
+**A merged head you did not approve contaminates the epic branch**, and that is a different
+kind of failure from a ticket that could not land. Unapproved code is now in the branch every
+later issue builds on, that Phase 2 verifies, and that the epic PR would hand a human.
+Failing the issue is not a sufficient response, because the issue is not what broke.
+
+So: **halt the run.** Schedule no further issues onto that branch, run no finalization, open
+no epic PR. Phase 3 still resolves the ledger — drafted tickets are real work and filing them
+costs the branch nothing — and Phase 4 still reports, in this shape instead of its usual one:
+
+```markdown
+Epic {name} — HALTED, {n} of {m} issues merged into epic/{slug}, {duration}
+
+CONTAMINATED  epic/{slug} carries a merge this run did not approve.
+              issue        #{id}
+              approved     {approved SHA}
+              merged       {head the forge reports}
+              commit       {merge commit}
+              found by     {the INSPECT mismatch, or the ancestry test}
+
+DO NOT MERGE  No epic PR was opened. Nothing here is reviewed work.
+              The branch needs a person before this epic goes further.
+
+MERGED        {the issues that landed on approved heads, with PR links}
+NOT ATTEMPTED {everything the halt cancelled}
+```
+
+The usual report leads with the epic PR because that is the thing the run cannot finish for
+the user. A halted run has no epic PR, and pretending otherwise — or quietly reusing a format
+whose most prominent line is missing — buries the one fact the whole report exists to
+deliver. The one thing a run must never do is hand a person a PR that presents unapproved
+content as reviewed work — the whole autonomy of this design is borrowed against that final
+review being of what the run says it is.
+
+`PR_STATE: queued` creates a persisted pending merge work item containing the PR URL,
+approved SHA, and queue identifier; poll it with `INSPECT`. Require every inspection's
+`HEAD_SHA` to equal the stored approved SHA too. A mismatch on an inspection that is *not*
+yet merged fails the issue; never bless or mark a different head complete. A mismatch on one
+reporting `PR_STATE: merged` is not an issue failure at all — the queue merged an unapproved
+head, which is contamination, and it halts the run exactly as above. Continue until the
+approved head is observed merged or terminally rejected. Any other outcome is a merge
+failure: leave the issue open and do not unblock dependents.
 
 Immediately publish `queued` after queue acceptance and `merged` after observed merge using
 the scheduler-state procedure above. A queue rejection, CI/policy observation failure,
@@ -615,7 +754,9 @@ branch that is not going to grow underneath it, and it is the only review the ep
 cost light exists to avoid is not a cost this phase can incur.
 
 **Run this phase even when some issues failed.** A partial epic still gets reviewed as a
-whole; what it does not get is a claim of completeness.
+whole; what it does not get is a claim of completeness. The sole exception is a run halted
+for a contaminated epic branch — there, reviewing and PR-ing the branch is the specific thing
+that must not happen.
 
 ### 1. Verify the epic branch
 
@@ -675,15 +816,32 @@ needs a person, not another round.
 
 ### 4. Open the epic PR
 
-With `epic/{slug}` checked out, and a context file built from the run's own state — the
-per-issue outcomes, the verification result of each finalization round, and anything left
-blocking:
+Write a context file from the run's own state — the per-issue outcomes, the verification
+result of each finalization round, and anything left blocking — then dispatch
+`OPEN_EPIC_PR` with `epic/{slug}`, `{target}`, and that path. The delivery-agent checks out
+`epic/{slug}` and opens the draft PR against `{target}`; `create-pr` opens the PR for the
+checked-out branch, so the checkout is what selects the head — which is why the epic branch
+is a parameter and not something the agent infers.
 
-```text
-/create-pr --draft --base={target} --context={epic_pr_context}
+It returns `PR_URL`, `PR_STATE`, `BASE`, `HEAD_REF`, and `HEAD_SHA`. Require all four to
+agree with what you asked for: `PR_STATE: draft`, `BASE` of `{target}`, `HEAD_REF` of
+`epic/{slug}`, and a `HEAD_SHA` equal to the epic tip you fetch yourself —
+
+```bash
+git fetch "$BASE_REMOTE" "epic/$SLUG"
+git rev-parse "$BASE_REMOTE/epic/$SLUG"
 ```
 
-`create-pr` opens the PR for the checked-out branch, so the checkout is what selects the head.
+The fetch is not optional. A remote-tracking ref is only as fresh as the last fetch, and
+every merge this phase follows landed on the remote after Phase 1's — a stale ref rejects a
+correct PR at the run's final step just as readily as it blesses a wrong one.
+
+— because the checkout that selected the head happened out of your sight. `BASE` and
+`PR_STATE` alone would pass a PR opened from the wrong branch, or a pre-existing draft
+against the same target, and this is the one artifact the whole run hands a person.
+The dispatch carries the rule below — **open this PR as a draft and stop there**, no merge,
+no ready.
+
 The context file is the epic summary for a human reviewer; it is not `epic-context.md`, which
 is the reviewer-facing backlog and has no place in a PR body.
 
@@ -702,12 +860,17 @@ hand-off into an unreviewed deployment.
 
 Depends on `--new-issues`:
 
-- **`create`** — file the drafted tickets.
+- **`create`** — file the drafted tickets, one `FILE_TICKET` dispatch each.
 - **`propose`** (default) — present them for approval, then file the approved ones. Because
   they were drafted during the run, the user is approving finished tickets rather than
   one-line summaries and a promise.
 - **`never`** — file nothing; the drafts remain in the state directory and appear in the
   report.
+
+A binding whose `create` is a no-op or was never resolved degrades the same way `comment` and
+`close` do: the drafts stay in the state directory, the completion report carries them, and
+Phase 0's confirmation already said so. `--new-issues=never` needs no `create` at all, so a
+missing one is only ever a blocker for the other two policies.
 
 **Every tracker write says it came from an agent.** Comments and tickets post under the
 user's account, and a human reading them later must not have to guess whether a person
@@ -743,8 +906,8 @@ DISCOVERIES  {n} tickets drafted{, awaiting approval}{, + 1 combined cleanup tic
 
 The epic PR leads because it is the one thing the run cannot finish for the user.
 
-Then, with write-back on, post the report as a comment on the epic ticket and **leave the epic
-open.** Clean verification is not delivery: the epic PR is still a draft against the default
+Then, with write-back on, post the report as a `COMMENT` on the epic ticket and **leave the
+epic open.** Clean verification is not delivery: the epic PR is still a draft against the default
 branch, and until a human merges it nothing the run produced has shipped. An open epic ticket
 states that accurately, and the `Closes` linkage in that PR closes it the moment the human
 merges — atomically, with the delivery it describes.
@@ -763,7 +926,7 @@ issues/{id}.md         per-issue journey logs written by issue-agents
 discoveries/{n}.md     drafted follow-up tickets
 epic-context.md        completed / current / remaining issues, handed to planners and implementers
 epic-verify/{n}.json   the verification report for each finalization round
-run.json               status blocks, approved HEAD SHA, pending merge-queue work, inferred edges, CI-fix counts, failure reasons
+run.json               status blocks, approved HEAD SHA, pending merge-queue work, inferred edges, CI-fix counts, failure reasons, and any halt
 ```
 
 `epic-context.md` and every report under `epic-verify/` are paths you hand to sub-agents and
@@ -780,15 +943,23 @@ all written back as Phase 1 goes. Evidence is the approved head SHA, the CI proo
 identifiers, retry counts, plans, journey logs, and unpublished drafts: technical, private,
 and never the sole record that an issue completed.
 
+**A halted run is recorded in `run.json`, and a resume does not clear it.** Write the halt —
+the issue, the approved SHA, the head actually merged, and the merge commit — the moment you
+declare one. A contaminated epic branch is still contaminated at hour six or next Tuesday,
+and nothing about restarting resolves it. On finding that record, report it and stop; only a
+human who has looked at the branch can say what the run may do next. Resuming past a halt on
+the grounds that the local state looks workable is the single worst thing this skill could
+do, because it is how unapproved code reaches a human labelled as reviewed work.
+
 On resume, re-read the tracker *first*, then the open PRs. **A child observed closed as
 completed is not reimplemented**, whatever the local file says. Where local evidence is
-missing, reconstruct delivery from the agent-attributed delivery comments and
-`/create-pr --inspect`. Where the two disagree, surface the disagreement in the report rather
+missing, reconstruct delivery from the agent-attributed delivery comments and an `INSPECT`
+dispatch per PR. Where the two disagree, surface the disagreement in the report rather
 than resolving it into a second implementation of shipped work.
 
 **An open PR goes to the merge check only on a head an issue-agent finished.** Adopt it when
 `run.json` holds a `MERGEABLE` block for that issue whose `HEAD_SHA` equals the PR's current
-head, observed through `/create-pr --inspect`. A head that moved since — or an issue with no
+head, observed through `INSPECT`. A head that moved since — or an issue with no
 such record — was left mid-flight, so it goes back through an issue-agent on its existing
 branch rather than to the merge check. Never derive approval from the current PR head, from
 tracker state, or from a `run.json` entry that disagrees with what the forge reports.
@@ -809,6 +980,11 @@ resumability genuinely degrades. Say so rather than pretending otherwise.
   three lines of it.
 - **Don't read verification reports or diffs.** Your context is the resource that has to
   last the whole run.
+- **Don't call the forge yourself.** You never invoke `create-pr` or `check-ci`, and you
+  never mutate the tracker; delivery-agents do both and hand you fields. Issue-agents run
+  those skills too, inside their own contexts — the rule is about yours.
+- **Never resume past a halt.** A contaminated epic branch stays contaminated; only a human
+  who has looked at it can say what happens next.
 - **Never merge the epic PR.** Open it as a draft and hand the human the link. The run's
   autonomy is borrowed against that final human review; merging it spends something you were
   not given.
@@ -842,8 +1018,37 @@ to nine sub-agents while two ancestors — this scheduler and the epic-verify ag
 active. A cap sized for what any one layer wants leaves the bottom layer with nothing, and
 the symptom is not an error but a review pipeline that quietly runs one reviewer at a time.
 
-Use a high-capability model for every sub-agent role — planning, implementation,
-ticket-writing, epic verification, and remediation planning. The planning agents especially:
-no reviewer reads an issue before it merges, so the plan and the implementer's own judgement
-are the whole of what stands between a ticket and the epic branch. Planning is the cheapest
-place in the pipeline to be smart.
+### Model tier per role
+
+The tree spans work of wildly different weight, and a single tier across all of it is either
+wasteful at the bottom or negligent at the top. These are cost tiers, not models — the
+orchestrator picks the model, and picks against these defaults.
+
+| Role | Tier |
+|---|---|
+| orchestrator — this skill | top |
+| plan-agent, remediation-planning agent | high |
+| epic-verify-agent | high — and not for its own sake |
+| issue-agent, ticket-writing agent | mid |
+| delivery-agent on `MERGE` | mid — it is the last gate before an irreversible act |
+| delivery-agent, every other operation | low |
+
+**Spend on the plan so the implementer doesn't have to reason.** A plan-agent runs a tier
+above the issue-agent that consumes it, deliberately: no reviewer reads an issue before it
+merges, so the plan is the entire requirements document and the cheapest place in the
+pipeline to be smart. An issue-agent working from a good plan is executing, not designing.
+Raise one a tier where a ticket is genuinely heavy — a default is a starting point.
+
+**`MERGE` is the exception that proves the delivery-agent is cheap.** Everything else it does
+is a command and a transcription. `MERGE` is not: it reads the pre-merge green predicate and
+decides, and your authorization was issued before that evidence existed, so nothing after it
+re-checks. The last gate before an irreversible act does not sit on the cheapest model in the
+tree — one dispatch per ticket at a tier that can be trusted to apply a predicate exactly is
+the cheapest insurance in this design.
+
+**The epic-verify-agent's tier is not about the epic-verify-agent.** Its own job is three
+lines: invoke `verify`, return counts. But where a harness has sub-agents inherit their
+parent's model absent an explicit choice, its tier is the tier of all nine reviewers beneath
+it. Phase 2 is the only review the epic gets — there is no per-issue verification anywhere in
+this skill — so a cheap dispatcher buys almost nothing and quietly downgrades that review.
+Choose its tier for its children.
