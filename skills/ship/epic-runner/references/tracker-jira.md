@@ -13,7 +13,7 @@ Either an MCP server for Atlassian or the `jira` CLI. **Check which is actually 
 and authenticated in Phase 0** — MCP servers that authenticate interactively may be absent
 in a headless run, which is exactly when this skill is used.
 
-## The five operations
+## The six operations
 
 | Operation | Approach |
 |---|---|
@@ -22,6 +22,7 @@ in a headless run, which is exactly when this skill is used.
 | `start` | Transition to the in-progress status **for this project's workflow** |
 | `comment` | Add a comment |
 | `close` | Transition to done |
+| `create` | Create an issue in the same project, linked to the epic as `list` expects to find it |
 
 **Transitions are the trap.** Status names are per-project (`In Progress`, `In Development`,
 `Started`) and transitions are gated by the workflow — you cannot set a status, only apply an

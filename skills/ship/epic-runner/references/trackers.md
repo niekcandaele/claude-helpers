@@ -20,7 +20,7 @@ it has never heard of Jira. So the entire job of a tracker binding is:
 That's it. Resolve the binding once in Phase 0, write it into `run.json`, and use it
 without re-deriving it for the rest of the run.
 
-## The five operations
+## The six operations
 
 | Operation | Required? | Produces |
 |---|---|---|
@@ -29,6 +29,7 @@ without re-deriving it for the rest of the run.
 | `start` | No | Marks an issue in-progress |
 | `comment` | No | Posts a comment |
 | `close` | No | Explicit completion, confirmed observed |
+| `create` | No | Files a new issue — only reached under `--new-issues=create\|propose` |
 
 **Only `list` and `read` are required.** A tracker you can read but not write is fully
 workable — the user reconciles status by hand afterward. Refusing to run because you
@@ -43,6 +44,7 @@ read:     gh issue view {id} --json title,body,labels
 start:    gh issue edit {id} --add-label in-progress
 comment:  gh issue comment {id} --body-file {file}
 close:    gh issue close {id} --reason completed
+create:   gh issue create --title {title} --body-file {file} --milestone "Q3 export"
 ```
 
 ## Resolving an unknown tracker

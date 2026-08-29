@@ -15,7 +15,7 @@ file. The whole tracker is a path.
 - [ ] Wire up the download button
 ```
 
-## The five operations
+## The six operations
 
 | Operation | Implementation |
 |---|---|
@@ -24,6 +24,7 @@ file. The whole tracker is a path.
 | `start` | No-op. |
 | `comment` | No-op — surface it in the final report instead. |
 | `close` | Rewrite `- [ ]` to `- [x]` on that line. |
+| `create` | No-op — see **What's missing**. |
 
 **Issue ids** are positional — `item-1`, `item-2` — since there's nothing else to key on.
 Keep them stable across a resume by re-deriving from file order, and note that this is why
