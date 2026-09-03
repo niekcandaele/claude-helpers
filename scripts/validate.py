@@ -20,6 +20,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 CONFIG = ROOT / "skills.sh.json"
 LEGACY = re.compile(r"/plugin|/cata-helpers:|\.claude-plugin|plugins/|cata-")
+# An upstream repo that happens to be named "plugins" is a credit, not packaging.
+UPSTREAM = re.compile(r"https://github\.com/[\w.-]+/plugins\b")
 
 errors: list[str] = []
 
@@ -185,7 +187,7 @@ def main() -> int:
         for lineno, line in enumerate(
             path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
         ):
-            if LEGACY.search(line):
+            if LEGACY.search(line) and not UPSTREAM.search(line):
                 fail(
                     f"{path}:{lineno}: plugin-era reference",
                     "this repo is a source repo for skills only — remove it",
