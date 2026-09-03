@@ -20,6 +20,14 @@ Engineers" — which is MIT licensed, Copyright (c) 2026 Matt Pocock.
 | `handoff` | Originally derived, substantially rewritten |
 | `research` | Originally derived, substantially rewritten |
 
+The `thermo-nuclear-code-quality-review` skill is derived from the skill of the
+same name in the `cursor-team-kit` of
+[`cursor/plugins`](https://github.com/cursor/plugins). The upstream content is kept nearly intact; the scope
+resolution, severity scale, output format, and boundaries sections were added so
+the review composes with this repo's verify pipeline. That repository ships no
+license file, so the credit line in the skill is the only notice travelling with
+it — check upstream terms before redistributing it further.
+
 Everything else is original.
 
 The MIT license this repository ships under is the same license those skills
