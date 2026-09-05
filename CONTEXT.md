@@ -60,6 +60,26 @@ The synthesized narrative in the final PR body that explains player turns, verif
 friction, testing, and terminal state.
 _Avoid_: log, transcript, summary
 
+**Dependency PR**:
+A pull or merge request opened by a dependency-update bot (Renovate, Dependabot, or similar), identified by its author and body structure.
+_Avoid_: bot PR, renovate PR (the term is bot-agnostic)
+
+**Risk tier**:
+The renovator's generic classification of a dependency PR, decided from bump size, dependency role, and changelog: `trivial`, `attentive`, or `guarded`. Sets the ceiling on what the renovator may do unaided.
+_Avoid_: risk level, severity, category
+
+**Verdict**:
+What the renovator concluded about one dependency PR and the action it took: `merged`, `commented`, `waiting`, or `blocked`. Recorded in the PR comment, which is re-read on the next invocation.
+_Avoid_: result, outcome, decision
+
+**Steering**:
+Repository-specific instruction that narrows or widens the renovator's generic defaults, supplied by the repository (beside its engineer skill) or on invocation. The skill stays generic; the repository carries the detail.
+_Avoid_: config, override, policy
+
+**Opportunity**:
+A finding that a dependency's new version offers something the repository should adopt, as opposed to something it breaks. An opportunity blocks the merge until a human has looked.
+_Avoid_: suggestion, improvement, nice-to-have
+
 ## Relationships
 
 - A **Suite** contains two or more **Skills**; a **Skill** may belong to several
@@ -77,6 +97,10 @@ _Avoid_: log, transcript, summary
 - Every finding in a **Run ledger** carries one **Disposition**; a finding still `open`
   after more than one **Verification run** is sticky
 - A **Quarantine** entry suppresses a finding at the verification gate only, never at CI
+
+- A **Dependency PR** receives exactly one **Risk tier** and, per invocation, one **Verdict**
+- **Steering** can move a **Dependency PR** between **Risk tiers**; the generic default never does more than the tier allows
+- An **Opportunity** on a **Dependency PR** forces the **Verdict** to `commented`, whatever the **Risk tier**
 
 ## Example dialogue
 

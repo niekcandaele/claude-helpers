@@ -37,6 +37,7 @@ look for repo-specific context they need. The ones already in use:
 | File | Read by |
 |---|---|
 | `TRACKER.md` | `epic-runner`, `wayfinder`, `to-spec`, `to-tickets` — the tracker binding ([tracker.md](tracker.md)) |
+| `DEPENDENCIES.md` | `renovator` — the dependency binding ([dependencies.md](dependencies.md)) |
 | `VERIFICATION.md` | `verify` — repo-defined review and exerciser gates |
 | `VISUAL.md` | `visual-verify` — screenshot mechanics, dev URLs, viewport conventions |
 | `API.md`, `DATABASE.md` | `exerciser` — how to authenticate and inspect service state |
