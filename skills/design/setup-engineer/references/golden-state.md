@@ -2,7 +2,7 @@
 
 This is the canonical definition of "golden." Two consumers share it:
 
-- **`setup-engineer`** diffs a repo against it (the existence/shape questions, §A–§F).
+- **`setup-engineer`** diffs a repo against it (the existence/shape questions, §A–§H).
 - **`doctor`** enforces the runtime invariants in it (the checkable rules, marked `[doctor]`).
 
 When you add a new invariant during self-improvement, add it here **and** as a `doctor` check,
@@ -79,6 +79,21 @@ Optional — a repo with no issue tracker worth binding is still golden. When on
       unauthenticated CLI is the failure mode this catches.
 - [ ] Its label table maps *meanings* to this repo's actual label strings, with no invented
       labels for meanings the repo doesn't use.
+
+## H. Dependency binding
+
+Optional — a repo with no dependency bot is still golden. When one exists:
+
+- [ ] `DEPENDENCIES.md` sits beside the engineer skill's `SKILL.md`.
+- [ ] Every command in it resolves to a verb `just --list` prints, and has been run once.
+- [ ] Each tier adjustment carries a reason, so a later maintainer can judge whether it
+      still holds.
+- [ ] Verification a role needs and this repo lacks is written down as a "not available"
+      line — a stated absence is a known bound; a blank row is an oversight.
+
+No `[doctor]` marks here on purpose: this file's truth is judgment about risk, and the only
+check worth making mechanically — that its commands resolve — belongs to the CLI's own verb
+list, which `doctor` already guards.
 
 ## The infra-change law (why several invariants above exist together)
 

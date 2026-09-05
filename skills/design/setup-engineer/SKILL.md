@@ -35,7 +35,7 @@ same shape — predictable, parallel-instance-safe, self-healing.
 
 ## What "golden state" means
 
-A repo is golden when all seven of these are true. The full invariant checklist (the thing
+A repo is golden when all eight of these are true. The full invariant checklist (the thing
 `doctor` enforces) lives in [references/golden-state.md](references/golden-state.md) — read it
 before you diff anything.
 
@@ -58,8 +58,13 @@ before you diff anything.
    tracker, its commands, and what its labels mean, so every skill that writes to the tracker
    agrees. Optional: a repo with no tracker worth binding stays golden without it. Spec:
    [references/tracker.md](references/tracker.md).
+8. **A dependency binding** — a `DEPENDENCIES.md` beside the engineer skill naming which
+   packages this repo treats as riskier than their bump size suggests, which verb proves
+   which kind of dependency, and how far an unattended sweep may go. Optional, like the
+   tracker: a repo with no dependency bot stays golden without it. Spec:
+   [references/dependencies.md](references/dependencies.md).
 
-`setup-engineer` reconciles the **existence and shape** of 1–7. `doctor` enforces the
+`setup-engineer` reconciles the **existence and shape** of 1–8. `doctor` enforces the
 **invariants** at runtime once the shape exists. Keep that split clear: setup-engineer is the
 meta-reconciler that *creates and migrates*; doctor is the in-repo guard that *catches drift*.
 setup-engineer runs `doctor` as its final gate.
@@ -88,6 +93,10 @@ ls -d */skills/*-engineer/ .*/skills/*-engineer/ 2>/dev/null | grep -v '^\.\./'
 # Tracker — a binding beside the engineer skill, and evidence of what to bind to
 ls */skills/*-engineer/TRACKER.md .*/skills/*-engineer/TRACKER.md 2>/dev/null
 git remote -v; command -v gh glab jira 2>/dev/null
+# Dependency binding — the same, plus evidence of a bot to bind to
+ls */skills/*-engineer/DEPENDENCIES.md .*/skills/*-engineer/DEPENDENCIES.md 2>/dev/null
+ls renovate.json renovate.json5 .renovaterc* .github/renovate.json* \
+   .github/dependabot.yml 2>/dev/null
 # CI
 ls .github/workflows/ .gitlab-ci.yml 2>/dev/null
 ```
@@ -109,7 +118,7 @@ Put the repo in exactly one bucket. This decides how aggressive you are.
 
 ### 3. Diff
 
-Produce a concrete drift report against the golden-state checklist. For each of the seven
+Produce a concrete drift report against the golden-state checklist. For each of the eight
 elements, state: present / partial / missing, and the specific gap. Example:
 
 ```
@@ -120,6 +129,7 @@ engineer skill partial   1 monolith SKILL.md (33KB) + 3 helper scripts inside th
 CI             partial   workflow reimplements test orchestration inline instead of calling CLI
 doctor         missing
 tracker        missing   github remote + authenticated gh, but no TRACKER.md
+dependencies   missing   renovate.json present, no DEPENDENCIES.md
 ```
 
 ### 4. Plan
@@ -136,8 +146,10 @@ keeps the repo working at every step is:
 4. **Restructure the engineer skill** to the four-file floor; move commands out, move scripts
    into the CLI, keep only why/architecture/gotchas.
 5. **Thin the CI** to call `just`/CLI.
-6. **Bind the tracker** — last, because it touches nothing the earlier phases depend on, and
+6. **Bind the tracker** — late, because it touches nothing the earlier phases depend on, and
    because resolving it may need a question the user can answer while the rest is landing.
+7. **Draft `DEPENDENCIES.md`** — with the tracker, and after the `just` verbs it points at
+   exist, because every command in it has to resolve to a real verb.
 
 Present the plan and get sign-off before applying. This matches the repo owner's standing rule:
 multi-phase plans verify at the end of each phase.
@@ -187,5 +199,6 @@ and rationale in [references/engineer-skill.md](references/engineer-skill.md).
 | [references/env-and-ports.md](references/env-and-ports.md) | Working the env/port contract, devbox, HTTPS |
 | [references/engineer-skill.md](references/engineer-skill.md) | Restructuring the engineer skill + the two laws |
 | [references/tracker.md](references/tracker.md) | Binding the repo's issue tracker into `TRACKER.md` |
+| [references/dependencies.md](references/dependencies.md) | Binding the repo's dependency policy into `DEPENDENCIES.md` |
 | [templates/justfile](templates/justfile) | The canonical thin verb surface to drop in |
 | [references/report-format.md](references/report-format.md) | The final golden-state report |

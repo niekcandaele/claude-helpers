@@ -28,6 +28,7 @@
         "player",
         "create-pr",
         "review-pr",
+        "renovator",
         "check-ci",
         "resolving-merge-conflicts"
       ]
