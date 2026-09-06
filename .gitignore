@@ -11,3 +11,6 @@ skills-lock.json
 
 __pycache__/
 .DS_Store
+
+# Pinned evaluation tooling
+node_modules/

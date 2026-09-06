@@ -193,7 +193,25 @@ def main() -> int:
                     "this repo is a source repo for skills only — remove it",
                 )
 
+    validate_evaluation_cases()
+
     return report()
+
+
+def validate_evaluation_cases() -> None:
+    """Fold the evaluation cases' own checks into this gate.
+
+    Skipped silently when evals/ is absent, so the validator keeps working if
+    the directory is ever removed. Pure python and pyyaml — CI needs no harness
+    to run the gate.
+    """
+    if not (ROOT / "evals" / "cases").is_dir():
+        return
+    sys.path.insert(0, str(ROOT / "scripts" / "evals"))
+    import cases as evaluation_cases
+
+    for message, remedy in evaluation_cases.validate_all():
+        fail(message, remedy)
 
 
 def report() -> int:
@@ -212,6 +230,17 @@ def report() -> int:
     print("✓ Every declared dependency names a skill that exists")
     print("✓ skills.sh.json matches the tree in both directions")
     print("✓ No plugin-era references")
+
+    if (ROOT / "evals" / "cases").is_dir():
+        sys.path.insert(0, str(ROOT / "scripts" / "evals"))
+        import cases as evaluation_cases
+
+        count = len(evaluation_cases.discover())
+        print(
+            f"✓ {count} evaluation case(s), each with a stable id, a real skill, "
+            "a built fixture, and a graded assertion"
+        )
+
     print("\n✓ Skill validation passed!")
     return 0
 

@@ -1,0 +1,10 @@
+{
+  "name": "skills-evals",
+  "private": true,
+  "description": "Pinned dev tooling for skill evaluations. Not published; not part of skill installation.",
+  "engines": { "node": ">=22.22.0" },
+  "dependencies": {
+    "promptfoo": "0.122.2",
+    "@openai/codex-sdk": "0.153.4"
+  }
+}

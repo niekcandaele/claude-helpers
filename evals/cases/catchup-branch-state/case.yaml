@@ -1,0 +1,39 @@
+# Stable identity — never renumber or rename; results are keyed on it.
+id: catchup-branch-state
+skill: catchup
+kind: behavior          # behavior | selection   (only `behavior` is accepted today)
+harnesses: [codex]
+fixture: git-branch-state
+
+# The underlying task, kept SEPARATE from the invocation so a future no-skill
+# baseline arm can send the task alone.
+task: >-
+  I just came back to this checkout. Summarise what has changed on the current
+  branch compared to the base branch: which commits, which files, and anything
+  uncommitted.
+
+# Only the skill-bearing arm prepends this.
+invocation: "Use the catchup skill."
+
+expected_behavior: >-
+  Reports the current branch and base branch by name, the number of commits
+  ahead, each commit subject, every added / modified / deleted file, and the
+  uncommitted change — all read from the repository, none invented.
+
+assert:
+  # --- required: observable facts about the fixture's Git state ---
+  - type: javascript
+    value: file://../../asserts/git_branch_state.mjs
+    metric: git-facts
+  - type: icontains
+    value: "feature/checkout-flow"
+    metric: names-branch
+  - type: icontains
+    value: "main"
+    metric: names-base-branch
+
+  # --- recorded, not decisive: Codex skill detection is heuristic ---
+  - type: skill-used
+    value: catchup
+    weight: 0
+    metric: skill-loaded-heuristic

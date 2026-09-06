@@ -50,3 +50,29 @@ jobs:
           fi
 
           echo "✓ all ${expected} skills discovered, no warnings"
+
+  # The evaluation tooling is code, so it gets checked like code. This job
+  # never holds subscription or API credentials: every check here runs against
+  # a provider double, and a real credential in CI is what the paid-credential
+  # preflight exists to refuse.
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: npm ci
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install pyyaml
+
+      - name: Evaluation tooling checks (no model credentials)
+        run: |
+          python3 scripts/evals/cases.py --validate
+          python3 scripts/evals/test_evals.py

@@ -10,10 +10,30 @@ harness. Use the `writing-for-agents` skill when creating or editing one.
 just validate    # the gate — run before committing
 just structure   # show the skills tree
 just try --list  # install from this checkout to try the skills
+
+just eval-list   # evaluation cases that exist
+just eval-check  # validate them, no model calls
+just eval-run ID # evaluate one case on Codex and save the report
+just eval-view   # browse saved reports, no model calls
+just eval-test   # model-free checks for the evaluation tooling
 ```
 
 `just validate` needs `python3` with `pyyaml`, plus `jq`. It also runs in CI on
 every pull request.
+
+## Evaluating skills
+
+`just validate` is *packaging* validation: does this skill install. The
+`just eval-*` commands are *behavioural* evaluation: does it work. They answer
+different questions and neither substitutes for the other.
+
+Cases, fixtures and the glue live in `evals/`; read
+[`evals/README.md`](evals/README.md) to add or execute one. The design this
+implements is [`docs/specs/skill-evaluations.md`](docs/specs/skill-evaluations.md).
+
+`package.json` and `package-lock.json` pin the evaluation tooling. They are
+private dev dependencies — not packaging, not published, and not part of
+installing a skill.
 
 ## Adding a skill
 
