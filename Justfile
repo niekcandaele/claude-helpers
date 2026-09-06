@@ -19,8 +19,10 @@ try *ARGS:
 
 # Show local testing instructions
 test:
-    @echo "This repo has no test suite — the skills are prompts, not code."
-    @echo "Its correctness harness is 'just validate'. Run that before committing."
+    @echo "The skills themselves are prompts, not code: their correctness"
+    @echo "harness is 'just validate'. Run that before committing."
+    @echo ""
+    @echo "The evaluation tooling is code, and 'just eval-test' checks it."
     @echo ""
     @echo "To try the skills from this checkout, install them somewhere else:"
     @echo "    cd /tmp/scratch && npx skills add /home/catalysm/code/skills --list"
@@ -31,3 +33,30 @@ test:
     @echo ""
     @echo "Installed skills land where your harness looks for them; the CLI"
     @echo "picks the directory and prints the path it used."
+
+# --- Skill evaluations -------------------------------------------------
+
+# List every evaluation case: id, skill, kind, harnesses
+eval-list:
+    @python3 scripts/evals/cases.py --list
+
+# Validate every case and its generated config, without calling a model
+eval-check:
+    @python3 scripts/evals/cases.py --validate
+    @python3 scripts/evals/prepare.py --check-config
+
+# Evaluate one case on Codex and save the report
+eval-run CASE:
+    @python3 scripts/evals/run.py --case {{ CASE }} --harness codex
+
+# Open the saved results in the Promptfoo viewer (makes no model calls)
+eval-view:
+    @PROMPTFOO_CONFIG_DIR="$(python3 scripts/evals/prepare.py --promptfoo-home)" npx --no-install promptfoo view
+
+# Model-free checks for the evaluation tooling (provider doubles)
+eval-test:
+    @python3 scripts/evals/test_evals.py
+
+# One cheap live probe: record the effective skill catalog and instructions
+eval-probe:
+    @python3 scripts/evals/run.py --probe --harness codex

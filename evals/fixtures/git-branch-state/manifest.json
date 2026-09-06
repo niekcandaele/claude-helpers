@@ -1,0 +1,66 @@
+{
+  "fixture": "git-branch-state",
+  "description": "A checkout with a feature branch three commits ahead of main: one file added, two modified, one deleted, plus one uncommitted edit.",
+  "base_branch": "main",
+  "branch": "feature/checkout-flow",
+  "commits_ahead": 3,
+  "author": {
+    "name": "Fixture Author",
+    "email": "fixture@example.invalid"
+  },
+  "steps": [
+    {
+      "branch": "main",
+      "subject": "Add the storefront skeleton",
+      "date": "2026-01-05T09:00:00+00:00",
+      "overlay": "01-storefront-skeleton",
+      "delete": []
+    },
+    {
+      "branch": "main",
+      "subject": "Document the pricing rules",
+      "date": "2026-01-06T09:00:00+00:00",
+      "overlay": "02-pricing-rules",
+      "delete": []
+    },
+    {
+      "branch": "feature/checkout-flow",
+      "subject": "Add the checkout session module",
+      "date": "2026-01-07T09:00:00+00:00",
+      "overlay": "03-checkout-session",
+      "delete": []
+    },
+    {
+      "branch": "feature/checkout-flow",
+      "subject": "Wire pricing into the cart",
+      "date": "2026-01-08T09:00:00+00:00",
+      "overlay": "04-wire-pricing",
+      "delete": []
+    },
+    {
+      "branch": "feature/checkout-flow",
+      "subject": "Remove the legacy coupon path",
+      "date": "2026-01-09T09:00:00+00:00",
+      "overlay": null,
+      "delete": ["src/legacy_coupon.js"]
+    }
+  ],
+  "uncommitted": {
+    "overlay": "05-uncommitted",
+    "paths": ["docs/notes.md"]
+  },
+  "expected": {
+    "commit_subjects": [
+      "Add the checkout session module",
+      "Wire pricing into the cart",
+      "Remove the legacy coupon path"
+    ],
+    "changes": [
+      { "path": "src/checkout.js", "disposition": "added" },
+      { "path": "src/cart.js", "disposition": "modified" },
+      { "path": "src/pricing.js", "disposition": "modified" },
+      { "path": "src/legacy_coupon.js", "disposition": "deleted" }
+    ],
+    "uncommitted_paths": ["docs/notes.md"]
+  }
+}

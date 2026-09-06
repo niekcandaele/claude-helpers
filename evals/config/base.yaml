@@ -1,0 +1,32 @@
+# The Promptfoo skeleton the generator fills in for one trial.
+#
+# This file is a template, not a runnable config: ${...} placeholders are
+# substituted by scripts/evals/prepare.py, which writes the rendered result
+# into the trial's work directory and copies it into the saved evidence.
+#
+# The requested model defaults to SKILL_EVAL_CODEX_MODEL. Not every model is
+# reachable on a ChatGPT subscription — `gpt-5.1-codex-max` is rejected with
+# HTTP 400 "not supported when using Codex with a ChatGPT account".
+description: skills repository — behavior evaluation
+evaluateOptions:
+  cache: false
+providers:
+  - id: openai:codex-sdk
+    label: codex
+    config:
+      model: ${SKILL_EVAL_CODEX_MODEL}
+      model_reasoning_effort: medium
+      working_dir: ${WORKSPACE}
+      sandbox_mode: read-only
+      approval_policy: never
+      network_access_enabled: false
+      skip_git_repo_check: true
+      inherit_process_env: true
+      cli_env:
+        HOME: ${WORK}/home
+        CODEX_HOME: ${WORK}/codex-home
+        OPENAI_API_KEY: ""
+        CODEX_API_KEY: ""
+prompts:
+  - "{{request}}"
+tests: []     # the generator inserts exactly one test built from the case
