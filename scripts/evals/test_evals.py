@@ -46,9 +46,18 @@ def rmtree(path: pathlib.Path) -> None:
 
 def cli(args: list[str], env_extra: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     env = dict(os.environ)
-    env.pop("OPENAI_API_KEY", None)
-    env.pop("CODEX_API_KEY", None)
-    env.pop("OPENAI_BASE_URL", None)
+    for name in (
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "OPENAI_BASE_URL",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_CUSTOM_HEADERS",
+        "CLAUDE_CODE_USE_BEDROCK",
+        "CLAUDE_CODE_USE_VERTEX",
+    ):
+        env.pop(name, None)
     env["NO_COLOR"] = "1"
     env.update(env_extra or {})
     return subprocess.run(
@@ -71,21 +80,36 @@ class StateDirTest(unittest.TestCase):
     def trial_dirs(self) -> list[pathlib.Path]:
         return sorted(p for p in self.runs.glob("*") if p.is_dir()) if self.runs.is_dir() else []
 
-    def double_trial(self, spec: str, **env_extra: str) -> tuple[subprocess.CompletedProcess, dict]:
-        result = cli(
+    def double_trial(
+        self, spec: str, harness: str = "codex", **env_extra: str
+    ) -> tuple[subprocess.CompletedProcess, dict]:
+        result = self.run_cli(spec, harness, **env_extra)
+        trials = self.trial_dirs()
+        self.assertEqual(len(trials), 1, result.stdout + result.stderr)
+        outcome = json.loads((trials[0] / "outcome.json").read_text(encoding="utf-8"))
+        return result, {"dir": trials[0], "outcome": outcome}
+
+    def run_cli(
+        self, spec: str, harness: str = "codex", **env_extra: str
+    ) -> subprocess.CompletedProcess:
+        return cli(
             [
                 str(SCRIPTS / "run.py"),
                 "--case",
                 "catchup-branch-state",
+                "--harness",
+                harness,
                 "--provider-double",
                 spec,
             ],
             {**self.env, **env_extra},
         )
-        trials = self.trial_dirs()
-        self.assertEqual(len(trials), 1, result.stdout + result.stderr)
-        outcome = json.loads((trials[0] / "outcome.json").read_text(encoding="utf-8"))
-        return result, {"dir": trials[0], "outcome": outcome}
+
+    def trial(self, path: pathlib.Path) -> dict:
+        return {
+            "manifest": json.loads((path / "manifest.json").read_text(encoding="utf-8")),
+            "outcome": json.loads((path / "outcome.json").read_text(encoding="utf-8")),
+        }
 
 
 class DiscoveryTest(unittest.TestCase):
@@ -95,7 +119,7 @@ class DiscoveryTest(unittest.TestCase):
         self.assertIn("catchup-branch-state", result.stdout)
         self.assertIn("skill=catchup", result.stdout)
         self.assertIn("kind=behavior", result.stdout)
-        self.assertIn("harnesses=codex", result.stdout)
+        self.assertIn("harnesses=codex,claude-code", result.stdout)
 
     def test_the_repository_case_validates(self) -> None:
         result = cli([str(SCRIPTS / "cases.py"), "--validate"])
@@ -119,6 +143,13 @@ class InvalidCaseTest(StateDirTest):
             {"task": case["invocation"] + " " + case["task"]}
         ),
         "unknown top-level key": lambda case: case.update({"harnes": ["codex"]}),
+        "duplicate harness": lambda case: case.update({"harnesses": ["codex", "codex"]}),
+        "task names a harness": lambda case: case.update(
+            {"task": "Using Codex, " + case["task"]}
+        ),
+        "expected_behavior names a harness directory": lambda case: case.update(
+            {"expected_behavior": case["expected_behavior"] + " Read it from .claude/ first."}
+        ),
     }
 
     def _broken_case_dir(self, mutate) -> pathlib.Path:
@@ -345,6 +376,340 @@ class EvidenceTest(StateDirTest):
         self.assertNotEqual(second.returncode, 0)
         self.assertIn("already exists", second.stderr)
         self.assertEqual(len(self.trial_dirs()), 1)
+
+
+class SecondHarnessTest(StateDirTest):
+    """The same case, the other harness — shared expectations, not duplicated ones."""
+
+    def test_a_good_summary_passes_on_claude_code_too(self) -> None:
+        result, trial = self.double_trial(
+            f"respond:{EXPECTATIONS / 'acceptable.md'}", "claude-code"
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(trial["outcome"]["status"], "passed")
+
+        manifest = json.loads((trial["dir"] / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["harness"], "claude-code")
+
+        required = [row for row in trial["outcome"]["assertions"] if row["required"]]
+        self.assertEqual(
+            sorted(row["metric"] for row in required),
+            ["git-facts", "names-base-branch", "names-branch"],
+        )
+        for row in required:
+            self.assertTrue(row["pass"], row)
+
+    def test_a_wrong_summary_fails_the_same_named_assertion(self) -> None:
+        _, trial = self.double_trial(
+            f"respond:{EXPECTATIONS / 'unacceptable.md'}", "claude-code"
+        )
+        self.assertEqual(trial["outcome"]["status"], "assertion-failed")
+        failed = [
+            row
+            for row in trial["outcome"]["assertions"]
+            if row["required"] and row["pass"] is False
+        ]
+        self.assertIn("git-facts", [row["metric"] for row in failed])
+
+
+class BothHarnessesTest(StateDirTest):
+    def test_two_trials_with_distinct_identities_and_one_shared_request(self) -> None:
+        result = self.run_cli(f"respond:{EXPECTATIONS / 'acceptable.md'}", "both")
+        combined = result.stdout + result.stderr
+        self.assertEqual(result.returncode, 0, combined)
+
+        trials = self.trial_dirs()
+        self.assertEqual(len(trials), 2, combined)
+        self.assertEqual(len({path.name for path in trials}), 2)
+
+        by_harness = {}
+        for path in trials:
+            saved = self.trial(path)
+            by_harness[saved["manifest"]["harness"]] = (path, saved)
+        self.assertEqual(sorted(by_harness), ["claude-code", "codex"])
+
+        for path, _ in by_harness.values():
+            for name in ("results.json", "results.html", "assertions.json"):
+                self.assertGreater((path / name).stat().st_size, 0, f"{path.name}/{name}")
+
+        # The same task reaches both harnesses byte for byte. Only the sentence
+        # that summons the skill is translated, because Claude Code refuses
+        # prose invocation of a skill whose own frontmatter disables it.
+        case = yaml.safe_load((CASE_DIR / "case.yaml").read_text(encoding="utf-8"))
+        task = " ".join(case["task"].split())
+        prompts = {
+            harness: (path / "request" / "prompt.txt").read_text(encoding="utf-8")
+            for harness, (path, _) in by_harness.items()
+        }
+        for harness, prompt in prompts.items():
+            invocation, _, sent_task = prompt.partition("\n\n")
+            self.assertEqual(" ".join(sent_task.split()), task, harness)
+            self.assertTrue(invocation.strip(), harness)
+        self.assertEqual(prompts["codex"].split("\n\n")[0], case["invocation"])
+        self.assertEqual(prompts["claude-code"].split("\n\n")[0], "/catchup")
+
+        self.assertIn("trials              2", result.stdout)
+        self.assertIn("[1] harness         codex", result.stdout)
+        self.assertIn("[2] harness         claude-code", result.stdout)
+        self.assertIn("says nothing about the other", result.stdout)
+
+    def test_one_harness_result_cannot_satisfy_the_other(self) -> None:
+        result = self.run_cli(
+            f"codex=respond:{EXPECTATIONS / 'acceptable.md'},claude-code=empty", "both"
+        )
+        combined = result.stdout + result.stderr
+        self.assertNotEqual(result.returncode, 0, combined)
+
+        saved = {
+            self.trial(path)["manifest"]["harness"]: (path, self.trial(path))
+            for path in self.trial_dirs()
+        }
+        self.assertEqual(saved["codex"][1]["outcome"]["status"], "passed")
+        self.assertEqual(saved["claude-code"][1]["outcome"]["status"], "ungraded")
+
+        # Neither trial's own record carries the other's verdict.
+        self.assertNotIn("ungraded", json.dumps(saved["codex"][1]["outcome"]))
+        self.assertNotEqual(saved["claude-code"][1]["outcome"]["status"], "passed")
+
+        # And they are genuinely separate directories.
+        rmtree(saved["claude-code"][0])
+        self.assertTrue((saved["codex"][0] / "manifest.json").is_file())
+
+
+class UnsupportedHarnessTest(StateDirTest):
+    def _codex_only_case(self) -> pathlib.Path:
+        cases_dir = self.state / "cases"
+        target = cases_dir / "catchup-branch-state"
+        target.mkdir(parents=True)
+        data = yaml.safe_load((CASE_DIR / "case.yaml").read_text(encoding="utf-8"))
+        data["harnesses"] = ["codex"]
+        (target / "case.yaml").write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+        shutil.copytree(EXPECTATIONS, target / "expectations")
+        shutil.copytree(ROOT / "evals" / "asserts", cases_dir.parent / "asserts", dirs_exist_ok=True)
+        return cases_dir
+
+    def test_a_harness_the_case_never_declared_is_saved_as_unsupported(self) -> None:
+        cases_dir = self._codex_only_case()
+        result = self.run_cli(
+            f"respond:{EXPECTATIONS / 'acceptable.md'}",
+            "both",
+            SKILL_EVAL_CASES_DIR=str(cases_dir),
+        )
+        combined = result.stdout + result.stderr
+        self.assertNotEqual(result.returncode, 0, combined)
+
+        saved = {
+            self.trial(path)["manifest"]["harness"]: self.trial(path)
+            for path in self.trial_dirs()
+        }
+        self.assertEqual(saved["codex"]["outcome"]["status"], "passed")
+        self.assertEqual(saved["claude-code"]["outcome"]["status"], "unsupported")
+        self.assertFalse((self.runs / saved["claude-code"]["manifest"]["evaluation_id"]
+                          / "results.json").exists())
+
+        reason = saved["claude-code"]["outcome"]["reason"]
+        self.assertIn("catchup-branch-state", reason)
+        self.assertIn("claude-code", reason)
+        self.assertEqual(saved["claude-code"]["manifest"]["status"], "unsupported")
+
+
+class ClaudePaidCredentialTest(StateDirTest):
+    def test_each_paid_anthropic_setting_stops_every_trial(self) -> None:
+        for name in (
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_BASE_URL",
+            "CLAUDE_CODE_USE_BEDROCK",
+            "CLAUDE_CODE_USE_VERTEX",
+        ):
+            with self.subTest(name):
+                result = self.run_cli("empty", "both", **{name: SECRET})
+                combined = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0, combined)
+                self.assertIn(name, combined)
+                self.assertIn("affects harness: claude-code", combined)
+                self.assertNotIn(SECRET, combined)
+                self.assertEqual(self.trial_dirs(), [])
+                for path in self.state.rglob("*"):
+                    if path.is_file():
+                        self.assertNotIn(
+                            SECRET, path.read_text(encoding="utf-8", errors="ignore"), str(path)
+                        )
+
+
+def _claude_stub(directory: str, payload: dict) -> None:
+    """A `claude` on PATH that answers one fixed auth status and nothing else.
+
+    A stub rather than a mocking seam, so the real subprocess call is what the
+    test exercises.
+    """
+    stub = pathlib.Path(directory) / "claude"
+    stub.write_text(
+        "#!/bin/sh\nprintf '%s' " + json.dumps(json.dumps(payload)) + "\n", encoding="utf-8"
+    )
+    stub.chmod(0o755)
+
+
+class ClaudeLoginTest(unittest.TestCase):
+    PAYLOADS = {
+        "not logged in": {"loggedIn": False, "authMethod": "none"},
+        "a paid API key is configured": {
+            "loggedIn": True,
+            "authMethod": "claude.ai",
+            "apiProvider": "firstParty",
+            "apiKeySource": "ANTHROPIC_API_KEY",
+        },
+        "routed through a third party": {
+            "loggedIn": True,
+            "authMethod": "claude.ai",
+            "apiProvider": "bedrock",
+        },
+    }
+
+    def _preflight(self, tmp: str) -> subprocess.CompletedProcess:
+        return cli(
+            [
+                str(SCRIPTS / "preflight.py"),
+                "--case",
+                "catchup-branch-state",
+                "--harness",
+                "claude-code",
+            ],
+            {"PATH": f"{tmp}:{os.environ['PATH']}"},
+        )
+
+    def test_each_broken_login_is_refused_with_a_remedy(self) -> None:
+        for label, payload in self.PAYLOADS.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                _claude_stub(tmp, payload)
+                result = self._preflight(tmp)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("affects harness: claude-code", result.stderr)
+                self.assertIn("→", result.stderr)
+
+    def test_a_healthy_login_names_the_subscription_route(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            _claude_stub(
+                tmp, {"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty"}
+            )
+            result = self._preflight(tmp)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("claude-subscription", result.stdout)
+
+
+class ClaudeIsolationTest(StateDirTest):
+    def _prepare(self, evaluation_id: str) -> pathlib.Path:
+        result = cli(
+            [
+                str(SCRIPTS / "prepare.py"),
+                "--case",
+                "catchup-branch-state",
+                "--harness",
+                "claude-code",
+                # No harness is contacted, so the post-stage authentication
+                # proof is skipped and this needs no `claude` on PATH.
+                "--provider-double",
+                "empty",
+            ],
+            {**self.env, "SKILL_EVAL_EVALUATION_ID": evaluation_id},
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return self.state / "work" / evaluation_id
+
+    def _codex_workspace(self) -> pathlib.Path:
+        result = cli(
+            [str(SCRIPTS / "prepare.py"), "--case", "catchup-branch-state"],
+            {**self.env, "SKILL_EVAL_EVALUATION_ID": "codex-side"},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return self.state / "work" / "codex-side" / "workspace"
+
+    def test_the_trial_config_dir_holds_only_what_the_case_staged(self) -> None:
+        work = self._prepare("claude-first")
+        claude_home = work / "claude-home"
+
+        self.assertEqual(sorted(p.name for p in (claude_home / "skills").iterdir()), ["catchup"])
+        self.assertTrue((claude_home / ".credentials.json").is_symlink())
+        self.assertTrue((claude_home / "projects").is_dir())
+        self.assertEqual(list((claude_home / "projects").iterdir()), [])
+
+        settings = json.loads((claude_home / "settings.json").read_text(encoding="utf-8"))
+        self.assertIs(settings["syncClaudeAiSkills"], False)
+        for forbidden in ("apiKey", "apiKeyHelper", "forceLoginMethod"):
+            self.assertNotIn(forbidden, settings)
+
+        for root in (claude_home, work / "workspace"):
+            for forbidden in ("AGENTS.md", "CLAUDE.md", ".claude", ".codex"):
+                self.assertEqual(list(root.rglob(forbidden)), [], f"{root.name}/{forbidden}")
+
+    def test_both_harnesses_are_given_byte_identical_workspaces(self) -> None:
+        claude = self._prepare("claude-second") / "workspace"
+        codex = self._codex_workspace()
+
+        def tree(root: pathlib.Path) -> dict[str, bytes]:
+            return {
+                str(path.relative_to(root)): path.read_bytes()
+                for path in sorted(root.rglob("*"))
+                if path.is_file() and ".git" not in path.parts
+            }
+
+        self.assertEqual(tree(claude), tree(codex))
+
+    def test_no_credential_file_is_written_under_the_saved_evidence(self) -> None:
+        self.double_trial(f"respond:{EXPECTATIONS / 'acceptable.md'}", "claude-code")
+        self.assertEqual(list(self.runs.rglob("auth.json")), [])
+        self.assertEqual(list(self.runs.rglob(".credentials.json")), [])
+
+
+class ResourceIdentityTest(StateDirTest):
+    def test_a_reported_model_identity_is_recorded_verbatim(self) -> None:
+        _, trial = self.double_trial(
+            f"respond:{EXPECTATIONS / 'acceptable.md'}",
+            "claude-code",
+            SKILL_EVAL_DOUBLE_MODEL_USAGE="claude-sonnet-5",
+        )
+        manifest = json.loads((trial["dir"] / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["model"]["resolved"], "claude-sonnet-5")
+        self.assertIsNone(manifest["model"]["resolved_reason"])
+        self.assertEqual(manifest["model"]["requested"], "sonnet")
+
+    def test_a_missing_model_identity_is_admitted_rather_than_invented(self) -> None:
+        _, trial = self.double_trial(f"respond:{EXPECTATIONS / 'acceptable.md'}", "claude-code")
+        manifest = json.loads((trial["dir"] / "manifest.json").read_text(encoding="utf-8"))
+        self.assertIsNone(manifest["model"]["resolved"])
+        self.assertTrue(manifest["model"]["resolved_reason"])
+
+    def test_skill_evidence_comes_from_the_provider_when_it_reports_any(self) -> None:
+        _, trial = self.double_trial(f"respond:{EXPECTATIONS / 'acceptable.md'}", "claude-code")
+        manifest = json.loads((trial["dir"] / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["skill_evidence"]["source"], "provider")
+        self.assertEqual(
+            [call["name"] for call in manifest["skill_evidence"]["calls"]], ["catchup"]
+        )
+        self.assertIsNone(manifest["skill_evidence"]["reason"])
+
+        recorded = next(
+            row for row in trial["outcome"]["assertions"] if row["type"] == "skill-used"
+        )
+        self.assertEqual([call["name"] for call in recorded["evidence"]], ["catchup"])
+
+    def test_unavailable_skill_evidence_is_admitted_rather_than_denied(self) -> None:
+        _, trial = self.double_trial("error:the harness fell over", "claude-code")
+        manifest = json.loads((trial["dir"] / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["skill_evidence"]["calls"], [])
+        self.assertTrue(manifest["skill_evidence"]["reason"])
+
+    def test_cost_is_recorded_as_an_estimate_and_never_as_a_charge(self) -> None:
+        _, trial = self.double_trial(f"respond:{EXPECTATIONS / 'acceptable.md'}", "claude-code")
+        manifest = json.loads((trial["dir"] / "manifest.json").read_text(encoding="utf-8"))
+        basis = manifest["cost_estimate"]["basis"]
+        self.assertIn("estimate", basis)
+        self.assertIn("not an invoice", basis)
+        self.assertIn("quota", basis)
+
+        for key in ("claude_cli", "claude_agent_sdk", "codex_cli", "codex_sdk"):
+            self.assertIn(key, manifest["versions"])
+        self.assertEqual(manifest["harness_context"]["conversation"], "fresh")
 
 
 class FixtureDeterminismTest(unittest.TestCase):

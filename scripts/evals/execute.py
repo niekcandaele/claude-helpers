@@ -58,6 +58,18 @@ def execute(paths: dict, run_dir: pathlib.Path) -> dict:
     env = dict(os.environ)
     env["PROMPTFOO_CONFIG_DIR"] = str(paths["promptfoo_home"])
     env["NO_COLOR"] = "1"
+    # The Codex provider carries its own per-trial `cli_env`; the Claude Agent
+    # SDK provider carries `env` in the generated config, which is layered over
+    # this process's environment. Setting the same two variables here as well
+    # means the harness cannot see the maintainer's config even if the provider
+    # block is ever rendered without them. PATH, npm_config_cache and NODE_PATH
+    # are untouched, so `npx --no-install` still resolves the repo's install.
+    if paths.get("harness") == "claude-code":
+        real_home = env.get("HOME")
+        if real_home and "npm_config_cache" not in env:
+            env["npm_config_cache"] = str(pathlib.Path(real_home) / ".npm")
+        env["CLAUDE_CONFIG_DIR"] = str(paths["harness_home"])
+        env["HOME"] = str(paths["home"])
 
     completed = subprocess.run(
         command, cwd=str(ROOT), env=env, capture_output=True, text=True

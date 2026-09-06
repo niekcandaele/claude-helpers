@@ -38,14 +38,22 @@ export default class DoubleProvider {
     }
 
     const output = readFileSync(this.config.responseFile, "utf8");
+    const metadata = { skillCalls: this.config.skillCalls ?? [] };
+    // Only when the caller asks for it: a harness that reports no resolved
+    // model is the case the manifest must also handle honestly.
+    if (this.config.modelUsage) {
+      metadata.modelUsage = this.config.modelUsage;
+    }
     return {
       output,
+      sessionId: this.config.sessionId,
+      cost: this.config.cost,
       tokenUsage: {
         total: prompt.length + output.length,
         prompt: prompt.length,
         completion: output.length,
       },
-      metadata: { skillCalls: this.config.skillCalls ?? [] },
+      metadata,
     };
   }
 }
