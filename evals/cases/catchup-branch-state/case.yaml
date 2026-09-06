@@ -2,7 +2,7 @@
 id: catchup-branch-state
 skill: catchup
 kind: behavior          # behavior | selection   (only `behavior` is accepted today)
-harnesses: [codex]
+harnesses: [codex, claude-code]   # every declared harness gets its own trial and its own result
 fixture: git-branch-state
 
 # The underlying task, kept SEPARATE from the invocation so a future no-skill
@@ -32,7 +32,7 @@ assert:
     value: "main"
     metric: names-base-branch
 
-  # --- recorded, not decisive: Codex skill detection is heuristic ---
+  # --- recorded, not decisive: skill detection is heuristic on some harnesses ---
   - type: skill-used
     value: catchup
     weight: 0

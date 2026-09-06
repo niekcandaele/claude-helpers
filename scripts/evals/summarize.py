@@ -9,6 +9,11 @@ harness that ran and got the answer wrong.
     assertion-failed   graded, and at least one required assertion failed
     execution-error    the harness errored, timed out, or never produced output
     ungraded           executed, but there was nothing to grade
+    unsupported        the case does not declare this harness; nothing was executed
+
+`unsupported` is a saved trial directory with no results file. It exists so a
+harness the case never claimed leaves visible evidence of the gap instead of
+silently vanishing from a two-harness comparison — and it never reads as a pass.
 
 The trial directory is made read-only at the end. Viewer ratings and comments
 live in Promptfoo's own database; the saved evidence cannot be edited to agree
@@ -20,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import re
 import shutil
 import stat
 import subprocess
@@ -36,12 +42,19 @@ STATUS_PASSED = "passed"
 STATUS_ASSERTION_FAILED = "assertion-failed"
 STATUS_EXECUTION_ERROR = "execution-error"
 STATUS_UNGRADED = "ungraded"
+STATUS_UNSUPPORTED = "unsupported"
 
 # Promptfoo's ResultFailureReason: NONE=0, ASSERT=1, ERROR=2.
 RESULT_FAILURE_ERROR = 2
 
-MODEL_RESOLVED_REASON = (
-    "the Codex SDK does not report the backend-resolved model through Promptfoo"
+MODEL_RESOLVED_REASONS = {
+    "codex": "the Codex SDK does not report the backend-resolved model through Promptfoo",
+    "claude-code": "the harness reported no modelUsage for this trial",
+}
+
+COST_BASIS = (
+    "API-rate estimate. Execution used subscription authentication, so this is "
+    "not an invoice and not remaining subscription quota."
 )
 
 
@@ -82,9 +95,75 @@ def tool_versions() -> dict:
         "promptfoo": manifest["dependencies"]["promptfoo"],
         "codex_sdk": manifest["dependencies"]["@openai/codex-sdk"],
         "codex_cli": _command_version(["codex", "--version"]),
+        "claude_agent_sdk": manifest["dependencies"]["@anthropic-ai/claude-agent-sdk"],
+        "claude_cli": _command_version(["claude", "--version"]),
         "node": _command_version(["node", "--version"]),
         "just": _command_version(["just", "--version"]),
     }
+
+
+# A skill a person types is recorded by Claude Code as a command, not as a
+# Skill tool call, so it never reaches the provider's skillCalls. Reading it
+# back out of the saved transcript is how the same `skill-used` assertion gets
+# an answer on both harnesses.
+SLASH_INVOCATION = re.compile(r"<command-name>/([a-z0-9][a-z0-9-]*)</command-name>")
+
+
+def skill_evidence(metadata: dict, transcript_dir: pathlib.Path) -> dict:
+    """What the harness can show about which skills were loaded.
+
+    The provider's own report is preferred. When it is empty the transcript is
+    read instead, and when that is unavailable the answer is an empty list plus
+    the reason it is empty — never a confident negative, because the assertion
+    that consumes it is evidence rather than a criterion.
+    """
+    calls = metadata.get("skillCalls")
+    if calls:
+        return {"calls": calls, "source": "provider", "reason": None}
+
+    files = sorted(transcript_dir.glob("*.jsonl")) if transcript_dir.is_dir() else []
+    if not files:
+        return {
+            "calls": [],
+            "source": None,
+            "reason": "the harness reported no skill calls and saved no transcript to read them from",
+        }
+
+    names: list[str] = []
+    for path in files:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for name in SLASH_INVOCATION.findall(text):
+            if name not in names:
+                names.append(name)
+        for entry in re.findall(r'"name"\s*:\s*"Skill"[^\n]*?"skill"\s*:\s*"([^"]+)"', text):
+            if entry not in names:
+                names.append(entry)
+    if not names:
+        return {
+            "calls": [],
+            "source": "transcript",
+            "reason": "the transcript records no skill invocation",
+        }
+    return {
+        "calls": [{"name": name, "source": "transcript"} for name in names],
+        "source": "transcript",
+        "reason": None,
+    }
+
+
+def _resolved_model(harness: str, metadata: dict) -> tuple[object, str | None]:
+    """The model the harness says it actually used, and why it is missing.
+
+    Claude Code keys its usage report by resolved model id, so the identity is
+    recoverable even though the requested name is a mutable alias. Several keys
+    means several models really were used, and collapsing them to one would be
+    a lie the manifest cannot afford.
+    """
+    usage = metadata.get("modelUsage")
+    if not isinstance(usage, dict) or not usage:
+        return None, MODEL_RESOLVED_REASONS.get(harness, MODEL_RESOLVED_REASONS["codex"])
+    names = sorted(usage)
+    return (names[0] if len(names) == 1 else names), None
 
 
 def _group_components(
@@ -235,6 +314,48 @@ def freeze(directory: pathlib.Path) -> None:
     os.chmod(directory, mode & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
 
 
+def save_unsupported(
+    case: cases_module.Case, run_dir: pathlib.Path, harness: str, trial: dict
+) -> dict:
+    """Save the trial that did not happen, so the gap is visible.
+
+    It carries no results.json — there is nothing to grade — and a status that
+    cannot be mistaken for a pass by anything reading the directory.
+    """
+    reason = (
+        f"case '{case.id}' does not declare the harness '{harness}' "
+        f"(it declares: {', '.join(case.harnesses)}), so nothing was executed"
+    )
+    (run_dir / "outcome.json").write_text(
+        json.dumps(
+            {"status": STATUS_UNSUPPORTED, "reason": reason, "exit_code": None, "assertions": []},
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    manifest = {
+        "evaluation_id": trial["evaluation_id"],
+        "case_id": case.id,
+        "skill": case.skill,
+        "kind": case.kind,
+        "harness": harness,
+        "arm": trial["arm"],
+        "repetition_index": 0,
+        "started_at": trial["started_at"],
+        "ended_at": trial["ended_at"],
+        "duration_ms": 0,
+        "declared_harnesses": case.harnesses,
+        "versions": tool_versions(),
+        "source": source_provenance(),
+        "status": STATUS_UNSUPPORTED,
+        "reason": reason,
+    }
+    (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    freeze(run_dir)
+    return {"status": STATUS_UNSUPPORTED, "reason": reason, "manifest": manifest}
+
+
 def summarize(
     case: cases_module.Case,
     run_dir: pathlib.Path,
@@ -256,10 +377,36 @@ def summarize(
     (run_dir / "request").mkdir(exist_ok=True)
     (run_dir / "response").mkdir(exist_ok=True)
     (run_dir / "transcript").mkdir(exist_ok=True)
+    transcript_dir = run_dir / "transcript"
 
     (run_dir / "request" / "prompt.txt").write_text(paths["prompt"], encoding="utf-8")
     shutil.copyfile(paths["config"], run_dir / "request" / "promptfooconfig.yaml")
     (run_dir / "response" / "final.txt").write_text(verdict["output"], encoding="utf-8")
+
+    copied = 0
+    transcripts = paths.get("transcripts")
+    if transcripts and transcripts.is_dir():
+        for jsonl in sorted(transcripts.rglob("*.jsonl")):
+            shutil.copyfile(jsonl, transcript_dir / jsonl.name)
+            copied += 1
+
+    row = {}
+    if results:
+        rows = results.get("results", {}).get("results", [])
+        row = rows[0] if rows else {}
+    metadata = (row.get("response") or {}).get("metadata") or row.get("metadata") or {}
+
+    # Promptfoo grades `skill-used` from the provider's own report, which on a
+    # typed invocation is empty. The verdict it reached stays exactly as it is —
+    # this only attaches what the trial can actually show, so an unavailable
+    # answer never reads as a confident negative.
+    evidence = skill_evidence(metadata, transcript_dir)
+    for assertion_row in verdict["assertions"]:
+        if assertion_row.get("type") == "skill-used":
+            assertion_row["evidence"] = evidence["calls"]
+            assertion_row["evidence_source"] = evidence["source"]
+            assertion_row["evidence_reason"] = evidence["reason"]
+
     (run_dir / "assertions.json").write_text(
         json.dumps(verdict["assertions"], indent=2) + "\n", encoding="utf-8"
     )
@@ -277,24 +424,30 @@ def summarize(
         encoding="utf-8",
     )
 
-    sessions = paths["codex_home"] / "sessions"
-    if sessions.is_dir():
-        for jsonl in sessions.rglob("*.jsonl"):
-            shutil.copyfile(jsonl, run_dir / "transcript" / jsonl.name)
-
     token_usage = None
     token_usage_reason = None
-    if results:
-        rows = results.get("results", {}).get("results", [])
-        usage = rows[0].get("tokenUsage") if rows else None
-        if usage:
-            token_usage = {
-                "total": usage.get("total"),
-                "prompt": usage.get("prompt"),
-                "completion": usage.get("completion"),
-            }
-    if token_usage is None:
+    usage = row.get("tokenUsage")
+    if usage:
+        token_usage = {
+            "total": usage.get("total"),
+            "prompt": usage.get("prompt"),
+            "completion": usage.get("completion"),
+            # Each harness counts differently — Claude Code splits cache reads
+            # and cache creation out of the prompt total. The normalised three
+            # are comparable; the raw shape is what makes them auditable.
+            "raw": usage,
+        }
+    else:
         token_usage_reason = "the harness reported no token usage for this trial"
+
+    harness = trial["harness"]
+    resolved_model, resolved_reason = _resolved_model(harness, metadata)
+
+    transcript_reason = None
+    if copied != 1:
+        transcript_reason = (
+            f"{copied} session transcript(s) were found where exactly one was expected"
+        )
 
     auth = dict(trial["auth"])
     manifest = {
@@ -310,10 +463,11 @@ def summarize(
         "duration_ms": trial["duration_ms"],
         "auth": auth,
         "model": {
-            "requested": prepare_module.requested_model(),
-            "resolved": None,
-            "resolved_reason": MODEL_RESOLVED_REASON,
+            "requested": prepare_module.requested_model(harness),
+            "resolved": resolved_model,
+            "resolved_reason": resolved_reason,
         },
+        "cost_estimate": {"value": row.get("cost"), "basis": COST_BASIS},
         "versions": tool_versions(),
         "source": source_provenance(),
         "fingerprints": {
@@ -322,6 +476,21 @@ def summarize(
             "fixture": f"{paths['fixture_head']}+{prepare_module.sha256_file(case.fixture_build())}",
         },
         "harness_provided_skills": trial.get("harness_provided_skills", []),
+        "skill_evidence": evidence,
+        "harness_context": {
+            "session_id": (row.get("response") or {}).get("sessionId") or paths.get("session_id"),
+            "config_dir": str(paths["harness_home"]),
+            "setting_sources": prepare_module.provider_config(paths["config_data"]).get(
+                "setting_sources"
+            ),
+            "conversation": "fresh",
+            "instruction_files": sorted(
+                str(path.relative_to(paths["harness_home"]))
+                for path in paths["harness_home"].rglob("*")
+                if path.name in ("SKILL.md", "settings.json", "config.toml")
+            ),
+            "transcript_reason": transcript_reason,
+        },
         "token_usage": token_usage,
         "token_usage_reason": token_usage_reason,
         "paths": {

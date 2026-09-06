@@ -45,9 +45,9 @@ eval-check:
     @python3 scripts/evals/cases.py --validate
     @python3 scripts/evals/prepare.py --check-config
 
-# Evaluate one case on Codex and save the report
-eval-run CASE:
-    @python3 scripts/evals/run.py --case {{ CASE }} --harness codex
+# Evaluate one case and save the report: HARNESS is codex, claude-code, or both
+eval-run CASE HARNESS="codex":
+    @python3 scripts/evals/run.py --case {{ CASE }} --harness {{ HARNESS }}
 
 # Open the saved results in the Promptfoo viewer (makes no model calls)
 eval-view:
@@ -57,6 +57,6 @@ eval-view:
 eval-test:
     @python3 scripts/evals/test_evals.py
 
-# One cheap live probe: record the effective skill catalog and instructions
-eval-probe:
-    @python3 scripts/evals/run.py --probe --harness codex
+# One cheap live probe per harness: record the effective skill catalog and instructions
+eval-probe HARNESS="codex":
+    @python3 scripts/evals/run.py --probe --harness {{ HARNESS }}

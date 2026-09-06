@@ -1,0 +1,35 @@
+# The Claude Code provider block, inserted verbatim into the generated config.
+#
+# Promptfoo's native `anthropic:claude-agent-sdk` provider, not an adapter
+# around the CLI: it reaches the local Claude subscription, accepts a per-trial
+# environment, and already reports the tool evidence the case's `skill-used`
+# assertion needs. evals/README.md records the evidence for that decision.
+#
+# Every key here was read out of the installed provider source, not out of the
+# documentation.
+- id: anthropic:claude-agent-sdk
+  label: claude-code
+  config:
+    model: ${SKILL_EVAL_CLAUDE_MODEL}
+    # Without this the provider refuses to start unless ANTHROPIC_API_KEY is
+    # set — which is exactly the paid credential preflight refuses. Saying the
+    # key is not required is what lets the OAuth subscription answer instead.
+    apiKeyRequired: false
+    working_dir: ${WORKSPACE}
+    permission_mode: dontAsk
+    # working_dir already allows Read/Grep/Glob/LS; the skill under evaluation
+    # reads Git state, so Bash is appended and nothing else is.
+    append_allowed_tools: [Bash]
+    disallowed_tools: [Write, Edit, NotebookEdit, WebFetch, WebSearch, Task]
+    # The isolated CLAUDE_CONFIG_DIR *is* the only "user" scope, so this loads
+    # the staged skill and nothing else; project and local settings — which a
+    # fixture could otherwise inject — stay out.
+    setting_sources: [user]
+    skills: [${SKILL}]
+    strict_mcp_config: true
+    # A fresh id per trial: the conversation cannot continue an earlier one,
+    # and the transcript it writes can be named without guessing.
+    session_id: ${SESSION_ID}
+    env:
+      CLAUDE_CONFIG_DIR: ${WORK}/claude-home
+      HOME: ${WORK}/home

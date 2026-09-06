@@ -41,10 +41,35 @@ KNOWN_KEYS = {
     "assert",
 }
 
-# Widened by later tickets; today one kind and one harness are implemented, and
-# a case that claims more would be silently mis-executed.
+# Widened by later tickets; today one kind is implemented, and a case that
+# claims more would be silently mis-executed.
 SUPPORTED_KINDS = {"behavior"}
-SUPPORTED_HARNESSES = {"codex"}
+SUPPORTED_HARNESSES = {"codex", "claude-code"}
+
+# Convenience words the CLI accepts for --harness. A case file must name its
+# harnesses literally: an alias in a case would silently widen as harnesses are
+# added, changing what an old case measures.
+HARNESS_ALIASES = {
+    "both": ("codex", "claude-code"),
+    "all": ("codex", "claude-code"),
+}
+
+# A case's prose is sent verbatim to every selected harness, so naming one
+# harness in it makes the comparison unfair in a way nothing downstream can
+# detect. Matched case-insensitively against task, invocation and
+# expected_behavior.
+HARNESS_VOCABULARY = (
+    "codex",
+    "claude code",
+    "claude-code",
+    "chatgpt",
+    "anthropic",
+    "openai",
+    ".codex/",
+    ".claude/",
+    "codex_home",
+    "claude_config_dir",
+)
 
 # The arms an evaluation can send. Only `candidate` is executed today; the
 # baseline arms are what compose_prompt() exists to keep separable.
@@ -125,7 +150,52 @@ def load(case_id: str) -> Case:
     )
 
 
-def compose_prompt(case: Case, arm: str = "candidate") -> str:
+def resolve_harnesses(spec: str) -> list[str]:
+    """Turn a --harness argument into the ordered harness list it selects.
+
+    Accepts one name, a comma-separated list, or an alias. Order is stable and
+    de-duplicated, because it decides the order the trials execute in.
+    """
+    selected: list[str] = []
+    for token in (part.strip() for part in spec.split(",")):
+        if not token:
+            continue
+        for name in HARNESS_ALIASES.get(token, (token,)):
+            if name not in selected:
+                selected.append(name)
+    unknown = [name for name in selected if name not in SUPPORTED_HARNESSES]
+    if unknown or not selected:
+        known = ", ".join(sorted(SUPPORTED_HARNESSES) + sorted(HARNESS_ALIASES))
+        raise SystemExit(
+            f"✗ unknown harness selection '{spec}'\n"
+            f"    → use one or more of: {known}"
+        )
+    return selected
+
+
+# How each harness is asked to load a skill. The case states its invocation
+# once, in neutral prose; this is the only place it is translated, and the
+# translation is confined to *how the skill is summoned* — the task itself is
+# byte-identical on every harness, which is what makes the results comparable.
+#
+# Claude Code honours a skill's own `disable-model-invocation: true`
+# frontmatter, so prose asking it to use such a skill is refused outright,
+# while the slash form a person would type still loads it. Codex ignores that
+# frontmatter and takes the prose. Translating here is what keeps the case from
+# having to know either fact.
+INVOCATION_FORMS = {"codex": "{invocation}", "claude-code": "/{skill}"}
+
+
+def compose_invocation(case: Case, harness: str = "codex") -> str:
+    """The sentence that summons the skill, in the form this harness accepts."""
+    invocation = str(case.data.get("invocation", "")).strip()
+    if not invocation:
+        return ""
+    form = INVOCATION_FORMS.get(harness, "{invocation}")
+    return form.format(invocation=invocation, skill=case.skill)
+
+
+def compose_prompt(case: Case, arm: str = "candidate", *, harness: str = "codex") -> str:
     """The exact request text for one arm.
 
     This is the only place the invocation and the task are joined, so a
@@ -136,7 +206,7 @@ def compose_prompt(case: Case, arm: str = "candidate") -> str:
     task = str(case.data.get("task", "")).strip()
     if arm == "no-skill":
         return task
-    invocation = str(case.data.get("invocation", "")).strip()
+    invocation = compose_invocation(case, harness)
     return f"{invocation}\n\n{task}" if invocation else task
 
 
@@ -195,14 +265,17 @@ def _validate_case(case: Case, seen_ids: dict[str, pathlib.Path]) -> list[tuple[
 
     harnesses = data.get("harnesses")
     if not isinstance(harnesses, list) or not harnesses:
-        fail("'harnesses' is missing or not a non-empty list", "write it as [codex]")
+        fail("'harnesses' is missing or not a non-empty list", "write it as [codex, claude-code]")
     else:
-        unsupported = sorted({str(h) for h in harnesses} - SUPPORTED_HARNESSES)
+        names = [str(h) for h in harnesses]
+        unsupported = sorted(set(names) - SUPPORTED_HARNESSES)
         if unsupported:
             fail(
                 f"harness(es) not supported yet: {', '.join(unsupported)}",
                 f"use only {', '.join(sorted(SUPPORTED_HARNESSES))}",
             )
+        for name in sorted({n for n in names if names.count(n) > 1}):
+            fail(f"duplicate harness '{name}'", "list each harness once")
 
     task = data.get("task")
     if not isinstance(task, str) or not task.strip():
@@ -236,6 +309,19 @@ def _validate_case(case: Case, seen_ids: dict[str, pathlib.Path]) -> list[tuple[
             f"fixture '{fixture}' has no builder",
             f"create {case.fixture_build().relative_to(ROOT)}",
         )
+
+    for field in ("task", "invocation", "expected_behavior"):
+        text = data.get(field)
+        if not isinstance(text, str):
+            continue
+        lowered = text.lower()
+        named = sorted({word for word in HARNESS_VOCABULARY if word in lowered})
+        if named:
+            fail(
+                f"'{field}' names a harness: {', '.join(named)}",
+                "state the behaviour, not the harness — the same text is sent to every "
+                "selected harness",
+            )
 
     asserts = data.get("assert")
     if not isinstance(asserts, list) or not asserts:

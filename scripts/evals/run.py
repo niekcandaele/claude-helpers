@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Evaluate one case on one harness and save the report.
+"""Evaluate one case on one or more harnesses and save the reports.
 
-preflight → prepare → preview → execute → summarize. The preview prints the
-whole planned cost on one screen and then proceeds: it is there so the
-maintainer can see what a trial will spend, not to ask permission twice.
+preflight → prepare → preview → execute → summarize, once per selected harness,
+serially. The preview prints the whole planned cost on one screen — every trial
+it is about to run — and then proceeds: it is there so the maintainer can see
+what an evaluation will spend, not to ask permission twice.
+
+Results are kept per harness and are never combined. One harness passing says
+nothing about the other, so this prints no aggregate figure and stores none.
 """
 
 from __future__ import annotations
@@ -24,18 +28,27 @@ import prepare as prepare_module  # noqa: E402
 import preflight as preflight_module  # noqa: E402
 import summarize as summarize_module  # noqa: E402
 
-# Measured on an isolated HOME and CODEX_HOME: whatever the case stages, Codex
-# also offers these. They are unavoidable harness-provided context, not a
-# defect — but anything else appearing beside them means isolation regressed.
-HARNESS_PROVIDED_SKILLS = [
-    "imagegen",
-    "openai-docs",
-    "plugin-creator",
-    "skill-creator",
-    "skill-installer",
-    "deep-research-work:deep-research",
-    "plugin-management:plugin-management",
-]
+# Measured on an isolated HOME and harness config directory: whatever the case
+# stages, the harness also offers these. They are unavoidable harness-provided
+# context, not a defect — and they vary by machine, so treat every list as a
+# superset and never assert equality. What *is* a regression is a repository
+# skill other than the staged one appearing beside them.
+HARNESS_PROVIDED_SKILLS = {
+    "codex": [
+        "imagegen",
+        "openai-docs",
+        "plugin-creator",
+        "skill-creator",
+        "skill-installer",
+        "deep-research-work:deep-research",
+        "plugin-management:plugin-management",
+    ],
+    # Claude Code's own bundled catalog. What the pilot's probe reported is
+    # narrower than what the harness actually ships: the harness enumerates its
+    # skills poorly when asked, so this list is the observed answer and not a
+    # promise. `disableBundledSkills` is the lever if it ever matters.
+    "claude-code": ["code-review"],
+}
 
 # Asking for JSON rather than prose: a line-by-line reading of an English
 # answer turns stray words into phantom skills, and a phantom skill reads as an
@@ -48,136 +61,262 @@ PROBE_PROMPT = (
 )
 
 
-def preview(case: cases_module.Case, harness: str, paths: dict, run_dir: pathlib.Path, double: str | None) -> None:
+class Planned:
+    """One trial this invocation intends to run."""
+
+    def __init__(self, harness: str, evaluation_id: str, double: str | None):
+        self.harness = harness
+        self.evaluation_id = evaluation_id
+        self.double = double
+        self.supported = True
+
+    @property
+    def run_dir(self) -> pathlib.Path:
+        return prepare_module.runs_dir() / self.evaluation_id
+
+    @property
+    def work_dir(self) -> pathlib.Path:
+        return prepare_module.work_dir() / self.evaluation_id
+
+
+def preview(case: cases_module.Case, plans: list[Planned]) -> None:
     lines = [
         "",
         "── planned evaluation ─────────────────────────────────────────",
         f"  case                {case.id}",
         f"  skill               {case.skill}",
         f"  kind                {case.kind}",
-        f"  harness             {harness}" + (f" (provider double: {double})" if double else ""),
-        f"  requested model     {prepare_module.requested_model()}",
-        "  arms                1 (candidate)",
-        "  repetitions         1",
-        "  concurrency         1",
-        "  model-judge passes  0",
-        "  caching             disabled",
-        f"  trial timeout       {execute_module.timeout_seconds()}s",
-        f"  workspace           {paths['workspace']}",
-        f"  results             {run_dir}",
+        f"  trials              {len(plans)} (one per harness, run serially)",
+        "",
+    ]
+    for index, plan in enumerate(plans, start=1):
+        suffix = f" (provider double: {plan.double})" if plan.double else ""
+        lines.append(f"  [{index}] harness         {plan.harness}{suffix}")
+        if not plan.supported:
+            lines.append("      not executed    the case does not declare this harness")
+        else:
+            lines.append(
+                f"      requested model {prepare_module.requested_model(plan.harness)}"
+            )
+            lines.append(f"      workspace       {plan.work_dir / 'workspace'}")
+        lines.append(f"      results         {plan.run_dir}")
+    lines += [
+        "",
+        "  arms                1 (candidate)      repetitions   1",
+        "  concurrency         1                  judge passes  0",
+        f"  caching             disabled           trial timeout {execute_module.timeout_seconds()}s",
         "───────────────────────────────────────────────────────────────",
         "",
     ]
     print("\n".join(lines))
 
 
-def _auth_record(route: str, double: str | None) -> dict:
+def _auth_record(harness: str, route: str, double: str | None) -> dict:
     if double:
         return {
             "route": "provider-double",
-            "auth_mode": None,
-            "auth_mode_reason": "a provider double stood in for the harness; no credentials were used",
+            "auth_method": None,
+            "auth_method_reason": "a provider double stood in for the harness; no credentials were used",
+            "api_provider": None,
+            "subscription_type": None,
             "source": None,
         }
+    env = dict(os.environ)
+    if harness == "codex":
+        return {
+            "route": route,
+            "auth_method": "chatgpt",
+            "api_provider": "openai",
+            "subscription_type": None,
+            "source": str(preflight_module.codex_home(env) / "auth.json"),
+        }
+    # Deliberately not email, orgId or orgName: the trial's identity is the
+    # subscription route, not the person holding it.
+    status, _ = preflight_module.claude_auth_status(env)
+    status = status or {}
     return {
         "route": route,
-        "auth_mode": "chatgpt",
-        "source": str(preflight_module.codex_home(dict(os.environ)) / "auth.json"),
+        "auth_method": status.get("authMethod"),
+        "api_provider": status.get("apiProvider"),
+        "subscription_type": status.get("subscriptionType"),
+        "source": str(preflight_module.claude_config_dir(env) / ".credentials.json"),
     }
 
 
-def trial(
+def parse_doubles(spec: str | None, harnesses: list[str]) -> dict[str, str | None]:
+    """One double spec applied to every harness, or per-harness pairs.
+
+    `respond:<file>` stands in for all of them; `codex=respond:<file>,
+    claude-code=empty` gives each its own, which is how a mixed outcome can be
+    reproduced without credentials.
+    """
+    if not spec:
+        return {harness: None for harness in harnesses}
+    pairs: dict[str, str | None] = {}
+    per_harness = all(
+        "=" in part and part.split("=", 1)[0] in cases_module.SUPPORTED_HARNESSES
+        for part in spec.split(",")
+        if part
+    )
+    if not per_harness:
+        return {harness: spec for harness in harnesses}
+    for part in spec.split(","):
+        if not part:
+            continue
+        name, _, value = part.partition("=")
+        pairs[name] = value
+    missing = [harness for harness in harnesses if harness not in pairs]
+    if missing:
+        raise SystemExit(
+            f"✗ --provider-double names no double for: {', '.join(missing)}\n"
+            "    → give every selected harness one, or pass a single bare spec for all of them"
+        )
+    return {harness: pairs[harness] for harness in harnesses}
+
+
+def run(
     case: cases_module.Case,
     *,
-    harness: str,
+    harnesses: list[str],
     provider_double: str | None,
     probe: bool = False,
 ) -> int:
+    doubles = parse_doubles(provider_double, harnesses)
+    live = [harness for harness in harnesses if not doubles[harness]]
+
     try:
-        route = preflight_module.preflight(
-            case, require_harness_auth=not provider_double
+        routes = preflight_module.preflight(
+            case,
+            harnesses=harnesses,
+            provider_configs=prepare_module.provider_configs(case, live),
+            require_harness_auth=bool(live),
         )
     except preflight_module.PreflightError as exc:
         preflight_module.report(exc.failures)
         return 1
+    except prepare_module.PrepareError as exc:
+        print(f"✗ {exc}", file=sys.stderr)
+        return 1
 
     suffix = "-probe" if probe else ""
-    evaluation_id = prepare_module.new_evaluation_id(case.id, harness) + suffix
-    run_dir = prepare_module.runs_dir() / evaluation_id
-    if run_dir.exists():
-        print(
-            f"✗ {run_dir} already exists\n"
-            "    → saved evidence is never overwritten; delete that trial directory "
-            "or wait a second and evaluate again",
-            file=sys.stderr,
+    plans = []
+    for harness in harnesses:
+        evaluation_id = (
+            prepare_module.new_evaluation_id(case.id, harness, distinguish=len(harnesses) > 1)
+            + suffix
         )
-        return 1
+        plan = Planned(harness, evaluation_id, doubles[harness])
+        # A probe asks the harness what it can see; whether the case claims the
+        # harness is beside the point.
+        plan.supported = probe or harness in case.harnesses
+        plans.append(plan)
+
+    for plan in plans:
+        if plan.run_dir.exists():
+            print(
+                f"✗ {plan.run_dir} already exists\n"
+                "    → saved evidence is never overwritten; delete that trial directory "
+                "or wait a second and evaluate again",
+                file=sys.stderr,
+            )
+            return 1
+
+    preview(case, plans)
+
+    outcomes: list[tuple[Planned, dict]] = []
+    for plan in plans:
+        outcome = _one_trial(case, plan, routes[plan.harness], probe)
+        if outcome is None:
+            return 1
+        outcomes.append((plan, outcome))
+
+    return _report(outcomes, probe)
+
+
+def _one_trial(
+    case: cases_module.Case, plan: Planned, route: str, probe: bool
+) -> dict | None:
+    started = dt.datetime.now(dt.timezone.utc)
+    plan.run_dir.mkdir(parents=True)
+
+    trial = {
+        "evaluation_id": plan.evaluation_id,
+        "harness": plan.harness,
+        "arm": "candidate",
+        "started_at": started.isoformat(),
+        "ended_at": started.isoformat(),
+    }
+
+    if not plan.supported:
+        return summarize_module.save_unsupported(case, plan.run_dir, plan.harness, trial)
 
     try:
         paths = prepare_module.prepare(
             case,
-            evaluation_id,
-            harness=harness,
-            provider_double=provider_double,
+            plan.evaluation_id,
+            harness=plan.harness,
+            provider_double=plan.double,
             prompt_override=PROBE_PROMPT if probe else None,
             description=f"{case.id}-probe" if probe else None,
             include_asserts=not probe,
         )
     except prepare_module.PrepareError as exc:
-        print(f"✗ {exc}", file=sys.stderr)
-        return 1
+        print(f"✗ {plan.harness}: {exc}", file=sys.stderr)
+        return None
 
-    run_dir.mkdir(parents=True)
-    preview(case, harness, paths, run_dir, provider_double)
-
-    started = dt.datetime.now(dt.timezone.utc)
     monotonic = time.monotonic()
-    execution = execute_module.execute(paths, run_dir)
+    execution = execute_module.execute(paths, plan.run_dir)
     execution["timeout_s"] = execute_module.timeout_seconds()
-    ended = dt.datetime.now(dt.timezone.utc)
 
-    harness_skills = []
+    harness_skills: list[str] = []
     isolation_intact = True
     if probe:
-        harness_skills, isolation_intact = _write_probe_context(run_dir, case, paths)
+        harness_skills, isolation_intact = _write_probe_context(plan, case, paths)
 
-    result = summarize_module.summarize(
-        case,
-        run_dir,
-        paths,
-        execution,
-        {
-            "evaluation_id": evaluation_id,
-            "harness": harness,
-            "arm": "candidate",
-            "started_at": started.isoformat(),
-            "ended_at": ended.isoformat(),
-            "duration_ms": int((time.monotonic() - monotonic) * 1000),
-            "auth": _auth_record(route, provider_double),
-            "harness_provided_skills": harness_skills or HARNESS_PROVIDED_SKILLS,
-        },
+    trial["ended_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    trial["duration_ms"] = int((time.monotonic() - monotonic) * 1000)
+    trial["auth"] = _auth_record(plan.harness, route, plan.double)
+    trial["harness_provided_skills"] = harness_skills or HARNESS_PROVIDED_SKILLS[plan.harness]
+
+    result = summarize_module.summarize(case, plan.run_dir, paths, execution, trial)
+    result["isolation_intact"] = isolation_intact
+    return result
+
+
+def _report(outcomes: list[tuple[Planned, dict]], probe: bool) -> int:
+    print("")
+    width = max(len(plan.harness) for plan, _ in outcomes)
+    for plan, result in outcomes:
+        print(f"{plan.harness.ljust(width)}  {result['status']}: {result['reason']}")
+        print(f"{' ' * width}  evidence   {plan.run_dir}")
+    print(f"{' ' * width}  viewer     just eval-view")
+    print(
+        "\nResults are per harness. A result on one harness says nothing about the other.\n"
     )
-
-    print(f"{result['status']}: {result['reason']}")
-    print(f"  evidence   {run_dir}")
-    print(f"  report     {run_dir / 'results.html'}")
-    print("  viewer     just eval-view")
 
     if probe:
         # A probe grades nothing; what it can fail at is isolation.
-        return 0 if isolation_intact and result["status"] != summarize_module.STATUS_EXECUTION_ERROR else 1
-    return 0 if result["status"] == summarize_module.STATUS_PASSED else 1
+        return (
+            0
+            if all(
+                result.get("isolation_intact")
+                and result["status"] != summarize_module.STATUS_EXECUTION_ERROR
+                for _, result in outcomes
+            )
+            else 1
+        )
+    return 0 if all(result["status"] == summarize_module.STATUS_PASSED for _, result in outcomes) else 1
 
 
 def _write_probe_context(
-    run_dir: pathlib.Path, case: cases_module.Case, paths: dict
+    plan: Planned, case: cases_module.Case, paths: dict
 ) -> tuple[list[str], bool]:
     """Record what the harness actually had in front of it, and shout if a skill
     the case never staged turns up.
 
     Returns the harness-provided skills observed, and whether isolation held.
     """
-    results_path = run_dir / "results.json"
+    results_path = plan.run_dir / "results.json"
     output = ""
     if results_path.is_file():
         data = json.loads(results_path.read_text(encoding="utf-8"))
@@ -187,33 +326,37 @@ def _write_probe_context(
 
     catalog, instruction_files, parse_error = _parse_probe(output)
 
-    expected = set(HARNESS_PROVIDED_SKILLS) | {case.skill}
+    known = HARNESS_PROVIDED_SKILLS[plan.harness]
+    expected = set(known) | {case.skill}
     unexpected = sorted(set(catalog or []) - expected)
     context = {
         "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(),
-        "model_requested": prepare_module.requested_model(),
+        "harness": plan.harness,
+        "model_requested": prepare_module.requested_model(plan.harness),
         "staged_skill": case.skill,
-        "expected_harness_provided_skills": HARNESS_PROVIDED_SKILLS,
+        "expected_harness_provided_skills": known,
         "observed_catalog": catalog,
         "observed_catalog_reason": parse_error,
         "observed_instruction_files": instruction_files,
         "unexpected_entries": unexpected,
         "raw_response": output,
         "workspace": str(paths["workspace"]),
+        "harness_home": str(paths["harness_home"]),
     }
-    (run_dir / "harness-context.json").write_text(
+    (plan.run_dir / "harness-context.json").write_text(
         json.dumps(context, indent=2) + "\n", encoding="utf-8"
     )
 
     if unexpected:
         print(
-            "⚠ the harness offered skills this case never staged: "
+            f"⚠ {plan.harness} offered skills this case never staged: "
             + ", ".join(unexpected)
-            + "\n    → isolation has regressed; check the HOME and CODEX_HOME overrides "
-            "before trusting any result",
+            + "\n    → the recorded catalog varies by machine, so add genuinely "
+            "harness-provided entries to HARNESS_PROVIDED_SKILLS; a *repository* "
+            "skill here means isolation has regressed",
             file=sys.stderr,
         )
-    return sorted(set(catalog or []) & set(HARNESS_PROVIDED_SKILLS)), not unexpected
+    return sorted(set(catalog or []) & set(known)), not unexpected
 
 
 def _parse_probe(output: str) -> tuple[list[str] | None, list[str] | None, str | None]:
@@ -242,17 +385,25 @@ def _parse_probe(output: str) -> tuple[list[str] | None, list[str] | None, str |
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--case", help="case id; the probe defaults to the first case")
-    parser.add_argument("--harness", default="codex", choices=sorted(cases_module.SUPPORTED_HARNESSES))
+    parser.add_argument(
+        "--harness",
+        default="codex",
+        help="a harness name, a comma-separated list, or 'both'/'all'",
+    )
     parser.add_argument(
         "--probe",
         action="store_true",
-        help="one cheap call that records the effective skill catalog instead of grading",
+        help="one cheap call per harness that records the effective skill catalog "
+        "instead of grading",
     )
     parser.add_argument(
         "--provider-double",
-        help="stand in for the harness: respond:<file>, error[:<message>], or empty",
+        help="stand in for the harness: respond:<file>, error[:<message>] or empty, "
+        "either bare for every harness or as <harness>=<spec> pairs",
     )
     args = parser.parse_args(argv)
+
+    harnesses = cases_module.resolve_harnesses(args.harness)
 
     if args.case:
         case = cases_module.load(args.case)
@@ -263,9 +414,9 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         case = discovered[0]
 
-    return trial(
+    return run(
         case,
-        harness=args.harness,
+        harnesses=harnesses,
         provider_double=args.provider_double,
         probe=args.probe,
     )
